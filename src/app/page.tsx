@@ -164,9 +164,9 @@ export default function Home() {
             {[
               {
                 icon: RefreshCw,
-                value: "60s",
-                label: "Live data refresh",
-                detail: "Faster tiers coming soon",
+                value: "5s",
+                label: "Fastest refresh",
+                detail: "Pro: 5s · Premium: real-time",
               },
               {
                 icon: Layers,

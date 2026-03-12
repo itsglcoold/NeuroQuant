@@ -262,6 +262,25 @@ export default function PricingPage() {
           </div>
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="border-t border-border py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
+            <p className="text-xs text-muted-foreground">
+              &copy; {new Date().getFullYear()} NeuroQuant. All rights reserved.
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+              <Link href="/pricing" className="text-xs text-muted-foreground transition-colors hover:text-foreground">Pricing</Link>
+              <Link href="/dashboard" className="text-xs text-muted-foreground transition-colors hover:text-foreground">Dashboard</Link>
+              <Link href="/auth/login" className="text-xs text-muted-foreground transition-colors hover:text-foreground">Sign In</Link>
+              <Link href="/legal/terms" className="text-xs text-muted-foreground transition-colors hover:text-foreground">Terms</Link>
+              <Link href="/legal/privacy" className="text-xs text-muted-foreground transition-colors hover:text-foreground">Privacy</Link>
+              <Link href="/legal/risk-disclosure" className="text-xs text-muted-foreground transition-colors hover:text-foreground">Risk Disclosure</Link>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
