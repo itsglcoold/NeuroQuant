@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Check, BarChart3, ArrowLeft } from "lucide-react";
+import { Check, BarChart3, ArrowLeft, Clock } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   Card,
@@ -10,7 +10,21 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 
-const plans = [
+interface Feature {
+  text: string;
+  soon?: boolean;
+}
+
+const plans: {
+  name: string;
+  price: string;
+  period: string;
+  description: string;
+  highlighted: boolean;
+  features: Feature[];
+  cta: string;
+  href: string;
+}[] = [
   {
     name: "Free",
     price: "$0",
@@ -18,12 +32,12 @@ const plans = [
     description: "Explore AI-powered market insights — no card needed",
     highlighted: false,
     features: [
-      "3 AI analyses per day",
-      "5 markets (Gold, EUR/USD & more)",
-      "60-second data refresh",
-      "Single AI model analysis",
-      "Daily market summary",
-      "Community support",
+      { text: "3 AI analyses per day" },
+      { text: "5 markets (Gold, EUR/USD & more)" },
+      { text: "60-second data refresh" },
+      { text: "Single AI model analysis" },
+      { text: "Daily market summary", soon: true },
+      { text: "Community support" },
     ],
     cta: "Start Free",
     href: "/auth/signup",
@@ -35,14 +49,14 @@ const plans = [
     description: "For traders who want an edge — faster data, smarter AI",
     highlighted: true,
     features: [
-      "50 AI analyses per day",
-      "All 25+ markets covered",
-      "5-second data refresh",
-      "Triple-AI consensus engine",
-      "Upload charts for AI pattern recognition",
-      "RSI, MACD, Bollinger & more indicators",
-      "Custom alerts & notifications",
-      "Priority support",
+      { text: "50 AI analyses per day" },
+      { text: "All 25+ markets covered" },
+      { text: "5-second data refresh", soon: true },
+      { text: "Triple-AI consensus engine" },
+      { text: "Upload charts for AI pattern recognition" },
+      { text: "RSI, MACD, Bollinger & more indicators" },
+      { text: "Custom alerts & notifications", soon: true },
+      { text: "Priority support" },
     ],
     cta: "Start Pro Trial",
     href: "/auth/signup?plan=pro",
@@ -54,17 +68,17 @@ const plans = [
     description: "Institutional-grade tools — built for serious professionals",
     highlighted: false,
     features: [
-      "Unlimited AI analyses",
-      "All 25+ markets covered",
-      "Real-time data refresh",
-      "Triple-AI consensus engine",
-      "Upload charts for AI pattern recognition",
-      "Advanced technical indicators",
-      "Custom alerts & notifications",
-      "AI Chat — ask anything about any market",
-      "Historical analysis reports",
-      "API access for your own tools",
-      "Dedicated 1-on-1 support",
+      { text: "Unlimited AI analyses" },
+      { text: "All 25+ markets covered" },
+      { text: "Real-time data refresh", soon: true },
+      { text: "Triple-AI consensus engine" },
+      { text: "Upload charts for AI pattern recognition" },
+      { text: "Advanced technical indicators" },
+      { text: "Custom alerts & notifications", soon: true },
+      { text: "AI Chat — ask anything about any market" },
+      { text: "Historical analysis reports", soon: true },
+      { text: "API access for your own tools", soon: true },
+      { text: "Dedicated 1-on-1 support" },
     ],
     cta: "Start Premium Trial",
     href: "/auth/signup?plan=premium",
@@ -157,11 +171,22 @@ export default function PricingPage() {
                   <ul className="space-y-3">
                     {plan.features.map((feature) => (
                       <li
-                        key={feature}
+                        key={feature.text}
                         className="flex items-start gap-2.5 text-sm"
                       >
-                        <Check className={`mt-0.5 h-4 w-4 shrink-0 ${plan.highlighted ? "text-cyan-400" : "text-blue-500"}`} />
-                        <span className={plan.highlighted ? "text-foreground/90" : "text-foreground/80"}>{feature}</span>
+                        {feature.soon ? (
+                          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                        ) : (
+                          <Check className={`mt-0.5 h-4 w-4 shrink-0 ${plan.highlighted ? "text-cyan-400" : "text-blue-500"}`} />
+                        )}
+                        <span className={feature.soon ? "text-muted-foreground" : plan.highlighted ? "text-foreground/90" : "text-foreground/80"}>
+                          {feature.text}
+                          {feature.soon && (
+                            <span className="ml-1.5 inline-flex items-center rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                              SOON
+                            </span>
+                          )}
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -210,7 +235,7 @@ export default function PricingPage() {
               },
               {
                 q: "How fast is the data refresh?",
-                a: "Free: every 60 seconds. Pro: every 5 seconds. Premium: real-time streaming. Faster data means faster decisions — critical for scalping and day trading.",
+                a: "Currently all plans refresh every 60 seconds. We're rolling out faster tiers soon — Pro will get 5-second refresh, Premium gets real-time streaming. Faster data means faster decisions.",
               },
               {
                 q: "Can I upload my own charts?",

@@ -16,9 +16,11 @@ import {
   ChevronDown,
   ChevronRight,
   Home,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useUsageTracking } from "@/hooks/useUsageTracking";
 import {
   Sheet,
   SheetContent,
@@ -45,6 +47,7 @@ interface NavItem {
   label: string;
   href?: string;
   icon: typeof BarChart3;
+  badge?: "PRO" | "PREMIUM";
   children?: MarketChild[];
 }
 
@@ -90,6 +93,7 @@ const navItems: NavItem[] = [
     label: "Chart Upload",
     href: "/dashboard/upload",
     icon: Upload,
+    badge: "PRO",
   },
   {
     label: "AI Chat",
@@ -221,7 +225,17 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                 )}
               >
                 <item.icon className="h-4 w-4" />
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {item.badge && (
+                  <span className={cn(
+                    "rounded px-1 py-0.5 text-[9px] font-bold leading-none",
+                    item.badge === "PRO"
+                      ? "bg-blue-500/10 text-blue-500"
+                      : "bg-amber-500/10 text-amber-500"
+                  )}>
+                    {item.badge}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -232,19 +246,69 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 
       {/* Bottom section */}
       <div className="p-4">
-        <div className="rounded-lg border border-border bg-secondary/50 p-3">
-          <p className="text-xs font-medium text-foreground/80">Free Plan</p>
-          <p className="mt-0.5 text-[10px] text-muted-foreground">
-            3 analyses remaining today
-          </p>
-          <Link
-            href="/pricing"
-            className="mt-2 block rounded-md bg-gradient-to-r from-blue-500 to-cyan-500 py-1 text-center text-[11px] font-medium text-white transition-opacity hover:opacity-90"
-          >
-            Upgrade to Pro
-          </Link>
-        </div>
+        <UsageWidget />
       </div>
+    </div>
+  );
+}
+
+function UsageWidget() {
+  const { tier, analysesRemaining, analysesTotal } = useUsageTracking();
+  const usedPercent = analysesTotal === Infinity
+    ? 0
+    : ((analysesTotal - analysesRemaining) / analysesTotal) * 100;
+
+  const tierLabel = tier === "free" ? "Free Plan" : tier === "pro" ? "Pro Plan" : "Premium Plan";
+  const isLow = analysesRemaining <= 1 && tier === "free";
+
+  if (tier === "premium") {
+    return (
+      <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+        <div className="flex items-center gap-1.5">
+          <Zap className="h-3.5 w-3.5 text-amber-500" />
+          <p className="text-xs font-medium text-foreground/80">{tierLabel}</p>
+        </div>
+        <p className="mt-0.5 text-[10px] text-muted-foreground">
+          Unlimited analyses
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn(
+      "rounded-lg border p-3",
+      isLow ? "border-red-500/30 bg-red-500/5" : "border-border bg-secondary/50"
+    )}>
+      <p className="text-xs font-medium text-foreground/80">{tierLabel}</p>
+      <p className={cn(
+        "mt-0.5 text-[10px]",
+        isLow ? "font-semibold text-red-500" : "text-muted-foreground"
+      )}>
+        {analysesRemaining} of {analysesTotal} analyses remaining
+      </p>
+      {/* Progress bar */}
+      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-border">
+        <div
+          className={cn(
+            "h-full rounded-full transition-all",
+            isLow
+              ? "bg-red-500"
+              : usedPercent > 60
+                ? "bg-amber-500"
+                : "bg-blue-500"
+          )}
+          style={{ width: `${usedPercent}%` }}
+        />
+      </div>
+      {tier === "free" && (
+        <Link
+          href="/pricing"
+          className="mt-2 block rounded-md bg-gradient-to-r from-blue-500 to-cyan-500 py-1 text-center text-[11px] font-medium text-white transition-opacity hover:opacity-90"
+        >
+          Upgrade to Pro
+        </Link>
+      )}
     </div>
   );
 }

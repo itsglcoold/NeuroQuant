@@ -4,8 +4,11 @@ import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Upload, X, Image as ImageIcon, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Upload, X, Image as ImageIcon, TrendingUp, TrendingDown, Minus, Lock } from "lucide-react";
 import { ChartAnalysisResult } from "@/types/analysis";
+import { useUsageTracking } from "@/hooks/useUsageTracking";
+import { UpgradeModal } from "@/components/dashboard/UpgradeModal";
+import Link from "next/link";
 
 export default function ChartUploadPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -14,6 +17,29 @@ export default function ChartUploadPage() {
   const [result, setResult] = useState<ChartAnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { canAccessFeature, getRequiredTier } = useUsageTracking();
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const hasAccess = canAccessFeature("chart-upload");
+
+  if (!hasAccess) {
+    return (
+      <div className="mx-auto max-w-2xl py-20 text-center">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-500/10">
+          <Lock className="h-8 w-8 text-blue-500" />
+        </div>
+        <h1 className="text-2xl font-bold">Chart Upload is a Pro Feature</h1>
+        <p className="mt-2 text-muted-foreground">
+          Upload any chart screenshot and let our AI detect patterns, support/resistance levels, and formations automatically.
+        </p>
+        <Link
+          href="/pricing"
+          className="mt-6 inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-3 text-sm font-medium text-white hover:shadow-lg hover:shadow-blue-500/25"
+        >
+          Upgrade to Pro — $19.99/mo
+        </Link>
+      </div>
+    );
+  }
 
   function handleFileSelect(selectedFile: File) {
     const allowedTypes = ["image/png", "image/jpeg", "image/webp"];

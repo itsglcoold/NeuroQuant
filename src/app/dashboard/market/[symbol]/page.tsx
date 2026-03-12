@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TradingChart } from "@/components/dashboard/TradingChart";
 import { MarketSwitcher } from "@/components/dashboard/MarketSwitcher";
+import { UpgradeModal } from "@/components/dashboard/UpgradeModal";
 import { getMarketBySymbol, getMarketEmoji, CATEGORY_COLORS } from "@/lib/market/symbols";
+import { useUsageTracking } from "@/hooks/useUsageTracking";
 import { ConsensusResult } from "@/types/analysis";
 import { MarketPrice, TechnicalIndicators } from "@/types/market";
 import {
@@ -110,6 +112,8 @@ export default function MarketDetailPage() {
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [showIndicators, setShowIndicators] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const { canRunAnalysis, consumeAnalysis, analysesRemaining, analysesTotal, tier } = useUsageTracking();
 
   useEffect(() => {
     fetchMarketData();
@@ -138,7 +142,14 @@ export default function MarketDetailPage() {
   }
 
   async function runAnalysis() {
+    if (!canRunAnalysis) {
+      setShowUpgradeModal(true);
+      return;
+    }
+
     setAnalyzing(true);
+    consumeAnalysis();
+
     try {
       const res = await fetch("/api/analysis/technical", {
         method: "POST",
@@ -241,14 +252,29 @@ export default function MarketDetailPage() {
         {/* AI Analysis Panel — 1/3 width */}
         <div className="lg:col-span-1 space-y-4">
           {/* Run Analysis Button */}
-          <Button
-            onClick={runAnalysis}
-            disabled={analyzing}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <BarChart3 className="h-4 w-4 mr-2" />
-            {analyzing ? "Analyzing..." : "Run AI Analysis"}
-          </Button>
+          <div className="space-y-1.5">
+            <Button
+              onClick={runAnalysis}
+              disabled={analyzing}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              {analyzing ? "Analyzing..." : "Run AI Analysis"}
+            </Button>
+            {tier === "free" && analysesTotal !== Infinity && (
+              <p className="text-center text-[10px] text-muted-foreground">
+                {analysesRemaining} of {analysesTotal} free analyses remaining today
+              </p>
+            )}
+          </div>
+
+          <UpgradeModal
+            open={showUpgradeModal}
+            onClose={() => setShowUpgradeModal(false)}
+            feature="ai-analysis"
+            requiredTier="pro"
+            reason="limit-reached"
+          />
 
           {/* Consensus Card */}
           {consensus ? (
