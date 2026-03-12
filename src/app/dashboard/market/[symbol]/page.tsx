@@ -94,7 +94,20 @@ function formatPrice(value: number | null | undefined, decimals: number = 2): st
 }
 
 function getCurrencyPrefix(symbol: string): string {
-  if (symbol.includes("JPY")) return "";
+  // Metals, energy, indices — all priced in USD
+  if (["XAU/USD", "XAG/USD", "CL", "SPX", "IXIC", "DXY"].includes(symbol)) return "$";
+  // Forex pairs: show symbol of the QUOTE currency (right side of pair)
+  if (symbol.includes("/")) {
+    const quote = symbol.split("/")[1];
+    if (quote === "USD") return "$";
+    if (quote === "GBP") return "£";
+    if (quote === "JPY") return "¥";
+    if (quote === "CHF") return "Fr ";
+    if (quote === "CAD") return "C$";
+    if (quote === "AUD") return "A$";
+    if (quote === "NZD") return "NZ$";
+    return "";
+  }
   return "$";
 }
 
