@@ -41,7 +41,7 @@ export default function DashboardLayout({
                 </div>
                 <div>
                   <span className="text-sm font-semibold leading-none">NeuroQuant</span>
-                  <span className="block text-[10px] text-muted-foreground leading-none mt-0.5">AI Analyst Assistant</span>
+                  <span className="block text-[10px] text-muted-foreground leading-none mt-0.5">AI Market Research</span>
                 </div>
               </div>
             </div>

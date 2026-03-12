@@ -5,9 +5,9 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "NeuroQuant — AI Analyst Assistant",
+  title: "NeuroQuant — AI Market Research",
   description:
-    "Your AI analyst assistant for market analysis. Triple-AI consensus engine delivers reliable insights for Gold, Silver, Oil, Forex, and major indices.",
+    "AI-powered market research platform. Triple-AI consensus engine delivers educational insights for Gold, Silver, Oil, Forex, and major indices.",
   keywords: [
     "AI",
     "market analysis",

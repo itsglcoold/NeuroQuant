@@ -100,7 +100,7 @@ export default function PricingPage() {
                 NeuroQuant
               </span>
               <span className="hidden sm:block text-xs font-bold text-foreground leading-none mt-0.5">
-                AI Analyst Assistant
+                AI Market Research
               </span>
             </div>
           </Link>

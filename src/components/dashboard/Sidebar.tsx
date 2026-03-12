@@ -129,7 +129,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
             NeuroQuant
           </span>
           <span className="block text-xs font-bold text-foreground leading-none mt-0.5">
-            AI Analyst Assistant
+            AI Market Research
           </span>
         </div>
       </Link>

@@ -70,7 +70,7 @@ export default function Home() {
                 NeuroQuant
               </span>
               <span className="hidden sm:block text-xs font-bold text-foreground leading-none mt-0.5">
-                AI Analyst Assistant
+                AI Market Research
               </span>
             </div>
           </Link>
@@ -421,7 +421,7 @@ export default function Home() {
               <Image src="/logo.png" alt="NeuroQuant" width={90} height={60} className="h-7 w-auto dark:brightness-100 brightness-0" />
               <div>
                 <span className="text-sm font-semibold leading-none">NeuroQuant</span>
-                <span className="block text-xs font-bold text-foreground leading-none mt-0.5">AI Analyst Assistant</span>
+                <span className="block text-xs font-bold text-foreground leading-none mt-0.5">AI Market Research</span>
               </div>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-6">
