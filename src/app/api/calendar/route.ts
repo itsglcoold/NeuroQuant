@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEconomicCalendar, type ImpactLevel } from "@/lib/market/economic-calendar";
 
+export const runtime = 'edge';
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const country = searchParams.get("country") || undefined;

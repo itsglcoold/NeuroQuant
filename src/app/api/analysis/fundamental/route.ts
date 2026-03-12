@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { analyzeFundamental } from "@/lib/ai/claude";
 import { getPrice, getTechnicalIndicators } from "@/lib/market/eodhd";
 
+export const runtime = 'edge';
+
 export async function POST(request: NextRequest) {
   try {
     const { symbol } = await request.json();

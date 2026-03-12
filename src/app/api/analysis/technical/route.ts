@@ -4,6 +4,8 @@ import { analyzeTechnical as deepseekAnalyze } from "@/lib/ai/deepseek";
 import { analyzeTechnical as qwenAnalyze } from "@/lib/ai/qwen";
 import { calculateConsensus } from "@/lib/ai/consensus";
 
+export const runtime = 'edge';
+
 export async function POST(request: NextRequest) {
   try {
     const { symbol } = await request.json();

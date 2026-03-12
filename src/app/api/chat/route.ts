@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { chatSystemPrompt, DISCLAIMER } from "@/lib/ai/prompts";
 import OpenAI from "openai";
 
+export const runtime = 'edge';
+
 const deepseek = new OpenAI({
   baseURL: "https://api.deepseek.com",
   apiKey: process.env.DEEPSEEK_API_KEY,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,8 @@ import {
   ChevronUp,
   ExternalLink,
 } from "lucide-react";
+
+export const runtime = 'edge';
 
 // ---------------------------------------------------------------------------
 // External links per symbol
@@ -115,11 +117,7 @@ export default function MarketDetailPage() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const { canRunAnalysis, consumeAnalysis, analysesRemaining, analysesTotal, tier } = useUsageTracking();
 
-  useEffect(() => {
-    fetchMarketData();
-  }, [symbol]);
-
-  async function fetchMarketData() {
+  const fetchMarketData = useCallback(async () => {
     setLoading(true);
     try {
       const [quoteRes, indicatorsRes] = await Promise.all([
@@ -139,7 +137,11 @@ export default function MarketDetailPage() {
       console.error("Failed to fetch market data:", error);
     }
     setLoading(false);
-  }
+  }, [symbol]);
+
+  useEffect(() => {
+    fetchMarketData();
+  }, [fetchMarketData]);
 
   async function runAnalysis() {
     if (!canRunAnalysis) {

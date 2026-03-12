@@ -82,7 +82,7 @@ export async function getPrice(symbol: string): Promise<MarketPrice> {
   const eodSymbol = toEodhdSymbol(symbol);
   const data = await fetchEodhd(`real-time/${eodSymbol}`);
 
-  let price = safeFloat(data.close) || safeFloat(data.previousClose);
+  const price = safeFloat(data.close) || safeFloat(data.previousClose);
 
   // If real-time returns all NA, try EOD (end-of-day) data as fallback
   // Use separate EOD ticker if available (e.g. CL → CL.US instead of CLUSD.FOREX)

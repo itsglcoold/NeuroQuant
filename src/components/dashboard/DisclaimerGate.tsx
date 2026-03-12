@@ -48,7 +48,8 @@ export function DisclaimerGate({ children }: { children: React.ReactNode }) {
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    setAccepted(isDisclaimerValid());
+    const valid = isDisclaimerValid();
+    requestAnimationFrame(() => setAccepted(valid));
   }, []);
 
   const handleAccept = () => {
