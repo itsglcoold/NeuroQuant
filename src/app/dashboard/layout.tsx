@@ -25,7 +25,7 @@ export default function DashboardLayout({
 
   return (
     <DisclaimerGate>
-      <div className="flex h-screen bg-background text-foreground">
+      <div className="flex h-screen overflow-hidden bg-background text-foreground">
         {/* Desktop sidebar */}
         <Sidebar />
 
