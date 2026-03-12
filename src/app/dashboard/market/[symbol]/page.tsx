@@ -410,8 +410,9 @@ export default function MarketDetailPage() {
                   {item.label}
                 </span>
                 <span className="text-base font-bold tabular-nums text-foreground">
-                  {prefix}
-                  {formatPrice(item.value, decimals)}
+                  {item.value && item.value > 0
+                    ? `${prefix}${formatPrice(item.value, decimals)}`
+                    : "—"}
                 </span>
               </CardContent>
             </Card>
