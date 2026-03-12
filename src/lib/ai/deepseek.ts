@@ -2,10 +2,12 @@ import OpenAI from "openai";
 import { ModelOutput } from "@/types/analysis";
 import { technicalAnalysisPrompt, buildMarketDataContext } from "./prompts";
 
-const client = new OpenAI({
-  baseURL: "https://api.deepseek.com",
-  apiKey: process.env.DEEPSEEK_API_KEY,
-});
+function getClient() {
+  return new OpenAI({
+    baseURL: "https://api.deepseek.com",
+    apiKey: process.env.DEEPSEEK_API_KEY || "",
+  });
+}
 
 export async function analyzeTechnical(marketData: {
   symbol: string;
@@ -23,7 +25,7 @@ export async function analyzeTechnical(marketData: {
 }): Promise<ModelOutput> {
   const context = buildMarketDataContext(marketData);
 
-  const response = await client.chat.completions.create({
+  const response = await getClient().chat.completions.create({
     model: "deepseek-chat",
     messages: [
       { role: "system", content: technicalAnalysisPrompt("deepseek", marketData.symbol) },

@@ -4,10 +4,12 @@ import OpenAI from "openai";
 
 export const runtime = 'edge';
 
-const deepseek = new OpenAI({
-  baseURL: "https://api.deepseek.com",
-  apiKey: process.env.DEEPSEEK_API_KEY,
-});
+function getDeepseek() {
+  return new OpenAI({
+    baseURL: "https://api.deepseek.com",
+    apiKey: process.env.DEEPSEEK_API_KEY || "",
+  });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,7 +23,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Use DeepSeek for chat (cheapest option)
-    const response = await deepseek.chat.completions.create({
+    const response = await getDeepseek().chat.completions.create({
       model: "deepseek-chat",
       messages: [
         { role: "system", content: chatSystemPrompt() },
