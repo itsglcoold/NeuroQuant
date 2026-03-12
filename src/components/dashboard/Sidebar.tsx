@@ -248,6 +248,16 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
       <div className="p-4">
         <UsageWidget />
       </div>
+
+      {/* Persistent legal disclaimer reminder */}
+      <div className="border-t border-border px-4 py-2.5">
+        <p className="text-[10px] leading-tight text-muted-foreground/60">
+          AI analysis: Not financial advice.{" "}
+          <Link href="/legal/risk-disclosure" className="underline hover:text-muted-foreground transition-colors">
+            Risk Disclosure
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }

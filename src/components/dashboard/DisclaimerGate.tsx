@@ -1,23 +1,36 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { AlertTriangle, ShieldAlert, ExternalLink } from "lucide-react";
 
 const DISCLAIMER_KEY = "disclaimer_accepted";
 const EXPIRY_DAYS = 30;
 
+// Bump this version whenever Terms/Privacy/Risk Disclosure change.
+// Users will be forced to re-accept even if their 30-day window hasn't expired.
+const DISCLAIMER_VERSION = "2026-03";
+
+interface StoredDisclaimer {
+  version: string;
+  timestamp: number;
+}
+
 function isDisclaimerValid(): boolean {
   if (typeof window === "undefined") return false;
-  const stored = localStorage.getItem(DISCLAIMER_KEY);
-  if (!stored) return false;
+  const raw = localStorage.getItem(DISCLAIMER_KEY);
+  if (!raw) return false;
 
   try {
-    const timestamp = Number(stored);
-    if (isNaN(timestamp)) return false;
+    // Support legacy format (plain timestamp) — treat as expired so users re-accept
+    const parsed = JSON.parse(raw) as StoredDisclaimer;
+    if (!parsed.version || !parsed.timestamp) return false;
+    if (parsed.version !== DISCLAIMER_VERSION) return false;
+
     const expiryMs = EXPIRY_DAYS * 24 * 60 * 60 * 1000;
-    return Date.now() - timestamp < expiryMs;
+    return Date.now() - parsed.timestamp < expiryMs;
   } catch {
+    // Legacy plain-number format or corrupted — force re-accept
     return false;
   }
 }
@@ -46,14 +59,40 @@ const riskWarnings = [
 export function DisclaimerGate({ children }: { children: React.ReactNode }) {
   const [accepted, setAccepted] = useState<boolean | null>(null);
   const [checked, setChecked] = useState(false);
+  const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const valid = isDisclaimerValid();
     requestAnimationFrame(() => setAccepted(valid));
   }, []);
 
+  // Detect when user has scrolled to the bottom of the warnings
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    // Consider "at bottom" when within 20px of the end
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 20;
+    if (atBottom) setHasScrolledToBottom(true);
+  }, []);
+
+  // Check on mount if content is short enough to not need scrolling
+  useEffect(() => {
+    if (accepted) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    // If content fits without scrolling, no need to scroll
+    if (el.scrollHeight <= el.clientHeight + 20) {
+      setHasScrolledToBottom(true);
+    }
+  }, [accepted]);
+
   const handleAccept = () => {
-    localStorage.setItem(DISCLAIMER_KEY, String(Date.now()));
+    const data: StoredDisclaimer = {
+      version: DISCLAIMER_VERSION,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem(DISCLAIMER_KEY, JSON.stringify(data));
     setAccepted(true);
   };
 
@@ -87,8 +126,11 @@ export function DisclaimerGate({ children }: { children: React.ReactNode }) {
             </p>
           </div>
 
-          {/* Scrollable warnings */}
-          <div className="max-h-[40vh] overflow-y-auto px-6 py-5">
+          {/* Scrollable warnings — must scroll to bottom to unlock checkbox */}
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            className="max-h-[40vh] overflow-y-auto px-6 py-5">
             <div className="space-y-3">
               {riskWarnings.map((warning, index) => (
                 <div
@@ -136,14 +178,22 @@ export function DisclaimerGate({ children }: { children: React.ReactNode }) {
 
           {/* Footer with checkbox and button */}
           <div className="border-t border-white/5 px-6 pt-5 pb-6">
-            {/* Checkbox */}
-            <label className="group flex cursor-pointer items-start gap-3">
+            {/* Scroll hint — shown until user scrolls to bottom */}
+            {!hasScrolledToBottom && (
+              <p className="mb-3 text-center text-xs text-amber-400/80 animate-pulse">
+                ↓ Scroll down to read all warnings before continuing
+              </p>
+            )}
+
+            {/* Checkbox — disabled until scrolled to bottom */}
+            <label className={`group flex items-start gap-3 ${hasScrolledToBottom ? "cursor-pointer" : "cursor-not-allowed opacity-50"}`}>
               <div className="relative mt-0.5 flex items-center">
                 <input
                   type="checkbox"
                   checked={checked}
+                  disabled={!hasScrolledToBottom}
                   onChange={(e) => setChecked(e.target.checked)}
-                  className="peer h-4.5 w-4.5 cursor-pointer appearance-none rounded border border-zinc-600 bg-zinc-800 transition-colors checked:border-blue-500 checked:bg-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                  className="peer h-4.5 w-4.5 appearance-none rounded border border-zinc-600 bg-zinc-800 transition-colors checked:border-blue-500 checked:bg-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none disabled:cursor-not-allowed"
                 />
                 <svg
                   className="pointer-events-none absolute left-0 h-4.5 w-4.5 text-white opacity-0 peer-checked:opacity-100"
