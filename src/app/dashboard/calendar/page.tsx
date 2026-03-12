@@ -187,6 +187,7 @@ function EventRow({ event }: { event: EconomicEvent }) {
     `${event.title} ${event.country} economic data ${event.date}`
   )}`;
   const investingUrl = `https://www.investing.com/search/?q=${encodeURIComponent(event.title)}`;
+  const yahooUrl = `https://finance.yahoo.com/calendar/economic/?q=${encodeURIComponent(event.title)}`;
   // Build Forex Factory calendar URL for the event's date (format: ?day=mar12.2026)
   const ffDate = (() => {
     const d = new Date(event.date + "T00:00:00");
@@ -362,6 +363,18 @@ function EventRow({ event }: { event: EconomicEvent }) {
                 <text x="12" y="17" textAnchor="middle" fontSize="13" fontWeight="bold" fill="white" fontFamily="Arial">FF</text>
               </svg>
               Forex Factory
+            </a>
+            <a
+              href={yahooUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md border border-[#6001d2]/30 bg-[#f5f0ff] dark:bg-[#1a0f2a] px-3 py-1.5 text-xs font-medium text-[#6001d2] dark:text-[#a78bfa] hover:shadow-sm transition-all"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <rect x="1" y="1" width="22" height="22" rx="4" fill="#6001d2"/>
+                <text x="12" y="17" textAnchor="middle" fontSize="14" fontWeight="bold" fill="white" fontFamily="Arial">Y!</text>
+              </svg>
+              Yahoo Finance
             </a>
           </div>
         </div>

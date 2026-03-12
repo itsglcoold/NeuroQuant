@@ -77,13 +77,13 @@ export async function getMarketNews(options?: {
         const filtered = options?.category
           ? articles.filter((a) => a.category === options.category)
           : articles;
-        return filtered.slice(0, limit);
+        if (filtered.length > 0) return filtered.slice(0, limit);
       }
 
       // If a specific category is requested, fetch targeted news for that category
       if (options?.category) {
         const articles = await fetchNewsByCategory(options.category as MarketCategory, limit);
-        return articles.slice(0, limit);
+        if (articles.length > 0) return articles.slice(0, limit);
       }
 
       // No filter: fetch from multiple categories to ensure coverage
@@ -106,7 +106,12 @@ export async function getMarketNews(options?: {
 
       // Sort by date descending
       unique.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
-      return unique.slice(0, limit);
+
+      // If live API returned results, use them; otherwise fall through to mock
+      if (unique.length > 0) {
+        return unique.slice(0, limit);
+      }
+      console.warn("Live news API returned 0 articles, falling back to mock data");
     } catch (error) {
       console.error("Failed to fetch live news, falling back to mock data:", error);
     }
