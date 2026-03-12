@@ -9,8 +9,8 @@ export const metadata: Metadata = {
 
 export default function PrivacyPolicyPage() {
   return (
-    <article className="prose prose-invert max-w-none prose-headings:text-white prose-p:text-zinc-300 prose-li:text-zinc-300 prose-strong:text-white prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline">
-      <header className="mb-12 border-b border-white/5 pb-8">
+    <article className="prose dark:prose-invert max-w-none prose-headings:text-foreground prose-p:text-muted-foreground prose-li:text-muted-foreground prose-strong:text-foreground prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline">
+      <header className="mb-12 border-b border-border pb-8">
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
           Privacy Policy
         </h1>
@@ -472,7 +472,7 @@ export default function PrivacyPolicyPage() {
         </ul>
       </section>
 
-      <footer className="mt-12 border-t border-white/5 pt-8">
+      <footer className="mt-12 border-t border-border pt-8">
         <p className="text-sm text-zinc-500">
           This Privacy Policy should be read in conjunction with our{" "}
           <Link href="/legal/terms" className="text-blue-400 hover:underline">

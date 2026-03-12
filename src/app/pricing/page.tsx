@@ -1,5 +1,9 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import { Check, BarChart3, ArrowLeft, Clock } from "lucide-react";
+import Image from "next/image";
+import { Check, ArrowLeft, Clock } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   Card,
@@ -20,7 +24,6 @@ const plans: {
   price: string;
   period: string;
   description: string;
-  highlighted: boolean;
   features: Feature[];
   cta: string;
   href: string;
@@ -30,7 +33,6 @@ const plans: {
     price: "$0",
     period: "",
     description: "Explore AI-powered market insights — no card needed",
-    highlighted: false,
     features: [
       { text: "3 AI analyses per day" },
       { text: "5 markets (Gold, EUR/USD & more)" },
@@ -47,7 +49,6 @@ const plans: {
     price: "$19.99",
     period: "/mo",
     description: "For traders who want an edge — faster data, smarter AI",
-    highlighted: true,
     features: [
       { text: "50 AI analyses per day" },
       { text: "All 25+ markets covered" },
@@ -66,7 +67,6 @@ const plans: {
     price: "$49.99",
     period: "/mo",
     description: "Institutional-grade tools — built for serious professionals",
-    highlighted: false,
     features: [
       { text: "Unlimited AI analyses" },
       { text: "All 25+ markets covered" },
@@ -86,20 +86,20 @@ const plans: {
 ];
 
 export default function PricingPage() {
+  const [selectedPlan, setSelectedPlan] = useState("Pro");
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Navigation */}
       <nav className="border-b border-border bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500">
-              <BarChart3 className="h-5 w-5 text-white" />
-            </div>
+            <Image src="/logo.png" alt="NeuroQuant" width={120} height={80} className="h-8 w-auto dark:brightness-100 brightness-0" priority />
             <div>
               <span className="text-lg font-semibold tracking-tight leading-none">
                 NeuroQuant
               </span>
-              <span className="hidden sm:block text-[10px] text-muted-foreground leading-none mt-0.5">
+              <span className="hidden sm:block text-xs font-bold text-foreground leading-none mt-0.5">
                 AI Analyst Assistant
               </span>
             </div>
@@ -135,77 +135,89 @@ export default function PricingPage() {
 
         {/* Pricing Cards */}
         <div className="mt-16 grid gap-6 lg:grid-cols-3 lg:items-start">
-          {plans.map((plan) => (
-            <div key={plan.name} className={`relative ${plan.highlighted ? "pt-4" : ""}`}>
-              {plan.highlighted && (
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 z-10">
-                  <span className="rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-1.5 text-xs font-semibold text-white shadow-lg shadow-blue-500/25">
-                    Most Popular
-                  </span>
-                </div>
-              )}
-              <Card
-                className={`relative flex flex-col ${
-                  plan.highlighted
-                    ? "border-2 border-blue-500 bg-gradient-to-b from-blue-500/10 via-card to-card shadow-2xl shadow-blue-500/10 scale-[1.02] lg:scale-105"
-                    : "ring-1 ring-border"
-                }`}
+          {plans.map((plan) => {
+            const isSelected = selectedPlan === plan.name;
+            return (
+              <div
+                key={plan.name}
+                className={`relative cursor-pointer transition-all duration-300 ${isSelected ? "pt-4" : ""}`}
+                onClick={() => setSelectedPlan(plan.name)}
               >
-                <CardHeader className="pb-2">
-                  <CardTitle className={`text-lg ${plan.highlighted ? "text-blue-400" : ""}`}>
-                    {plan.name}
-                  </CardTitle>
-                  <CardDescription className={plan.highlighted ? "text-foreground/70" : ""}>
-                    {plan.description}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex-1">
-                  <div className="mb-6">
-                    <span className="text-4xl font-bold">
-                      {plan.price}
+                {isSelected && (
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 z-10">
+                    <span className="rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-1.5 text-xs font-semibold text-white shadow-lg shadow-blue-500/25">
+                      {plan.name === "Pro" ? "Most Popular" : "Selected"}
                     </span>
-                    {plan.period && (
-                      <span className="text-muted-foreground">{plan.period}</span>
-                    )}
                   </div>
-                  <ul className="space-y-3">
-                    {plan.features.map((feature) => (
-                      <li
-                        key={feature.text}
-                        className="flex items-start gap-2.5 text-sm"
-                      >
-                        {feature.soon ? (
-                          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                        ) : (
-                          <Check className={`mt-0.5 h-4 w-4 shrink-0 ${plan.highlighted ? "text-cyan-400" : "text-blue-500"}`} />
-                        )}
-                        <span className={feature.soon ? "text-muted-foreground" : plan.highlighted ? "text-foreground/90" : "text-foreground/80"}>
-                          {feature.text}
-                          {feature.soon && (
-                            <span className="ml-1.5 inline-flex items-center rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
-                              SOON
-                            </span>
+                )}
+                <Card
+                  className={`relative flex flex-col transition-all duration-300 ${
+                    isSelected
+                      ? "border-2 border-blue-500 bg-gradient-to-b from-blue-500/10 via-card to-card shadow-2xl shadow-blue-500/10 scale-[1.02] lg:scale-105"
+                      : "ring-1 ring-border hover:ring-blue-500/30"
+                  }`}
+                >
+                  <CardHeader className="pb-2">
+                    <CardTitle className={`text-lg ${isSelected ? "text-blue-400" : ""}`}>
+                      {plan.name}
+                    </CardTitle>
+                    <CardDescription className={isSelected ? "text-foreground/70" : ""}>
+                      {plan.description}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex-1">
+                    <div className="mb-6">
+                      <span className="text-4xl font-bold">
+                        {plan.price}
+                      </span>
+                      {plan.period && (
+                        <span className="text-muted-foreground">{plan.period}</span>
+                      )}
+                    </div>
+                    <ul className="space-y-3">
+                      {plan.features.map((feature) => (
+                        <li
+                          key={feature.text}
+                          className="flex items-start gap-2.5 text-sm"
+                        >
+                          {feature.soon ? (
+                            <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                          ) : (
+                            <Check className={`mt-0.5 h-4 w-4 shrink-0 ${isSelected ? "text-cyan-400" : "text-blue-500"}`} />
                           )}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-                <CardFooter className="border-0 bg-transparent p-4">
-                  <Link
-                    href={plan.href}
-                    className={`block w-full rounded-lg py-2.5 text-center text-sm font-medium transition-all ${
-                      plan.highlighted
-                        ? "bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:shadow-lg hover:shadow-blue-500/25"
-                        : "border border-border bg-secondary text-foreground hover:bg-accent"
-                    }`}
-                  >
-                    {plan.cta}
-                  </Link>
-                </CardFooter>
-              </Card>
-            </div>
-          ))}
+                          <span className={feature.soon ? "text-muted-foreground" : isSelected ? "text-foreground/90" : "text-foreground/80"}>
+                            {feature.text}
+                            {feature.soon && (
+                              <span className="ml-1.5 inline-flex items-center rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                                SOON
+                              </span>
+                            )}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                  <CardFooter className="border-0 bg-transparent p-4">
+                    {isSelected ? (
+                      <Link
+                        href={plan.href}
+                        className="block w-full rounded-lg py-2.5 text-center text-sm font-semibold transition-all bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:shadow-lg hover:shadow-blue-500/25"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {plan.cta}
+                      </Link>
+                    ) : (
+                      <span
+                        className="block w-full rounded-lg py-2.5 text-center text-sm font-medium border border-border/50 bg-muted/50 text-muted-foreground cursor-not-allowed opacity-50"
+                      >
+                        {plan.cta}
+                      </span>
+                    )}
+                  </CardFooter>
+                </Card>
+              </div>
+            );
+          })}
         </div>
 
         {/* Trust signals */}

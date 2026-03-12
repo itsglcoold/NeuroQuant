@@ -172,15 +172,15 @@ export default function MarketDetailPage() {
   }
 
   const directionIcon = {
-    bullish: <TrendingUp className="h-4 w-4 text-green-500" />,
-    bearish: <TrendingDown className="h-4 w-4 text-red-500" />,
-    neutral: <Minus className="h-4 w-4 text-yellow-500" />,
+    bullish: <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />,
+    bearish: <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />,
+    neutral: <Minus className="h-4 w-4 text-amber-600 dark:text-amber-400" />,
   };
 
   const directionColor = {
-    bullish: "bg-green-500/10 text-green-500 border-green-500/20",
-    bearish: "bg-red-500/10 text-red-500 border-red-500/20",
-    neutral: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
+    bullish: "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20",
+    bearish: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
+    neutral: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
   };
 
   const decimals = getPriceDecimals(price?.price);
@@ -543,20 +543,20 @@ function IndicatorRow({
   value: string;
   signal?: string;
 }) {
-  const signalColor =
+  const signalStyle =
     signal === "Bullish" || signal === "Oversold"
-      ? "text-green-500"
+      ? "text-green-600 dark:text-green-400 bg-green-500/10"
       : signal === "Bearish" || signal === "Overbought"
-        ? "text-red-500"
-        : "text-yellow-500";
+        ? "text-red-600 dark:text-red-400 bg-red-500/10"
+        : "text-amber-600 dark:text-amber-400 bg-amber-500/10";
 
   return (
     <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
       <span className="text-xs text-foreground/80">{label}</span>
-      <div className="text-right">
+      <div className="flex items-center gap-2">
         <span className="text-xs font-mono tabular-nums">{value}</span>
         {signal && (
-          <span className={`block text-[10px] ${signalColor}`}>{signal}</span>
+          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${signalStyle}`}>{signal}</span>
         )}
       </div>
     </div>
