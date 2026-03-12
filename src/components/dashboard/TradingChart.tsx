@@ -320,7 +320,7 @@ export function TradingChart({ symbol, height = 400 }: TradingChartProps) {
       {/* Timeframe selector */}
       <div className="flex items-center gap-1 mb-2 flex-wrap">
         {/* Scalp group */}
-        <span className="mr-1 text-[11px] font-bold uppercase tracking-wider text-foreground/50">Scalp</span>
+        <span className="mr-1.5 rounded bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Scalp</span>
         {INTERVALS.filter((iv) => iv.group === "scalp").map((iv) => (
           <button
             key={iv.value}
@@ -338,7 +338,7 @@ export function TradingChart({ symbol, height = 400 }: TradingChartProps) {
         <div className="mx-2 h-4 w-px bg-border" />
 
         {/* Swing group */}
-        <span className="mr-1 text-[11px] font-bold uppercase tracking-wider text-foreground/50">Swing</span>
+        <span className="mr-1.5 rounded bg-blue-500/10 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Swing</span>
         {INTERVALS.filter((iv) => iv.group === "swing").map((iv) => (
           <button
             key={iv.value}
