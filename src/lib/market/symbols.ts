@@ -8,6 +8,11 @@ export const MARKETS: MarketSymbol[] = [
   // Energy
   { symbol: "CL", name: "Crude Oil (WTI)", category: "energy", icon: "OIL", emoji: "\u{1F6E2}\uFE0F" },
 
+  // Indices
+  { symbol: "DXY", name: "US Dollar Index", category: "indices", icon: "DX", emoji: "\u{1F4B5}" },
+  { symbol: "SPX", name: "S&P 500", category: "indices", icon: "SP", emoji: "\u{1F4C8}" },
+  { symbol: "IXIC", name: "NASDAQ", category: "indices", icon: "NQ", emoji: "\u{1F4B9}" },
+
   // Forex — Majors
   { symbol: "EUR/USD", name: "EUR/USD", category: "forex", icon: "EU", emoji: "\u{1F1EA}\u{1F1FA}" },
   { symbol: "GBP/USD", name: "GBP/USD", category: "forex", icon: "GB", emoji: "\u{1F1EC}\u{1F1E7}" },
@@ -37,18 +42,13 @@ export const MARKETS: MarketSymbol[] = [
   { symbol: "AUD/NZD", name: "AUD/NZD", category: "forex", icon: "AN", emoji: "\u{1F1E6}\u{1F1FA}" },
   { symbol: "EUR/AUD", name: "EUR/AUD", category: "forex", icon: "EA", emoji: "\u{1F1EA}\u{1F1FA}" },
   { symbol: "NZD/CAD", name: "NZD/CAD", category: "forex", icon: "NC", emoji: "\u{1F1F3}\u{1F1FF}" },
-
-  // Indices
-  { symbol: "DXY", name: "US Dollar Index", category: "indices", icon: "DX", emoji: "\u{1F4B5}" },
-  { symbol: "SPX", name: "S&P 500", category: "indices", icon: "SP", emoji: "\u{1F4C8}" },
-  { symbol: "IXIC", name: "NASDAQ", category: "indices", icon: "NQ", emoji: "\u{1F4B9}" },
 ];
 
 export const MARKET_CATEGORIES = {
   metals: { label: "Metals", description: "Gold & Silver" },
   energy: { label: "Energy", description: "Crude Oil" },
-  forex: { label: "Forex", description: "Currency Pairs" },
   indices: { label: "Indices", description: "DXY, S&P 500 & NASDAQ" },
+  forex: { label: "Forex", description: "Currency Pairs" },
 } as const;
 
 export const CATEGORY_COLORS: Record<
@@ -67,17 +67,17 @@ export const CATEGORY_COLORS: Record<
     border: "border-l-emerald-500",
     dot: "bg-emerald-500",
   },
-  forex: {
-    bg: "bg-blue-500/20",
-    text: "text-blue-600 dark:text-blue-500",
-    border: "border-l-blue-500",
-    dot: "bg-blue-500",
-  },
   indices: {
     bg: "bg-indigo-500/20",
     text: "text-indigo-600 dark:text-indigo-500",
     border: "border-l-indigo-500",
     dot: "bg-indigo-500",
+  },
+  forex: {
+    bg: "bg-blue-500/20",
+    text: "text-blue-600 dark:text-blue-500",
+    border: "border-l-blue-500",
+    dot: "bg-blue-500",
   },
 } as const;
 

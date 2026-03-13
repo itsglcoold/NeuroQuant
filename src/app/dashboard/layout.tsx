@@ -1,10 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { Sidebar, MobileSidebar } from "@/components/dashboard/Sidebar";
 import { DisclaimerGate } from "@/components/dashboard/DisclaimerGate";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { BarChart3, Bell, User, Settings, CreditCard, LogOut } from "lucide-react";
+import { BarChart3, Bell, User, Settings, CreditCard, LogOut, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -22,6 +24,38 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Client-side auth guard — needed because Cloudflare Pages serves
+  // static pages directly via CDN, bypassing the middleware.
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          router.replace("/auth/login");
+          return;
+        }
+      } catch {
+        router.replace("/auth/login");
+        return;
+      }
+      setAuthChecked(true);
+    };
+    checkAuth();
+  }, [router]);
+
+  if (!authChecked) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Verifying session...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <DisclaimerGate>
@@ -40,8 +74,8 @@ export default function DashboardLayout({
                   <BarChart3 className="h-4 w-4 text-white" />
                 </div>
                 <div>
-                  <span className="text-sm font-semibold leading-none">NeuroQuant</span>
-                  <span className="block text-[10px] text-muted-foreground leading-none mt-0.5">AI Market Research</span>
+                  <span className="text-sm font-bold leading-none">NeuroQuant</span>
+                  <span className="block text-[11px] text-muted-foreground/80 leading-none mt-0.5">AI Market Research</span>
                 </div>
               </div>
             </div>
@@ -76,12 +110,18 @@ export default function DashboardLayout({
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => router.push("/pricing")}>
                     <CreditCard className="h-4 w-4" />
-                    Upgrade Plan
+                    Manage Plan
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     variant="destructive"
-                    onClick={() => router.push("/auth/login")}
+                    onClick={async () => {
+                      const supabase = createClient();
+                      await supabase.auth.signOut();
+                      localStorage.removeItem("nq_tier");
+                      localStorage.removeItem("nq_usage");
+                      router.replace("/");
+                    }}
                   >
                     <LogOut className="h-4 w-4" />
                     Sign Out

@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Check, ArrowLeft, Clock } from "lucide-react";
+import { Check, ArrowLeft, Clock, Crown } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { type UserTier } from "@/hooks/useUsageTracking";
+import { createClient } from "@/lib/supabase/client";
 import {
   Card,
   CardHeader,
@@ -19,16 +21,19 @@ interface Feature {
   soon?: boolean;
 }
 
-const plans: {
+interface Plan {
+  id: UserTier;
   name: string;
   price: string;
   period: string;
   description: string;
   features: Feature[];
-  cta: string;
   href: string;
-}[] = [
+}
+
+const plans: Plan[] = [
   {
+    id: "free",
     name: "Free",
     price: "$0",
     period: "",
@@ -41,10 +46,10 @@ const plans: {
       { text: "Daily market summary", soon: true },
       { text: "Community support" },
     ],
-    cta: "Start Free",
     href: "/auth/signup",
   },
   {
+    id: "pro",
     name: "Pro",
     price: "$19.99",
     period: "/mo",
@@ -54,15 +59,16 @@ const plans: {
       { text: "All 25+ markets covered" },
       { text: "5-second data refresh", soon: true },
       { text: "Triple-AI consensus engine" },
+      { text: "AI Market Research — daily top opportunities" },
       { text: "Upload charts for AI pattern recognition" },
       { text: "RSI, MACD, Bollinger & more indicators" },
       { text: "Custom alerts & notifications", soon: true },
       { text: "Priority support" },
     ],
-    cta: "Start Pro Trial",
     href: "/auth/signup?plan=pro",
   },
   {
+    id: "premium",
     name: "Premium",
     price: "$49.99",
     period: "/mo",
@@ -72,6 +78,7 @@ const plans: {
       { text: "All 25+ markets covered" },
       { text: "Real-time data refresh", soon: true },
       { text: "Triple-AI consensus engine" },
+      { text: "AI Market Research — daily top opportunities" },
       { text: "Upload charts for AI pattern recognition" },
       { text: "Advanced technical indicators" },
       { text: "Custom alerts & notifications", soon: true },
@@ -80,13 +87,55 @@ const plans: {
       { text: "API access for your own tools", soon: true },
       { text: "Dedicated 1-on-1 support" },
     ],
-    cta: "Start Premium Trial",
     href: "/auth/signup?plan=premium",
   },
 ];
 
+const TIER_ORDER: UserTier[] = ["free", "pro", "premium"];
+
+function getCtaLabel(planId: UserTier, currentTier: UserTier | null): string {
+  if (!currentTier) return `Start ${plans.find((p) => p.id === planId)!.name}${planId === "free" ? "" : " Trial"}`;
+  if (planId === currentTier) return "Current Plan";
+  const planIdx = TIER_ORDER.indexOf(planId);
+  const currentIdx = TIER_ORDER.indexOf(currentTier);
+  if (planIdx > currentIdx) return `Upgrade to ${plans.find((p) => p.id === planId)!.name}`;
+  return `Downgrade to ${plans.find((p) => p.id === planId)!.name}`;
+}
+
 export default function PricingPage() {
+  const [currentTier, setCurrentTier] = useState<UserTier | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState("Pro");
+
+  // Check auth directly — don't rely on localStorage
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setCurrentTier(null);
+          setIsLoggedIn(false);
+          return;
+        }
+        setIsLoggedIn(true);
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("subscription_tier")
+          .eq("id", user.id)
+          .single();
+        if (profile?.subscription_tier) {
+          setCurrentTier(profile.subscription_tier as UserTier);
+        } else {
+          setCurrentTier("free");
+        }
+      } catch {
+        setCurrentTier(null);
+        setIsLoggedIn(false);
+      }
+    }
+    checkAuth();
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -107,11 +156,11 @@ export default function PricingPage() {
           <div className="flex items-center gap-3">
             <ThemeToggle />
             <Link
-              href="/"
+              href={isLoggedIn ? "/dashboard" : "/auth/login"}
               className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
               <ArrowLeft className="h-4 w-4" />
-              Back to Home
+              {isLoggedIn ? "Back to Dashboard" : "Sign In"}
             </Link>
           </div>
         </div>
@@ -131,12 +180,20 @@ export default function PricingPage() {
             Choose the plan that fits your trading needs. Upgrade or downgrade
             at any time.
           </p>
+          {isLoggedIn && currentTier && currentTier !== "free" && (
+            <p className="mt-2 text-sm font-medium text-foreground/70">
+              You are currently on the <span className="font-bold text-foreground">{currentTier === "pro" ? "Pro" : "Premium"}</span> plan
+            </p>
+          )}
         </div>
 
         {/* Pricing Cards */}
         <div className="mt-16 grid gap-6 lg:grid-cols-3 lg:items-start">
           {plans.map((plan) => {
             const isSelected = selectedPlan === plan.name;
+            const isCurrent = isLoggedIn && currentTier !== null && plan.id === currentTier;
+            const ctaLabel = getCtaLabel(plan.id, currentTier);
+
             return (
               <div
                 key={plan.name}
@@ -146,7 +203,16 @@ export default function PricingPage() {
                 {isSelected && (
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 z-10">
                     <span className="rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-1.5 text-xs font-semibold text-white shadow-lg shadow-blue-500/25">
-                      {plan.name === "Pro" ? "Most Popular" : "Selected"}
+                      {isCurrent ? "Your Plan" : plan.name === "Pro" ? "Most Popular" : "Selected"}
+                    </span>
+                  </div>
+                )}
+                {/* Current plan indicator (when not selected) */}
+                {isCurrent && !isSelected && (
+                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-10">
+                    <span className="rounded-full bg-emerald-500 px-3 py-1 text-[10px] font-semibold text-white shadow-md flex items-center gap-1">
+                      <Crown className="h-3 w-3" />
+                      Your Plan
                     </span>
                   </div>
                 )}
@@ -154,7 +220,9 @@ export default function PricingPage() {
                   className={`relative flex flex-col transition-all duration-300 ${
                     isSelected
                       ? "border-2 border-blue-500 bg-gradient-to-b from-blue-500/10 via-card to-card shadow-2xl shadow-blue-500/10 scale-[1.02] lg:scale-105"
-                      : "ring-1 ring-border hover:ring-blue-500/30"
+                      : isCurrent
+                        ? "ring-2 ring-emerald-500/50 hover:ring-emerald-500/70"
+                        : "ring-1 ring-border hover:ring-blue-500/30"
                   }`}
                 >
                   <CardHeader className="pb-2">
@@ -198,19 +266,25 @@ export default function PricingPage() {
                     </ul>
                   </CardContent>
                   <CardFooter className="border-0 bg-transparent p-4">
-                    {isSelected ? (
+                    {isCurrent ? (
+                      <span
+                        className="block w-full rounded-lg py-2.5 text-center text-sm font-semibold border-2 border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                      >
+                        Current Plan
+                      </span>
+                    ) : isSelected ? (
                       <Link
                         href={plan.href}
                         className="block w-full rounded-lg py-2.5 text-center text-sm font-semibold transition-all bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:shadow-lg hover:shadow-blue-500/25"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {plan.cta}
+                        {ctaLabel}
                       </Link>
                     ) : (
                       <span
                         className="block w-full rounded-lg py-2.5 text-center text-sm font-medium border border-border/50 bg-muted/50 text-muted-foreground cursor-not-allowed opacity-50"
                       >
-                        {plan.cta}
+                        {ctaLabel}
                       </span>
                     )}
                   </CardFooter>

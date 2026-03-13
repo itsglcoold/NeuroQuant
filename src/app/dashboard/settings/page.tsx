@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -12,14 +12,40 @@ import { useRouter } from "next/navigation";
 export default function SettingsPage() {
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
+  const [tier, setTier] = useState<string>("free");
+
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setEmail(user.email ?? null);
+        // Try to get tier from profiles
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("subscription_tier")
+          .eq("id", user.id)
+          .single();
+        if (profile?.subscription_tier) {
+          setTier(profile.subscription_tier);
+        }
+      }
+    }
+    load();
+  }, []);
 
   async function handleSignOut() {
     setSigningOut(true);
     const supabase = createClient();
     await supabase.auth.signOut();
+    localStorage.removeItem("nq_tier");
+    localStorage.removeItem("nq_usage");
     router.push("/");
     router.refresh();
   }
+
+  const tierLabel = tier === "premium" ? "Premium" : tier === "pro" ? "Pro" : "Free";
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -40,7 +66,7 @@ export default function SettingsPage() {
           <div className="flex justify-between items-center">
             <div>
               <p className="text-sm text-muted-foreground">Signed in as</p>
-              <p className="font-medium">Your account</p>
+              <p className="font-medium">{email ?? "Loading..."}</p>
             </div>
             <Button
               variant="destructive"
@@ -68,7 +94,7 @@ export default function SettingsPage() {
             <div>
               <p className="text-sm text-muted-foreground">Current plan</p>
               <div className="flex items-center gap-2">
-                <p className="font-medium">Premium</p>
+                <p className="font-medium">{tierLabel}</p>
                 <Badge className="bg-blue-500/10 text-blue-500 dark:text-blue-400 border-blue-500/20">Active</Badge>
               </div>
             </div>

@@ -2,14 +2,16 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TradingChart } from "@/components/dashboard/TradingChart";
+import { TradingViewChart } from "@/components/dashboard/TradingViewChart";
 import { MarketSwitcher } from "@/components/dashboard/MarketSwitcher";
 import { UpgradeModal } from "@/components/dashboard/UpgradeModal";
 import { getMarketBySymbol, getMarketEmoji, CATEGORY_COLORS } from "@/lib/market/symbols";
+import { cn } from "@/lib/utils";
 import { useUsageTracking } from "@/hooks/useUsageTracking";
 import { ConsensusResult } from "@/types/analysis";
 import { MarketPrice, TechnicalIndicators } from "@/types/market";
@@ -22,7 +24,15 @@ import {
   ChevronDown,
   ChevronUp,
   ExternalLink,
+  Cpu,
+  Eye,
+  Globe2,
+  Lock,
+  Crown,
+  Sparkles,
+  Shield,
 } from "lucide-react";
+import type { ModelOutput } from "@/types/analysis";
 
 export const runtime = 'edge';
 
@@ -126,6 +136,8 @@ export default function MarketDetailPage() {
   const [consensus, setConsensus] = useState<ConsensusResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analysisStatus, setAnalysisStatus] = useState<string>("");
+  const [streamedAnalysts, setStreamedAnalysts] = useState<ModelOutput[]>([]);
   const [showIndicators, setShowIndicators] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const { canRunAnalysis, consumeAnalysis, analysesRemaining, analysesTotal, tier } = useUsageTracking();
@@ -163,25 +175,72 @@ export default function MarketDetailPage() {
     }
 
     setAnalyzing(true);
+    setAnalysisStatus("Starting analysis…");
+    setStreamedAnalysts([]);
+    setConsensus(null);
     consumeAnalysis();
 
     try {
       const res = await fetch("/api/analysis/technical", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ symbol }),
+        body: JSON.stringify({ symbol, tier }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setConsensus(data.consensus);
-        if (data.price) setPrice(data.price);
-        if (data.indicators) setIndicators(data.indicators);
+      if (!res.ok || !res.body) {
+        throw new Error("Analysis request failed");
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Parse SSE lines
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const match = line.match(/^data: (.+)$/m);
+          if (!match) continue;
+
+          try {
+            const { event, data } = JSON.parse(match[1]);
+
+            if (event === "status") {
+              setAnalysisStatus(data.message);
+            } else if (event === "market_data") {
+              if (data.price) setPrice(data.price);
+              if (data.indicators) setIndicators(data.indicators);
+            } else if (event === "analyst") {
+              setStreamedAnalysts((prev) => {
+                const next = [...prev];
+                next[data.index] = data.result;
+                return next;
+              });
+              setAnalysisStatus(`${data.result.model} done — ${data.result.direction} (${data.result.confidence}%)`);
+            } else if (event === "consensus") {
+              setConsensus(data.consensus);
+              if (data.price) setPrice(data.price);
+              if (data.indicators) setIndicators(data.indicators);
+            } else if (event === "error") {
+              console.error("Analysis error:", data.message);
+            }
+          } catch {
+            // Ignore malformed SSE lines
+          }
+        }
       }
     } catch (error) {
       console.error("Analysis failed:", error);
     }
     setAnalyzing(false);
+    setAnalysisStatus("");
   }
 
   const directionIcon = {
@@ -253,160 +312,228 @@ export default function MarketDetailPage() {
         </div>
       </div>
 
-      {/* Chart + AI Panel (side by side on desktop) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Chart — 2/3 width */}
-        <div className="lg:col-span-2">
-          <Card>
-            <CardContent className="pt-4 pb-2 px-3">
-              <TradingChart symbol={symbol} height={420} />
-            </CardContent>
-          </Card>
-        </div>
+      {/* Chart — full width */}
+      <TradingViewChart symbol={symbol} height={500} />
 
-        {/* AI Analysis Panel — 1/3 width */}
-        <div className="lg:col-span-1 space-y-4">
-          {/* Run Analysis Button */}
-          <div className="space-y-1.5">
-            <Button
-              onClick={runAnalysis}
-              disabled={analyzing}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              <BarChart3 className="h-4 w-4 mr-2" />
-              {analyzing ? "Analyzing..." : "Run AI Analysis"}
-            </Button>
-            {tier === "free" && analysesTotal !== Infinity && (
-              <p className="text-center text-[10px] text-muted-foreground">
-                {analysesRemaining} of {analysesTotal} free analyses remaining today
+      {/* Run Analysis Button */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <Button
+          onClick={runAnalysis}
+          disabled={analyzing}
+          className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg shadow-blue-500/20 h-11 text-sm font-semibold"
+        >
+          {analyzing ? (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              {analysisStatus || "Analyzing…"}
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-4 w-4 mr-2" />
+              Run AI Analysis
+            </>
+          )}
+        </Button>
+
+        {/* Usage meter (inline on desktop) */}
+        {tier === "free" && analysesTotal !== Infinity && (
+          <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+            <span className="text-xs font-bold text-amber-600 dark:text-amber-400 whitespace-nowrap">
+              {analysesRemaining}/{analysesTotal}
+            </span>
+            <div className="h-1.5 w-20 bg-amber-500/10 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all"
+                style={{ width: `${((analysesTotal - analysesRemaining) / analysesTotal) * 100}%` }}
+              />
+            </div>
+            <Link href="/pricing" className="text-[10px] text-blue-500 hover:underline font-medium whitespace-nowrap">
+              Upgrade
+            </Link>
+          </div>
+        )}
+      </div>
+
+      <UpgradeModal
+        open={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        feature="ai-analysis"
+        requiredTier="pro"
+        reason="limit-reached"
+      />
+
+      {/* Analysis results: Analysts (left) + Consensus (right) */}
+      {(() => {
+        const analyses = consensus?.individualAnalyses || streamedAnalysts.filter(Boolean);
+        const hasAnalysis = analyses.length > 0 || consensus;
+
+        if (!hasAnalysis) {
+          // No analysis yet — centered full-width placeholder
+          return (
+            <div className="rounded-xl border border-dashed border-border/50 bg-muted/20 backdrop-blur-sm p-8 text-center">
+              <BarChart3 className="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" />
+              <p className="text-sm text-muted-foreground">
+                Click &quot;Run AI Analysis&quot; for{" "}
+                {tier === "free" ? "single-analyst" : "triple-AI consensus"}{" "}
+                insights.
               </p>
+              {tier === "free" && (
+                <div className="mt-4 rounded-lg border border-dashed border-border/60 bg-muted/30 p-3 max-w-sm mx-auto space-y-2">
+                  <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                    <Lock className="h-3.5 w-3.5" />
+                    <span className="font-medium">Free plan: 1 AI analyst</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    Unlock the full Triple-AI Consensus Engine with Analyst Alpha, Beta &amp; Gamma for higher accuracy.
+                  </p>
+                  <Link
+                    href="/pricing"
+                    className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-blue-500 hover:text-blue-400 transition-colors"
+                  >
+                    <Crown className="h-3 w-3" />
+                    Upgrade to Pro
+                  </Link>
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        // Analysis available — two-column layout
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Analyst Tabs — left 2/3 */}
+            <div className="lg:col-span-2 space-y-4">
+              {analyses.length > 0 && (
+                <AnalystTabs
+                  analyses={analyses}
+                  directionIcon={directionIcon}
+                  directionColor={directionColor}
+                  tier={tier}
+                />
+              )}
+
+              {/* Compliance badge + Disclaimer */}
+              {consensus && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-center gap-1.5 rounded-lg bg-muted/40 py-1.5">
+                    <Shield className="h-3 w-3 text-muted-foreground/60" />
+                    <span className="text-[9px] font-medium text-muted-foreground/60 tracking-wide uppercase">
+                      NeuroQuant Institutional Analytics — For Educational Use Only
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground/60 leading-relaxed text-center">
+                    {consensus.disclaimer}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* AI Consensus — right 1/3 */}
+            {consensus && (
+              <div className="lg:col-span-1">
+                <div className="rounded-xl border border-border/60 bg-card/80 backdrop-blur-md p-3 space-y-3 shadow-sm lg:sticky lg:top-4">
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 shadow-md">
+                        <BarChart3 className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold">AI Consensus</h3>
+                        <p className="text-[10px] text-muted-foreground">
+                          {consensus.individualAnalyses.length} analyst{consensus.individualAnalyses.length > 1 ? "s" : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge className={`${directionColor[consensus.consensusDirection]} text-xs font-bold`}>
+                      {consensus.consensusDirection.toUpperCase()}
+                    </Badge>
+                  </div>
+
+                  {/* Consensus Progress Bar */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[10px] font-medium">
+                      <span className="text-red-500 dark:text-red-400">Bearish</span>
+                      <span className="text-xs font-bold text-foreground">
+                        Score: {consensus.consensusScore > 0 ? "+" : ""}{consensus.consensusScore}
+                      </span>
+                      <span className="text-green-500 dark:text-green-400">Bullish</span>
+                    </div>
+                    <div className="h-3 bg-muted rounded-full overflow-hidden relative shadow-inner">
+                      <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-amber-400 to-green-500 opacity-25" />
+                      <div
+                        className="absolute top-0 bottom-0 w-2.5 bg-foreground rounded-full shadow-md transition-all duration-700 -translate-x-1/2"
+                        style={{
+                          left: `${Math.max(4, Math.min(96, ((consensus.consensusScore + 100) / 200) * 100))}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="flex flex-col items-center gap-1">
+                      <span className={`text-xs font-bold ${
+                        consensus.consensusScore > 20 ? "text-green-500" :
+                        consensus.consensusScore < -20 ? "text-red-500" : "text-amber-500"
+                      }`}>
+                        {consensus.sentimentLabel || `${consensus.agreementLevel} agreement`}
+                      </span>
+                      {consensus.probabilityScore !== undefined && (
+                        <span className="text-xs text-foreground/70">
+                          Probability Alignment: <span className="font-bold text-foreground">{consensus.probabilityScore}%</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Key Levels */}
+                  {(consensus.mergedKeyLevels.support.length > 0 ||
+                    consensus.mergedKeyLevels.resistance.length > 0) && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-lg bg-green-500/5 border border-green-500/15 p-2.5">
+                        <h4 className="text-[10px] font-semibold uppercase tracking-wider text-green-600 dark:text-green-400 mb-1.5">
+                          Support
+                        </h4>
+                        {consensus.mergedKeyLevels.support.slice(0, 3).map((level, i) => (
+                          <p key={i} className="text-xs tabular-nums text-foreground/80 font-medium">
+                            {prefix}{formatPrice(level, decimals)}
+                          </p>
+                        ))}
+                      </div>
+                      <div className="rounded-lg bg-red-500/5 border border-red-500/15 p-2.5">
+                        <h4 className="text-[10px] font-semibold uppercase tracking-wider text-red-600 dark:text-red-400 mb-1.5">
+                          Resistance
+                        </h4>
+                        {consensus.mergedKeyLevels.resistance.slice(0, 3).map((level, i) => (
+                          <p key={i} className="text-xs tabular-nums text-foreground/80 font-medium">
+                            {prefix}{formatPrice(level, decimals)}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Summary */}
+                  <div className="text-xs text-foreground/80 leading-relaxed space-y-1">
+                    {consensus.summary.split("\n").map((line, i) => {
+                      const parts = line.split(/(\*\*[^*]+\*\*)/g);
+                      return (
+                        <p key={i}>
+                          {parts.map((part, j) =>
+                            part.startsWith("**") && part.endsWith("**") ? (
+                              <strong key={j} className="font-bold text-foreground">{part.slice(2, -2)}</strong>
+                            ) : (
+                              <span key={j}>{part}</span>
+                            )
+                          )}
+                        </p>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
-
-          <UpgradeModal
-            open={showUpgradeModal}
-            onClose={() => setShowUpgradeModal(false)}
-            feature="ai-analysis"
-            requiredTier="pro"
-            reason="limit-reached"
-          />
-
-          {/* Consensus Card */}
-          {consensus ? (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  AI Consensus
-                  {directionIcon[consensus.consensusDirection]}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Direction + Agreement */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge className={directionColor[consensus.consensusDirection]}>
-                    {consensus.consensusDirection.toUpperCase()}
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    {consensus.agreementLevel} agreement
-                  </Badge>
-                  <span className="text-xs text-muted-foreground ml-auto">
-                    {consensus.consensusScore > 0 ? "+" : ""}
-                    {consensus.consensusScore}
-                  </span>
-                </div>
-
-                {/* Sentiment Bar */}
-                <div className="space-y-1">
-                  <div className="flex justify-between text-[10px] text-muted-foreground">
-                    <span>Bearish</span>
-                    <span>Bullish</span>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden relative">
-                    <div
-                      className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 opacity-30"
-                    />
-                    <div
-                      className="absolute top-0 bottom-0 w-1 bg-foreground rounded"
-                      style={{
-                        left: `${((consensus.consensusScore + 100) / 200) * 100}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Key Levels */}
-                {(consensus.mergedKeyLevels.support.length > 0 ||
-                  consensus.mergedKeyLevels.resistance.length > 0) && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <h4 className="text-[10px] font-semibold uppercase tracking-wider text-green-500 mb-1">
-                        Support
-                      </h4>
-                      {consensus.mergedKeyLevels.support.slice(0, 3).map((level, i) => (
-                        <p key={i} className="text-xs tabular-nums text-foreground/80">
-                          {prefix}
-                          {formatPrice(level, decimals)}
-                        </p>
-                      ))}
-                    </div>
-                    <div>
-                      <h4 className="text-[10px] font-semibold uppercase tracking-wider text-red-500 mb-1">
-                        Resistance
-                      </h4>
-                      {consensus.mergedKeyLevels.resistance.slice(0, 3).map((level, i) => (
-                        <p key={i} className="text-xs tabular-nums text-foreground/80">
-                          {prefix}
-                          {formatPrice(level, decimals)}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Summary */}
-                <p className="text-xs text-foreground/80 leading-relaxed">
-                  {consensus.summary}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground text-sm">
-                <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                Click &quot;Run AI Analysis&quot; to get consensus insights from
-                our triple-AI engine.
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Individual Model Cards */}
-          {consensus?.individualAnalyses.map((analysis, i) => (
-            <Card key={i}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xs flex items-center gap-2">
-                  {analysis.model}
-                  {directionIcon[analysis.direction]}
-                  <Badge variant="outline" className="ml-auto text-[10px]">
-                    {analysis.confidence}%
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-foreground/80 leading-relaxed line-clamp-6">
-                  {analysis.reasoning}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-
-          {/* Disclaimer */}
-          {consensus && (
-            <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
-              {consensus.disclaimer}
-            </p>
-          )}
-        </div>
-      </div>
+        );
+      })()}
 
       {/* OHLC Price Bar */}
       {price && (
@@ -573,6 +700,221 @@ function IndicatorRow({
           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${signalStyle}`}>{signal}</span>
         )}
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Format reasoning text — bold section headers, separate paragraphs
+// ---------------------------------------------------------------------------
+
+function formatReasoning(text: string): React.ReactNode[] {
+  if (!text) return [];
+
+  // Split on known section markers
+  const sectionPattern = /(📊\s*(?:Intraday\/Scalp Outlook|Scalp\/Intraday Outlook)[:\s]*|📈\s*(?:Swing\/Daily Outlook|Swing\/Position Outlook)[:\s]*|(?:Overall Assessment|In summary|Conclusion)[:\s]*)/gi;
+
+  const parts = text.split(sectionPattern).filter(Boolean);
+
+  return parts.map((part, i) => {
+    const isHeader = sectionPattern.test(part);
+    // Reset lastIndex after test (regex with /g flag)
+    sectionPattern.lastIndex = 0;
+
+    if (isHeader) {
+      return (
+        <h4 key={i} className="font-bold text-foreground mt-1">
+          {part.trim()}
+        </h4>
+      );
+    }
+    return (
+      <p key={i} className="text-foreground/80">
+        {part.trim()}
+      </p>
+    );
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Tabbed Analyst Interface — replaces stacked accordion cards
+// ---------------------------------------------------------------------------
+
+const ANALYST_META: Record<string, { icon: typeof Cpu; label: string; subtitle: string; description: string; color: string; bg: string; border: string; dot: string }> = {
+  "Analyst Alpha": { icon: Cpu, label: "Quantitative Engine · 40%", subtitle: "Quantitative Engine", description: "Processes thousands of data points — from RSI and moving averages to Fibonacci retracements — searching for statistical patterns invisible to the human eye.", color: "text-blue-500", bg: "bg-blue-500/10", border: "border-blue-500/30", dot: "bg-blue-500" },
+  "Analyst Beta":  { icon: Eye, label: "Pattern Recognition · 40%", subtitle: "Pattern Recognition", description: "Identifies chart formations like head-and-shoulders, flags, and support zones — exactly like a seasoned trader, but at the speed of light.", color: "text-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/30", dot: "bg-purple-500" },
+  "Analyst Gamma": { icon: Globe2, label: "Strategic Context · 20%", subtitle: "Strategic Context", description: "Goes beyond price — integrating technical signals with macro-economic trends, central bank policy, and cross-market correlations for a deeper perspective.", color: "text-emerald-500", bg: "bg-emerald-500/10", border: "border-emerald-500/30", dot: "bg-emerald-500" },
+};
+const FALLBACK_META = { icon: Cpu, label: "Analysis", subtitle: "Analysis", description: "", color: "text-blue-500", bg: "bg-blue-500/10", border: "border-blue-500/30", dot: "bg-blue-500" };
+
+function AnalystTabs({
+  analyses,
+  directionIcon,
+  directionColor,
+  tier,
+}: {
+  analyses: ModelOutput[];
+  directionIcon: Record<string, React.ReactNode>;
+  directionColor: Record<string, string>;
+  tier: string;
+}) {
+  const [activeTab, setActiveTab] = useState(0);
+
+  // All 3 possible analysts (for locked state on free tier)
+  const allSlots = ["Analyst Alpha", "Analyst Beta", "Analyst Gamma"];
+  const analysisMap = new Map(analyses.map((a) => [a.model, a]));
+
+  const activeAnalysis = analyses[activeTab] || analyses[0];
+  const activeMeta = activeAnalysis ? (ANALYST_META[activeAnalysis.model] || FALLBACK_META) : FALLBACK_META;
+
+  return (
+    <div className="rounded-xl border border-border/60 bg-card/80 backdrop-blur-md overflow-hidden shadow-sm">
+      {/* Tab bar */}
+      <div className="flex border-b border-border/40">
+        {tier === "free" ? (
+          // Free tier: show all 3 slots, Beta/Gamma locked
+          allSlots.map((slotName, i) => {
+            const meta = ANALYST_META[slotName] || FALLBACK_META;
+            const analysis = analysisMap.get(slotName);
+            const isLocked = i > 0;
+            const isActive = activeTab === i && !isLocked;
+
+            return (
+              <button
+                key={slotName}
+                onClick={() => !isLocked && analysis && setActiveTab(i)}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 text-[11px] font-medium transition-all relative",
+                  isActive
+                    ? "text-foreground"
+                    : isLocked
+                      ? "text-muted-foreground/50 cursor-not-allowed"
+                      : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {isLocked ? (
+                  <Lock className="h-3 w-3" />
+                ) : (
+                  <span className={cn("h-2 w-2 rounded-full shrink-0", meta.dot)} />
+                )}
+                <span className="truncate">{slotName.replace("Analyst ", "")}</span>
+                {analysis && !isLocked && (
+                  <span className={cn("text-[9px] font-bold",
+                    analysis.direction === "bullish" ? "text-green-500" :
+                    analysis.direction === "bearish" ? "text-red-500" : "text-amber-500"
+                  )}>
+                    {analysis.confidence}%
+                  </span>
+                )}
+                {/* Active indicator */}
+                {isActive && (
+                  <span className={cn("absolute bottom-0 left-2 right-2 h-0.5 rounded-full", meta.dot)} />
+                )}
+              </button>
+            );
+          })
+        ) : (
+          // Pro/Premium: show actual analyses as tabs
+          analyses.map((analysis, i) => {
+            const meta = ANALYST_META[analysis.model] || FALLBACK_META;
+            const isActive = activeTab === i;
+
+            return (
+              <button
+                key={analysis.model}
+                onClick={() => setActiveTab(i)}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 text-[11px] font-medium transition-all relative",
+                  isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <span className={cn("h-2 w-2 rounded-full shrink-0", meta.dot)} />
+                <span className="truncate">{analysis.model.replace("Analyst ", "")}</span>
+                <span className={cn("text-[9px] font-bold",
+                  analysis.direction === "bullish" ? "text-green-500" :
+                  analysis.direction === "bearish" ? "text-red-500" : "text-amber-500"
+                )}>
+                  {analysis.confidence}%
+                </span>
+                {isActive && (
+                  <span className={cn("absolute bottom-0 left-2 right-2 h-0.5 rounded-full", meta.dot)} />
+                )}
+              </button>
+            );
+          })
+        )}
+      </div>
+
+      {/* Tab content */}
+      {activeAnalysis && (
+        <div className="p-3 space-y-3">
+          {/* Direction + Confidence header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className={cn("flex h-7 w-7 items-center justify-center rounded-lg", activeMeta.bg)}>
+                {(() => { const Icon = activeMeta.icon; return <Icon className={cn("h-3.5 w-3.5", activeMeta.color)} />; })()}
+              </div>
+              <div>
+                <h4 className="text-xs font-bold">{activeAnalysis.model}</h4>
+                <p className="text-[9px] text-muted-foreground">{activeMeta.subtitle} · {activeMeta.label.split(" · ")[1]} weight</p>
+              </div>
+            </div>
+            <Badge className={`${directionColor[activeAnalysis.direction]} text-xs font-bold`}>
+              {directionIcon[activeAnalysis.direction]}
+              <span className="ml-1">{activeAnalysis.direction} {activeAnalysis.confidence}%</span>
+            </Badge>
+          </div>
+
+          {/* Analyst role description */}
+          {activeMeta.description && (
+            <p className={cn("text-sm leading-relaxed rounded-lg px-3 py-3 border", activeMeta.bg, activeMeta.border, "text-foreground/70")}>
+              {activeMeta.description}
+            </p>
+          )}
+
+          {/* Key Levels (compact) */}
+          {(activeAnalysis.keyLevels.support.length > 0 || activeAnalysis.keyLevels.resistance.length > 0) && (
+            <div className="flex gap-3">
+              {activeAnalysis.keyLevels.support.length > 0 && (
+                <div className="flex items-center gap-1.5 text-[10px]">
+                  <span className="font-semibold text-green-600 dark:text-green-400">S:</span>
+                  <span className="font-mono text-foreground/80">
+                    {activeAnalysis.keyLevels.support.slice(0, 2).map((l) => formatPrice(l, getPriceDecimals(l))).join(" / ")}
+                  </span>
+                </div>
+              )}
+              {activeAnalysis.keyLevels.resistance.length > 0 && (
+                <div className="flex items-center gap-1.5 text-[10px]">
+                  <span className="font-semibold text-red-600 dark:text-red-400">R:</span>
+                  <span className="font-mono text-foreground/80">
+                    {activeAnalysis.keyLevels.resistance.slice(0, 2).map((l) => formatPrice(l, getPriceDecimals(l))).join(" / ")}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Reasoning */}
+          <div className="text-xs text-foreground/80 leading-relaxed space-y-2">
+            {formatReasoning(activeAnalysis.reasoning)}
+          </div>
+        </div>
+      )}
+
+      {/* Locked overlay for free tier when locked tab is somehow active */}
+      {tier === "free" && activeTab > 0 && !analysisMap.get(allSlots[activeTab]) && (
+        <div className="p-6 text-center">
+          <Lock className="h-5 w-5 mx-auto mb-2 text-muted-foreground/40" />
+          <p className="text-xs text-muted-foreground mb-2">Unlock Analyst Beta & Gamma</p>
+          <Link
+            href="/pricing"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-500 hover:text-blue-400"
+          >
+            <Crown className="h-3 w-3" />
+            Upgrade to Pro
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

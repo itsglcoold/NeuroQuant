@@ -9,19 +9,15 @@ interface MarketSwitcherProps {
   currentSymbol: string;
 }
 
-const CATEGORY_ORDER: MarketCategory[] = ["metals", "energy", "forex", "indices"];
+const CATEGORY_ORDER: MarketCategory[] = Object.keys(MARKET_CATEGORIES) as MarketCategory[];
 
 const SHORT_NAMES: Record<string, string> = {
   "XAU/USD": "Gold",
   "XAG/USD": "Silver",
   "CL": "Oil",
-  "EUR/USD": "EUR",
-  "GBP/USD": "GBP",
-  "USD/JPY": "JPY",
-  "USD/CHF": "CHF",
-  "AUD/USD": "AUD",
   "SPX": "S&P",
   "IXIC": "NASDAQ",
+  "DXY": "DXY",
 };
 
 export function MarketSwitcher({ currentSymbol }: MarketSwitcherProps) {
@@ -72,7 +68,7 @@ export function MarketSwitcher({ currentSymbol }: MarketSwitcherProps) {
             })}
 
             {/* Separator */}
-            {category !== "indices" && (
+            {category !== CATEGORY_ORDER[CATEGORY_ORDER.length - 1] && (
               <div className="mx-1 h-4 w-px bg-border" />
             )}
           </div>
