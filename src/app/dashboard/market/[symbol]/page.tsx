@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import type { ModelOutput } from "@/types/analysis";
 
+export const runtime = 'edge';
 
 // ---------------------------------------------------------------------------
 // External links per symbol
