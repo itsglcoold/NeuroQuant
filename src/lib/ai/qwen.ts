@@ -35,7 +35,13 @@ export async function analyzeTechnical(marketData: {
     max_tokens: 1500,
   });
 
-  const content = response.choices[0]?.message?.content || "";
+  let content = response.choices[0]?.message?.content || "";
+
+  // Strip markdown code block wrappers if present
+  const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlockMatch) {
+    content = codeBlockMatch[1].trim();
+  }
 
   try {
     const parsed = JSON.parse(content);
@@ -81,10 +87,43 @@ export async function analyzeChart(imageBase64: string): Promise<ChartAnalysisRe
       },
     ],
     temperature: 0.3,
-    max_tokens: 2000,
+    max_tokens: 3000,
   });
 
-  const content = response.choices[0]?.message?.content || "";
+  let content = response.choices[0]?.message?.content || "";
+
+  // Strip markdown code block wrappers if present
+  const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlockMatch) {
+    content = codeBlockMatch[1].trim();
+  }
+
+  // If still not clean JSON, try to extract the first { ... } object
+  if (!content.startsWith("{")) {
+    const jsonObjMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonObjMatch) {
+      content = jsonObjMatch[0];
+    }
+  }
+
+  // Fix truncated JSON — try to close open brackets/braces
+  function tryRepairJson(raw: string): string {
+    let s = raw.trim();
+    // Count open/close braces and brackets
+    const openBraces = (s.match(/\{/g) || []).length;
+    const closeBraces = (s.match(/\}/g) || []).length;
+    const openBrackets = (s.match(/\[/g) || []).length;
+    const closeBrackets = (s.match(/\]/g) || []).length;
+    // Remove trailing comma if present
+    s = s.replace(/,\s*$/, "");
+    // Close any unclosed strings
+    const quoteCount = (s.match(/"/g) || []).length;
+    if (quoteCount % 2 !== 0) s += '"';
+    // Close arrays then objects
+    for (let i = 0; i < openBrackets - closeBrackets; i++) s += "]";
+    for (let i = 0; i < openBraces - closeBraces; i++) s += "}";
+    return s;
+  }
 
   try {
     const parsed = JSON.parse(content);
@@ -93,17 +132,27 @@ export async function analyzeChart(imageBase64: string): Promise<ChartAnalysisRe
       disclaimer: DISCLAIMER,
     };
   } catch {
-    return {
-      detectedSymbol: null,
-      detectedTimeframe: null,
-      patterns: [],
-      direction: "neutral",
-      confidence: 1,
-      supportLevels: [],
-      resistanceLevels: [],
-      indicators: [],
-      analysis: "Chart analysis could not be completed. " + content.slice(0, 500),
-      disclaimer: DISCLAIMER,
-    };
+    // Try repairing truncated JSON
+    try {
+      const repaired = tryRepairJson(content);
+      const parsed = JSON.parse(repaired);
+      return {
+        ...parsed,
+        disclaimer: DISCLAIMER,
+      };
+    } catch {
+      return {
+        detectedSymbol: null,
+        detectedTimeframe: null,
+        patterns: [],
+        direction: "neutral",
+        confidence: 1,
+        supportLevels: [],
+        resistanceLevels: [],
+        indicators: [],
+        analysis: "Chart analysis could not be completed. " + content.slice(0, 500),
+        disclaimer: DISCLAIMER,
+      };
+    }
   }
 }

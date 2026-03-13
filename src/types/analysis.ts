@@ -15,6 +15,8 @@ export interface ConsensusResult {
   consensusDirection: "bullish" | "bearish" | "neutral";
   consensusScore: number; // -100 to +100
   agreementLevel: "high" | "medium" | "low";
+  sentimentLabel: string; // e.g. "Strong Bullish Momentum", "Moderate Bearish"
+  probabilityScore: number; // 0-100 probability alignment %
   individualAnalyses: ModelOutput[];
   mergedKeyLevels: {
     support: number[];
@@ -31,10 +33,12 @@ export interface ChartAnalysisResult {
   detectedTimeframe: string | null;
   patterns: string[];
   direction: "bullish" | "bearish" | "neutral";
-  confidence: number; // 1-10
+  confidence: number; // 0-100
   supportLevels: number[];
   resistanceLevels: number[];
   indicators: string[];
+  scalpOutlook?: string;
+  swingOutlook?: string;
   analysis: string;
   disclaimer: string;
 }
@@ -48,6 +52,29 @@ export interface FundamentalAnalysis {
   analysis: string;
   sources: string[];
   disclaimer: string;
+}
+
+export interface MarketSuggestion {
+  symbol: string;
+  name: string;
+  emoji: string;
+  category: string;
+  direction: "bullish" | "bearish" | "neutral";
+  confidence: number;
+  sentiment: number;
+  sentimentLabel: string;
+  probabilityAlignment: number;
+  timeframe: string;
+  reasoning: string;
+  keyLevel: number;
+}
+
+export interface SuggestionsResponse {
+  suggestions: MarketSuggestion[];
+  generatedAt: string;
+  expiresAt: string;
+  disclaimer: string;
+  marketsScanned: number;
 }
 
 export interface ChatMessage {

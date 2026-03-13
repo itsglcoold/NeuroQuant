@@ -35,7 +35,13 @@ export async function analyzeTechnical(marketData: {
     max_tokens: 1500,
   });
 
-  const content = response.choices[0]?.message?.content || "";
+  let content = response.choices[0]?.message?.content || "";
+
+  // Strip markdown code block wrappers if present (DeepSeek often wraps JSON in ```json ... ```)
+  const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlockMatch) {
+    content = codeBlockMatch[1].trim();
+  }
 
   try {
     const parsed = JSON.parse(content);

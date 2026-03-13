@@ -44,7 +44,7 @@ export default function NewsPage() {
       }
       const url = `/api/news?${params}`;
       console.log("[News] Fetching:", url);
-      const res = await fetch(url, { cache: "no-store" });
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         console.log("[News] Got", (data.data || []).length, "articles for tab:", tab);

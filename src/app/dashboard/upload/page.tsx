@@ -1,14 +1,37 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Upload, X, Image as ImageIcon, TrendingUp, TrendingDown, Minus, Lock } from "lucide-react";
+import { Upload, X, Image as ImageIcon, TrendingUp, TrendingDown, Minus, Lock, ClipboardPaste } from "lucide-react";
 import { ChartAnalysisResult } from "@/types/analysis";
 import { useUsageTracking } from "@/hooks/useUsageTracking";
 import { UpgradeModal } from "@/components/dashboard/UpgradeModal";
 import Link from "next/link";
+import React from "react";
+
+// Render markdown-like text: **bold**, numbered lists, line breaks
+function renderMarkdown(text: string): React.ReactNode[] {
+  if (!text) return [];
+  // Split by newlines first
+  const lines = text.split(/\n/);
+  return lines.map((line, i) => {
+    // Process **bold** within each line
+    const parts = line.split(/(\*\*[^*]+\*\*)/g);
+    const rendered = parts.map((part, j) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return <strong key={j} className="font-bold text-foreground">{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
+    return (
+      <p key={i} className={line.trim() === "" ? "h-1" : ""}>
+        {rendered}
+      </p>
+    );
+  });
+}
 
 export default function ChartUploadPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -20,6 +43,36 @@ export default function ChartUploadPage() {
   const { canAccessFeature, getRequiredTier } = useUsageTracking();
   const [showUpgrade, setShowUpgrade] = useState(false);
   const hasAccess = canAccessFeature("chart-upload");
+
+  const pasteZoneRef = useRef<HTMLDivElement>(null);
+
+  // Handle paste events (from both global Ctrl+V and iOS paste callout)
+  function handlePasteEvent(e: React.ClipboardEvent | ClipboardEvent) {
+    const items = (e as ClipboardEvent).clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const blob = item.getAsFile();
+        if (blob) {
+          const pastedFile = new File([blob], `pasted-chart-${Date.now()}.png`, { type: blob.type });
+          handleFileSelect(pastedFile);
+        }
+        // Clean up any text/html injected into the contentEditable
+        if (pasteZoneRef.current) pasteZoneRef.current.textContent = "";
+        return;
+      }
+    }
+  }
+
+  // Global paste listener for desktop (Ctrl+V / Cmd+V)
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      handlePasteEvent(e);
+    }
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, []);
 
   if (!hasAccess) {
     return (
@@ -129,25 +182,57 @@ export default function ChartUploadPage() {
       <Card>
         <CardContent className="pt-6">
           {!preview ? (
-            <div
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-border rounded-xl p-12 text-center cursor-pointer hover:border-blue-500/50 transition-colors"
-            >
-              <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-lg font-medium mb-1">Drop your chart here</p>
-              <p className="text-sm text-muted-foreground">or click to browse (PNG, JPG, WebP up to 5MB)</p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handleFileSelect(f);
+            <div className="space-y-3">
+              {/* Paste zone — tap to focus on iOS, then iOS shows "Paste" callout */}
+              <div
+                ref={pasteZoneRef}
+                contentEditable
+                suppressContentEditableWarning
+                onPaste={(e) => handlePasteEvent(e)}
+                onFocus={() => {
+                  if (pasteZoneRef.current) pasteZoneRef.current.textContent = "";
                 }}
-              />
+                onInput={() => {
+                  if (pasteZoneRef.current) pasteZoneRef.current.textContent = "";
+                }}
+                className="w-full flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-blue-500/30 bg-blue-500/5 px-4 py-8 text-center cursor-pointer transition-colors hover:bg-blue-500/10 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 caret-transparent select-none"
+                role="button"
+                tabIndex={0}
+                aria-label="Tap to paste chart from clipboard"
+              >
+                <ClipboardPaste className="h-10 w-10 text-blue-500 pointer-events-none mb-1" />
+                <span className="text-lg font-medium text-foreground pointer-events-none">Tap to paste copied chart</span>
+                <span className="text-sm text-muted-foreground pointer-events-none">Long-press a chart → Copy Image → tap here</span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs text-muted-foreground/60 uppercase tracking-wider">or</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+
+              {/* Upload zone — screenshot or file browse */}
+              <div
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-blue-500/50 transition-colors"
+              >
+                <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                <p className="text-base font-medium mb-1">Upload a screenshot</p>
+                <p className="text-sm text-muted-foreground">Take a screenshot of your chart, then tap here to upload</p>
+                <p className="text-xs text-muted-foreground/50 mt-1">PNG, JPG, WebP up to 5MB</p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleFileSelect(f);
+                  }}
+                />
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
@@ -203,19 +288,38 @@ export default function ChartUploadPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Header badges */}
               <div className="flex flex-wrap gap-2">
                 <Badge className={directionColor[result.direction]}>
                   {result.direction.toUpperCase()}
                 </Badge>
                 <Badge variant="outline">
-                  Confidence: {result.confidence}/10
+                  Confidence: {result.confidence}%
                 </Badge>
                 {result.detectedSymbol && (
                   <Badge variant="secondary">{result.detectedSymbol}</Badge>
                 )}
                 {result.detectedTimeframe && (
-                  <Badge variant="secondary">{result.detectedTimeframe}</Badge>
+                  <Badge variant="secondary">⏱ {result.detectedTimeframe}</Badge>
                 )}
+              </div>
+
+              {/* Sentiment strength label */}
+              <div className="rounded-lg border p-3 text-center">
+                <span className={`text-lg font-bold ${
+                  result.confidence >= 70 && result.direction === "bullish" ? "text-green-500" :
+                  result.confidence >= 70 && result.direction === "bearish" ? "text-red-500" :
+                  "text-amber-500"
+                }`}>
+                  {result.direction === "bullish"
+                    ? result.confidence >= 70 ? "Strong Bullish Momentum" : result.confidence >= 40 ? "Moderate Bullish" : "Slightly Bullish"
+                    : result.direction === "bearish"
+                    ? result.confidence >= 70 ? "Strong Bearish Exhaustion" : result.confidence >= 40 ? "Moderate Bearish" : "Slightly Bearish"
+                    : "Neutral — Consolidation Phase"}
+                </span>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Probability Alignment: <span className="font-semibold">{result.confidence}%</span>
+                </p>
               </div>
 
               {result.patterns.length > 0 && (
@@ -233,18 +337,18 @@ export default function ChartUploadPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 {result.supportLevels.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-semibold text-green-600 dark:text-green-500 mb-1">Support</h4>
+                  <div className="rounded-lg bg-green-500/5 border border-green-500/15 p-2.5">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-green-600 dark:text-green-400 mb-1.5">Support</h4>
                     {result.supportLevels.map((level, i) => (
-                      <p key={i} className="text-sm text-muted-foreground">${level}</p>
+                      <p key={i} className="text-sm tabular-nums font-medium text-foreground/80">{level}</p>
                     ))}
                   </div>
                 )}
                 {result.resistanceLevels.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-semibold text-red-600 dark:text-red-500 mb-1">Resistance</h4>
+                  <div className="rounded-lg bg-red-500/5 border border-red-500/15 p-2.5">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-red-600 dark:text-red-400 mb-1.5">Resistance</h4>
                     {result.resistanceLevels.map((level, i) => (
-                      <p key={i} className="text-sm text-muted-foreground">${level}</p>
+                      <p key={i} className="text-sm tabular-nums font-medium text-foreground/80">{level}</p>
                     ))}
                   </div>
                 )}
@@ -255,15 +359,36 @@ export default function ChartUploadPage() {
                   <h4 className="text-sm font-semibold text-foreground/80 mb-2">Indicator Readings</h4>
                   <ul className="text-sm text-muted-foreground space-y-1">
                     {result.indicators.map((ind, i) => (
-                      <li key={i}>- {ind}</li>
+                      <li key={i} className="flex items-start gap-1.5">
+                        <span className="text-blue-500 mt-0.5">•</span>
+                        <span>{ind}</span>
+                      </li>
                     ))}
                   </ul>
                 </div>
               )}
 
+              {/* Scalp Outlook */}
+              {result.scalpOutlook && (
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+                  <h4 className="text-sm font-semibold text-amber-600 dark:text-amber-400 mb-1">📊 Scalp / Intraday Outlook</h4>
+                  <div className="text-sm text-foreground/80 leading-relaxed space-y-1">{renderMarkdown(result.scalpOutlook)}</div>
+                </div>
+              )}
+
+              {/* Swing Outlook */}
+              {result.swingOutlook && (
+                <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
+                  <h4 className="text-sm font-semibold text-blue-600 dark:text-blue-400 mb-1">📈 Swing / Position Outlook</h4>
+                  <div className="text-sm text-foreground/80 leading-relaxed space-y-1">{renderMarkdown(result.swingOutlook)}</div>
+                </div>
+              )}
+
               <div>
                 <h4 className="text-sm font-semibold text-foreground/80 mb-2">Detailed Analysis</h4>
-                <p className="text-sm text-foreground/80 whitespace-pre-wrap">{result.analysis}</p>
+                <div className="text-sm text-foreground/80 leading-relaxed space-y-1">
+                  {renderMarkdown(result.analysis)}
+                </div>
               </div>
 
               <p className="text-xs text-muted-foreground italic">{result.disclaimer}</p>

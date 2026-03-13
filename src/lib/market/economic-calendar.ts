@@ -191,7 +191,10 @@ function parseEventFromApi(event: EodhdCalendarEvent, index: number): EconomicEv
     : "";
 
   const country = (event.country || "").toUpperCase();
-  const title = event.type || "Unknown Event";
+  const rawTitle = event.type || "";
+  // Filter out junk values from EODHD — never show "Unknown" to the user
+  const junkTitles = ["unknown", "null", "undefined", "unknown event", ""];
+  const title = junkTitles.includes(rawTitle.toLowerCase().trim()) ? "Economic Release" : rawTitle;
 
   // Build display title with comparison suffix if available
   let displayTitle = title;

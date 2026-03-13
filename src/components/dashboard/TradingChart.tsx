@@ -26,19 +26,32 @@ interface TradingChartProps {
 type Interval = "1min" | "5min" | "15min" | "1h" | "4h" | "1day" | "1week" | "1month";
 
 const INTERVALS: { label: string; value: Interval; group: "scalp" | "swing" }[] = [
-  // Scalping timeframes
   { label: "1m", value: "1min", group: "scalp" },
   { label: "5m", value: "5min", group: "scalp" },
   { label: "15m", value: "15min", group: "scalp" },
   { label: "1H", value: "1h", group: "scalp" },
   { label: "4H", value: "4h", group: "scalp" },
-  // Day/Swing trading timeframes
   { label: "1D", value: "1day", group: "swing" },
   { label: "1W", value: "1week", group: "swing" },
   { label: "1M", value: "1month", group: "swing" },
 ];
 
 const INTRADAY_INTERVALS: Interval[] = ["1min", "5min", "15min", "1h", "4h"];
+
+// How often to fetch full candle data (seconds)
+const CANDLE_REFRESH: Record<Interval, number> = {
+  "1min": 60,
+  "5min": 60,
+  "15min": 120,
+  "1h": 300,
+  "4h": 300,
+  "1day": 300,
+  "1week": 600,
+  "1month": 600,
+};
+
+// How often to tick the last candle with live price (seconds)
+const TICK_RATE = 3;
 
 function transformData(bars: OHLCVBar[], isIntraday: boolean): {
   candles: CandlestickData<Time>[];
@@ -47,24 +60,16 @@ function transformData(bars: OHLCVBar[], isIntraday: boolean): {
   const candles: CandlestickData<Time>[] = [];
   const volume: HistogramData<Time>[] = [];
 
-  // Sort bars ascending by time (EODHD may return desc order)
   const sortedBars = [...bars].sort(
     (a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
   );
 
   for (const bar of sortedBars) {
-    // Intraday: use Unix timestamp (seconds). Daily+: use YYYY-MM-DD string.
     const time = isIntraday
       ? (Math.floor(new Date(bar.datetime).getTime() / 1000) as unknown as Time)
       : (bar.datetime.split(" ")[0] as Time);
 
-    candles.push({
-      time,
-      open: bar.open,
-      high: bar.high,
-      low: bar.low,
-      close: bar.close,
-    });
+    candles.push({ time, open: bar.open, high: bar.high, low: bar.low, close: bar.close });
     volume.push({
       time,
       value: bar.volume,
@@ -95,8 +100,12 @@ export function TradingChart({ symbol, height = 400 }: TradingChartProps) {
   const sma20Ref = useRef<ISeriesApi<"Line"> | null>(null);
   const sma50Ref = useRef<ISeriesApi<"Line"> | null>(null);
 
+  // Store last candle so we can update it with ticks
+  const lastCandleRef = useRef<CandlestickData<Time> | null>(null);
+
   const [interval, setInterval] = useState<Interval>("1day");
   const [loading, setLoading] = useState(true);
+  const [livePrice, setLivePrice] = useState<number | null>(null);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
@@ -114,7 +123,7 @@ export function TradingChart({ symbol, height = 400 }: TradingChartProps) {
     };
   }, [isDark]);
 
-  // Create chart (only once per mount / height change — theme updates are handled separately)
+  // Create chart
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -184,7 +193,6 @@ export function TradingChart({ symbol, height = 400 }: TradingChartProps) {
     sma20Ref.current = sma20Series;
     sma50Ref.current = sma50Series;
 
-    // Resize observer
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         chart.applyOptions({ width: entry.contentRect.width });
@@ -219,38 +227,18 @@ export function TradingChart({ symbol, height = 400 }: TradingChartProps) {
     });
   }, [isDark, getChartColors]);
 
-  // Auto-refresh interval based on timeframe
-  const REFRESH_RATES: Record<Interval, number> = {
-    "1min": 15,    // every 15 seconds
-    "5min": 30,    // every 30 seconds
-    "15min": 60,   // every 60 seconds
-    "1h": 120,     // every 2 minutes
-    "4h": 300,     // every 5 minutes
-    "1day": 300,   // every 5 minutes
-    "1week": 300,  // every 5 minutes
-    "1month": 300, // every 5 minutes
-  };
-
-  const [countdown, setCountdown] = useState(0);
-
-  // Fetch data + auto-refresh
+  // =============================================
+  // CANDLE DATA: Full fetch on load + interval
+  // =============================================
   useEffect(() => {
     let cancelled = false;
-    let refreshTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
-    let isFirstLoad = true;
 
-    async function fetchData() {
-      if (isFirstLoad) setLoading(true);
+    async function fetchCandles() {
+      setLoading(true);
       try {
         const outputsizeMap: Record<Interval, number> = {
-          "1min": 120,
-          "5min": 120,
-          "15min": 96,
-          "1h": 120,
-          "4h": 90,
-          "1day": 90,
-          "1week": 52,
-          "1month": 24,
+          "1min": 120, "5min": 120, "15min": 96, "1h": 120,
+          "4h": 90, "1day": 90, "1week": 52, "1month": 24,
         };
         const outputsize = outputsizeMap[interval];
         const res = await fetch(
@@ -276,50 +264,82 @@ export function TradingChart({ symbol, height = 400 }: TradingChartProps) {
             sma20Ref.current?.setData(sma20Data);
             sma50Ref.current?.setData(sma50Data);
 
-            if (isFirstLoad) chartRef.current?.timeScale().fitContent();
+            // Store last candle for live ticking
+            lastCandleRef.current = candles[candles.length - 1] || null;
+
+            chartRef.current?.timeScale().fitContent();
           }
         }
       } catch (e) {
         console.error("Chart data fetch error:", e);
       }
-      // Always schedule next refresh, even if data was empty or failed
-      if (!cancelled) {
-        setLoading(false);
-        isFirstLoad = false;
-        setCountdown(REFRESH_RATES[interval]);
-        scheduleRefresh();
-      }
+      if (!cancelled) setLoading(false);
     }
 
-    function scheduleRefresh() {
-      if (cancelled) return;
-      refreshTimer = globalThis.setTimeout(() => {
-        if (!cancelled) fetchData();
-      }, REFRESH_RATES[interval] * 1000);
-    }
+    fetchCandles();
 
-    fetchData();
+    // Periodically refetch full candle data
+    const candleTimer = globalThis.setInterval(() => {
+      if (!cancelled) fetchCandles();
+    }, CANDLE_REFRESH[interval] * 1000);
 
     return () => {
       cancelled = true;
-      if (refreshTimer) clearTimeout(refreshTimer);
+      clearInterval(candleTimer);
     };
   }, [symbol, interval]);
 
-  // Countdown timer display
+  // =============================================
+  // LIVE TICK: Fetch real-time price every few seconds
+  // and update the last candle so the chart "moves"
+  // =============================================
   useEffect(() => {
-    if (countdown <= 0) return;
-    const tick = globalThis.setInterval(() => {
-      setCountdown((c) => (c > 0 ? c - 1 : 0));
-    }, 1000);
-    return () => clearInterval(tick);
-  }, [countdown]);
+    let cancelled = false;
+
+    async function tickPrice() {
+      try {
+        const res = await fetch(
+          `/api/market-data?symbol=${encodeURIComponent(symbol)}&type=quote`
+        );
+        if (cancelled || !res.ok) return;
+
+        const json = await res.json();
+        const price = json.data?.price;
+        if (typeof price !== "number" || price <= 0) return;
+
+        setLivePrice(price);
+
+        // Update the last candle in-place
+        const lastCandle = lastCandleRef.current;
+        if (lastCandle && candleSeriesRef.current) {
+          const updated: CandlestickData<Time> = {
+            ...lastCandle,
+            close: price,
+            high: Math.max(lastCandle.high, price),
+            low: Math.min(lastCandle.low, price),
+          };
+          candleSeriesRef.current.update(updated);
+          lastCandleRef.current = updated;
+        }
+      } catch {
+        // Silent fail — will retry next tick
+      }
+    }
+
+    // Start ticking immediately
+    tickPrice();
+    const tickTimer = globalThis.setInterval(tickPrice, TICK_RATE * 1000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(tickTimer);
+    };
+  }, [symbol]);
 
   return (
     <div className="relative">
       {/* Timeframe selector */}
       <div className="flex items-center gap-1 mb-2 flex-wrap">
-        {/* Scalp group */}
         <span className="mr-1.5 rounded bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Scalp</span>
         {INTERVALS.filter((iv) => iv.group === "scalp").map((iv) => (
           <button
@@ -337,7 +357,6 @@ export function TradingChart({ symbol, height = 400 }: TradingChartProps) {
 
         <div className="mx-2 h-4 w-px bg-border" />
 
-        {/* Swing group */}
         <span className="mr-1.5 rounded bg-blue-500/10 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Swing</span>
         {INTERVALS.filter((iv) => iv.group === "swing").map((iv) => (
           <button
@@ -361,10 +380,12 @@ export function TradingChart({ symbol, height = 400 }: TradingChartProps) {
             <span className="inline-block h-0.5 w-4 bg-amber-500 rounded" />
             SMA 50
           </span>
-          <span className="flex items-center gap-1 tabular-nums" title={`Auto-refresh every ${REFRESH_RATES[interval]}s`}>
-            <span className={`inline-block h-1.5 w-1.5 rounded-full ${countdown <= 3 ? "bg-green-500 animate-pulse" : "bg-green-500/50"}`} />
-            {countdown}s
-          </span>
+          {livePrice !== null && (
+            <span className="flex items-center gap-1 tabular-nums font-medium text-foreground">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+              LIVE
+            </span>
+          )}
         </div>
       </div>
 

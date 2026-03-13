@@ -57,7 +57,11 @@ function toEodhdEodSymbol(symbol: string): string {
   return EOD_SYMBOL_MAP[symbol] || SYMBOL_MAP[symbol] || symbol;
 }
 
-async function fetchEodhd(endpoint: string, params: Record<string, string> = {}) {
+async function fetchEodhd(
+  endpoint: string,
+  params: Record<string, string> = {},
+  cacheSecs: number = 0
+) {
   const searchParams = new URLSearchParams({
     ...params,
     api_token: API_KEY || "",
@@ -65,7 +69,9 @@ async function fetchEodhd(endpoint: string, params: Record<string, string> = {})
   });
   const url = `${BASE_URL}/${endpoint}?${searchParams}`;
 
-  const response = await fetch(url, { next: { revalidate: 60 } });
+  const response = await fetch(url, {
+    next: { revalidate: cacheSecs },
+  });
   if (!response.ok) {
     throw new Error(`EODHD API error: ${response.status}`);
   }
@@ -147,7 +153,7 @@ export async function getPrices(symbols: string[]): Promise<MarketPrice[]> {
   });
 
   const url = `${BASE_URL}/real-time/${first.eod}?${searchParams}`;
-  const response = await fetch(url, { next: { revalidate: 60 } });
+  const response = await fetch(url, { next: { revalidate: 0 } });
 
   if (!response.ok) {
     // Fallback to individual fetches
@@ -208,11 +214,26 @@ export async function getPrices(symbols: string[]): Promise<MarketPrice[]> {
   return results;
 }
 
+// EODHD intraday interval mapping
+const INTRADAY_INTERVALS: Record<string, string> = {
+  "1min": "1m",
+  "5min": "5m",
+  "15min": "15m",
+  "1h": "1h",
+  "4h": "4h",
+};
+
 export async function getTimeSeries(
   symbol: string,
   interval: string = "1day",
   outputSize: number = 30
 ): Promise<OHLCVBar[]> {
+  const isIntraday = interval in INTRADAY_INTERVALS;
+
+  if (isIntraday) {
+    return getIntradayTimeSeries(symbol, interval, outputSize);
+  }
+
   // Use EOD-specific ticker for symbols that need it (e.g. CL → CL.US)
   const eodSymbol = toEodhdEodSymbol(symbol);
 
@@ -225,14 +246,14 @@ export async function getTimeSeries(
   const toStr = to.toISOString().split("T")[0];
 
   // Use EOD endpoint for daily data
-  const period = interval === "1day" ? "d" : interval === "1week" ? "w" : "d";
+  const period = interval === "1day" ? "d" : interval === "1week" ? "w" : interval === "1month" ? "m" : "d";
 
   const data = await fetchEodhd(`eod/${eodSymbol}`, {
     from: fromStr,
     to: toStr,
     period,
     order: "d", // Descending (newest first)
-  });
+  }, 120); // Cache EOD data for 2 minutes (it only updates once a day)
 
   if (!Array.isArray(data)) return [];
 
@@ -246,6 +267,45 @@ export async function getTimeSeries(
   }));
 }
 
+async function getIntradayTimeSeries(
+  symbol: string,
+  interval: string,
+  outputSize: number
+): Promise<OHLCVBar[]> {
+  const eodSymbol = toEodhdSymbol(symbol);
+  const eodhdInterval = INTRADAY_INTERVALS[interval] || "5m";
+
+  // Calculate date range for intraday: go back enough days to get enough bars
+  const to = new Date();
+  const from = new Date();
+  // For 1min data we need fewer days, for 4h we need more
+  const daysBack = interval === "1min" ? 3 : interval === "5min" ? 7 : interval === "15min" ? 14 : 30;
+  from.setDate(from.getDate() - daysBack);
+
+  const fromTimestamp = Math.floor(from.getTime() / 1000);
+  const toTimestamp = Math.floor(to.getTime() / 1000);
+
+  const data = await fetchEodhd(`intraday/${eodSymbol}`, {
+    interval: eodhdInterval,
+    from: fromTimestamp.toString(),
+    to: toTimestamp.toString(),
+  }, 10); // Cache intraday data for 10 seconds only
+
+  if (!Array.isArray(data)) return [];
+
+  // EODHD intraday returns newest-last, take the last N bars
+  const bars = data.slice(-outputSize);
+
+  return bars.map((bar: Record<string, string | number>) => ({
+    datetime: bar.datetime as string,
+    open: safeFloat(bar.open),
+    high: safeFloat(bar.high),
+    low: safeFloat(bar.low),
+    close: safeFloat(bar.close),
+    volume: parseInt(String(bar.volume)) || 0,
+  }));
+}
+
 export async function getTechnicalIndicators(
   symbol: string,
   interval: string = "1day"
@@ -254,11 +314,11 @@ export async function getTechnicalIndicators(
   const eodSymbol = toEodhdEodSymbol(symbol);
 
   const [rsiData, macdData, sma20Data, sma50Data, bbData] = await Promise.allSettled([
-    fetchEodhd(`technical/${eodSymbol}`, { function: "rsi", period: "14" }),
-    fetchEodhd(`technical/${eodSymbol}`, { function: "macd", fast_period: "12", slow_period: "26", signal_period: "9" }),
-    fetchEodhd(`technical/${eodSymbol}`, { function: "sma", period: "20" }),
-    fetchEodhd(`technical/${eodSymbol}`, { function: "sma", period: "50" }),
-    fetchEodhd(`technical/${eodSymbol}`, { function: "bbands", period: "20" }),
+    fetchEodhd(`technical/${eodSymbol}`, { function: "rsi", period: "14" }, 60),
+    fetchEodhd(`technical/${eodSymbol}`, { function: "macd", fast_period: "12", slow_period: "26", signal_period: "9" }, 60),
+    fetchEodhd(`technical/${eodSymbol}`, { function: "sma", period: "20" }, 60),
+    fetchEodhd(`technical/${eodSymbol}`, { function: "sma", period: "50" }, 60),
+    fetchEodhd(`technical/${eodSymbol}`, { function: "bbands", period: "20" }, 60),
   ]);
 
   const getLatest = (result: PromiseSettledResult<Record<string, string | number>[]>) => {

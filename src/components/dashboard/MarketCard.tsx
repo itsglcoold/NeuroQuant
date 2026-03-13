@@ -102,15 +102,38 @@ export function MarketCard({
   );
 }
 
+function getCurrencyPrefix(symbol: string): string {
+  // USD-denominated assets
+  if (["XAU/USD", "XAG/USD", "CL", "SPX", "IXIC", "DXY"].includes(symbol)) return "$";
+  // Forex pairs — use the quote currency symbol
+  if (symbol.includes("/")) {
+    const quote = symbol.split("/")[1];
+    if (quote === "USD") return "$";
+    if (quote === "GBP") return "\u00A3";
+    if (quote === "JPY") return "\u00A5";
+    if (quote === "CHF") return "Fr ";
+    if (quote === "CAD") return "C$";
+    if (quote === "AUD") return "A$";
+    if (quote === "NZD") return "NZ$";
+    return "";
+  }
+  return "$";
+}
+
 function formatPrice(price: number, symbol: string): string {
+  const prefix = getCurrencyPrefix(symbol);
   if (symbol.includes("JPY")) {
-    return price.toFixed(3);
+    return `${prefix}${price.toFixed(3)}`;
   }
   if (symbol === "SPX" || symbol === "IXIC") {
-    return price.toLocaleString("en-US", {
+    return `${prefix}${price.toLocaleString("en-US", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    });
+    })}`;
   }
-  return price.toFixed(2);
+  // Forex majors with 4-5 decimal places
+  if (symbol.includes("/") && !symbol.includes("JPY")) {
+    return `${prefix}${price.toFixed(price < 10 ? 5 : 4)}`;
+  }
+  return `${prefix}${price.toFixed(2)}`;
 }

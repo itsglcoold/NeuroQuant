@@ -21,6 +21,29 @@ export const metadata: Metadata = {
     "AI trading",
     "technical analysis",
   ],
+  metadataBase: new URL("https://neuroquant.app"),
+  openGraph: {
+    title: "NeuroQuant — AI Market Research",
+    description: "Triple-AI consensus engine for Gold, Forex, Oil & Indices. Real-time charts, 3 AI analysts, institutional-grade insights.",
+    url: "https://neuroquant.app",
+    siteName: "NeuroQuant",
+    type: "website",
+    locale: "en_US",
+    images: [
+      {
+        url: "/logo-bg.png",
+        width: 1200,
+        height: 630,
+        alt: "NeuroQuant — AI Market Research",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "NeuroQuant — AI Market Research",
+    description: "Triple-AI consensus engine for Gold, Forex, Oil & Indices.",
+    images: ["/logo-bg.png"],
+  },
 };
 
 export default function RootLayout({

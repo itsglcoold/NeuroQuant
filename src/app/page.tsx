@@ -24,7 +24,7 @@ const features = [
     icon: Brain,
     title: "Triple-AI Consensus",
     description:
-      "Three independent AI models — two for technical, one for fundamental analysis — cross-validate for maximum reliability.",
+      "Three independent AI models analyze every market from different angles — quantitative, visual, and strategic — then converge into one consensus.",
     gradient: "from-blue-500 to-cyan-500",
   },
   {
@@ -69,7 +69,7 @@ export default function Home() {
               <span className="text-lg font-semibold tracking-tight leading-none">
                 NeuroQuant
               </span>
-              <span className="hidden sm:block text-xs font-bold text-foreground leading-none mt-0.5">
+              <span className="block text-[10px] sm:text-xs font-bold text-foreground leading-none mt-0.5">
                 AI Market Research
               </span>
             </div>
@@ -86,6 +86,12 @@ export default function Home() {
               className="text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
               Markets
+            </Link>
+            <Link
+              href="#how-it-works"
+              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              How it Works
             </Link>
             <Link
               href="/pricing"
@@ -374,6 +380,103 @@ export default function Home() {
                 </div>
               );
             })()}
+          </div>
+        </div>
+      </section>
+
+      {/* How it Works — Triple-Analyst Consensus */}
+      <section id="how-it-works" className="relative py-20 sm:py-32 border-t border-border">
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute right-1/3 top-1/3 h-[500px] w-[500px] rounded-full bg-blue-500/5 blur-[120px]" />
+        </div>
+
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center mb-16">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-4 py-1.5 text-sm text-blue-500 dark:text-blue-400">
+              <Brain className="h-3.5 w-3.5" />
+              Institutional-Grade Consensus Engine
+            </div>
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+              How the{" "}
+              <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                Triple-AI Consensus
+              </span>{" "}
+              works
+            </h2>
+            <p className="mt-4 text-lg text-muted-foreground">
+              We don&apos;t rely on a single opinion. Three specialized AI
+              analysts independently scan the market — only when they converge
+              does the NeuroQuant Consensus emerge.
+            </p>
+          </div>
+
+          <div className="grid gap-6 sm:grid-cols-3">
+            {/* Analyst Alpha */}
+            <div className="group relative rounded-2xl border border-blue-500/20 bg-gradient-to-b from-blue-500/10 via-card to-card p-6 transition-all hover:border-blue-500/40 hover:shadow-lg hover:shadow-blue-500/5">
+              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/15 shadow-inner">
+                <Layers className="h-6 w-6 text-blue-500" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground">Analyst Alpha</h3>
+              <p className="text-xs font-semibold uppercase tracking-wider text-blue-500 dark:text-blue-400 mb-3">
+                Quantitative Engine
+              </p>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Alpha is our &quot;numbers engine.&quot; It processes thousands
+                of data points — from RSI and moving averages to complex
+                Fibonacci retracements — searching for statistical patterns
+                invisible to the human eye.
+              </p>
+            </div>
+
+            {/* Analyst Beta */}
+            <div className="group relative rounded-2xl border border-purple-500/20 bg-gradient-to-b from-purple-500/10 via-card to-card p-6 transition-all hover:border-purple-500/40 hover:shadow-lg hover:shadow-purple-500/5">
+              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-purple-500/15 shadow-inner">
+                <Activity className="h-6 w-6 text-purple-500" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground">Analyst Beta</h3>
+              <p className="text-xs font-semibold uppercase tracking-wider text-purple-500 dark:text-purple-400 mb-3">
+                Pattern Recognition
+              </p>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Beta is the &quot;chartist.&quot; Using advanced pattern
+                recognition, it identifies formations like head-and-shoulders,
+                flags, and support zones — exactly like a seasoned trader, but
+                at the speed of light.
+              </p>
+            </div>
+
+            {/* Analyst Gamma */}
+            <div className="group relative rounded-2xl border border-emerald-500/20 bg-gradient-to-b from-emerald-500/10 via-card to-card p-6 transition-all hover:border-emerald-500/40 hover:shadow-lg hover:shadow-emerald-500/5">
+              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/15 shadow-inner">
+                <Globe className="h-6 w-6 text-emerald-500" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground">Analyst Gamma</h3>
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-500 dark:text-emerald-400 mb-3">
+                Strategic Context
+              </p>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Gamma is the &quot;strategist.&quot; It goes beyond just price
+                — integrating technical signals with macro-economic trends,
+                central bank policy, and cross-market correlations for a deeper,
+                more nuanced perspective.
+              </p>
+            </div>
+          </div>
+
+          {/* Convergence arrow */}
+          <div className="mt-10 text-center space-y-4">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card shadow-md">
+              <ArrowRight className="h-5 w-5 text-muted-foreground rotate-90" />
+            </div>
+            <div className="mx-auto max-w-md rounded-xl border border-blue-500/30 bg-gradient-to-r from-blue-500/10 via-card to-cyan-500/10 p-5">
+              <h4 className="font-bold text-foreground">NeuroQuant Consensus</h4>
+              <p className="text-sm text-muted-foreground mt-1">
+                Individual AI models can sometimes see patterns that aren&apos;t
+                there. By combining three different specialisms — quantitative,
+                visual, and strategic — NeuroQuant filters the noise and
+                delivers a distilled, objective score.
+              </p>
+            </div>
           </div>
         </div>
       </section>

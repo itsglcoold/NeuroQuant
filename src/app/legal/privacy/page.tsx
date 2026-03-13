@@ -188,48 +188,48 @@ export default function PrivacyPolicyPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-white/10">
-                <th className="py-3 pr-4 text-left font-semibold text-white">
+              <tr className="border-b border-border">
+                <th className="py-3 pr-4 text-left font-semibold text-foreground">
                   Processor
                 </th>
-                <th className="py-3 pr-4 text-left font-semibold text-white">
+                <th className="py-3 pr-4 text-left font-semibold text-foreground">
                   Purpose
                 </th>
-                <th className="py-3 text-left font-semibold text-white">
+                <th className="py-3 text-left font-semibold text-foreground">
                   Data Location
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
+            <tbody className="divide-y divide-border">
               <tr>
-                <td className="py-3 pr-4 text-zinc-300">Supabase</td>
-                <td className="py-3 pr-4 text-zinc-300">
+                <td className="py-3 pr-4 text-muted-foreground">Supabase</td>
+                <td className="py-3 pr-4 text-muted-foreground">
                   Authentication, database, and file storage
                 </td>
-                <td className="py-3 text-zinc-300">EU (Frankfurt, Germany)</td>
+                <td className="py-3 text-muted-foreground">EU (Frankfurt, Germany)</td>
               </tr>
               <tr>
-                <td className="py-3 pr-4 text-zinc-300">Vercel</td>
-                <td className="py-3 pr-4 text-zinc-300">
+                <td className="py-3 pr-4 text-muted-foreground">Cloudflare</td>
+                <td className="py-3 pr-4 text-muted-foreground">
                   Application hosting and content delivery
                 </td>
-                <td className="py-3 text-zinc-300">EU / Global CDN</td>
+                <td className="py-3 text-muted-foreground">EU / Global CDN</td>
               </tr>
               <tr>
-                <td className="py-3 pr-4 text-zinc-300">Stripe</td>
-                <td className="py-3 pr-4 text-zinc-300">
+                <td className="py-3 pr-4 text-muted-foreground">Stripe</td>
+                <td className="py-3 pr-4 text-muted-foreground">
                   Payment processing and subscription management
                 </td>
-                <td className="py-3 text-zinc-300">EU / US</td>
+                <td className="py-3 text-muted-foreground">EU / US</td>
               </tr>
               <tr>
-                <td className="py-3 pr-4 text-zinc-300">
+                <td className="py-3 pr-4 text-muted-foreground">
                   AI Model Providers
                 </td>
-                <td className="py-3 pr-4 text-zinc-300">
+                <td className="py-3 pr-4 text-muted-foreground">
                   AI-powered market analysis and chart interpretation
                 </td>
-                <td className="py-3 text-zinc-300">US / Global</td>
+                <td className="py-3 text-muted-foreground">US / Global</td>
               </tr>
             </tbody>
           </table>

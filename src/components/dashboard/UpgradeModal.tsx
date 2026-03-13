@@ -32,6 +32,7 @@ const FEATURE_NAMES: Record<string, string> = {
   "ai-chat": "AI Chat",
   "triple-ai": "Triple-AI Consensus",
   "custom-alerts": "Custom Alerts & Notifications",
+  "ai-suggestions": "AI Market Suggestions",
   "historical-reports": "Historical Analysis Reports",
   "api-access": "API Access",
 };
@@ -82,6 +83,7 @@ export function UpgradeModal({ open, onClose, feature, requiredTier, reason = "f
                 <li>• Triple-AI consensus engine</li>
                 <li>• Chart upload & pattern recognition</li>
                 <li>• All technical indicators</li>
+                <li>• AI Market Suggestions (3 markets)</li>
               </>
             ) : (
               <>
@@ -90,6 +92,7 @@ export function UpgradeModal({ open, onClose, feature, requiredTier, reason = "f
                 <li>• AI Chat for market Q&A</li>
                 <li>• Historical analysis reports</li>
                 <li>• API access for your own tools</li>
+                <li>• AI Market Suggestions (5 markets)</li>
               </>
             )}
           </ul>

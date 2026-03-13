@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { AlertTriangle, ShieldAlert, ExternalLink } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 const DISCLAIMER_KEY = "disclaimer_accepted";
 const EXPIRY_DAYS = 30;
@@ -16,13 +17,12 @@ interface StoredDisclaimer {
   timestamp: number;
 }
 
-function isDisclaimerValid(): boolean {
+function isDisclaimerValidLocal(): boolean {
   if (typeof window === "undefined") return false;
   const raw = localStorage.getItem(DISCLAIMER_KEY);
   if (!raw) return false;
 
   try {
-    // Support legacy format (plain timestamp) — treat as expired so users re-accept
     const parsed = JSON.parse(raw) as StoredDisclaimer;
     if (!parsed.version || !parsed.timestamp) return false;
     if (parsed.version !== DISCLAIMER_VERSION) return false;
@@ -30,8 +30,26 @@ function isDisclaimerValid(): boolean {
     const expiryMs = EXPIRY_DAYS * 24 * 60 * 60 * 1000;
     return Date.now() - parsed.timestamp < expiryMs;
   } catch {
-    // Legacy plain-number format or corrupted — force re-accept
     return false;
+  }
+}
+
+/** Save disclaimer acceptance to Supabase profiles table (fire-and-forget) */
+async function saveDisclaimerToSupabase() {
+  try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    await supabase
+      .from("profiles")
+      .update({
+        disclaimer_version: DISCLAIMER_VERSION,
+        disclaimer_accepted_at: new Date().toISOString(),
+      })
+      .eq("id", user.id);
+  } catch {
+    // Supabase logging is best-effort; localStorage is the primary gate
   }
 }
 
@@ -63,7 +81,7 @@ export function DisclaimerGate({ children }: { children: React.ReactNode }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const valid = isDisclaimerValid();
+    const valid = isDisclaimerValidLocal();
     requestAnimationFrame(() => setAccepted(valid));
   }, []);
 
@@ -93,6 +111,8 @@ export function DisclaimerGate({ children }: { children: React.ReactNode }) {
       timestamp: Date.now(),
     };
     localStorage.setItem(DISCLAIMER_KEY, JSON.stringify(data));
+    // Also log to Supabase (fire-and-forget, non-blocking)
+    saveDisclaimerToSupabase();
     setAccepted(true);
   };
 

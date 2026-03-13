@@ -22,6 +22,37 @@ const CATEGORY_SYMBOLS: Record<string, string[]> = {
   indices: ["SPX", "IXIC"],
 };
 
+// Extract a readable source name from EODHD news item
+function extractSource(item: Record<string, unknown>): string {
+  // EODHD may use different field names for source
+  const directSource =
+    (item.source as string) ||
+    (item.site as string) ||
+    (item.site_name as string) ||
+    (item.publisher as string);
+  const ignoreSources = ["null", "unknown", "undefined", ""];
+  if (directSource && !ignoreSources.includes(directSource.toLowerCase().trim())) return directSource;
+
+  // Fallback: extract domain name from article URL
+  const link = (item.link as string) || (item.url as string) || "";
+  if (link) {
+    try {
+      const hostname = new URL(link).hostname
+        .replace(/^www\./, "")
+        .replace(/\.(com|org|net|co|io|uk|au).*$/, "");
+      // Capitalize first letter of each segment
+      return hostname
+        .split(".")
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
+    } catch {
+      // ignore
+    }
+  }
+
+  return "Market Wire";
+}
+
 function inferCategory(text: string, symbol?: string): MarketCategory {
   const lower = text.toLowerCase();
 
@@ -175,19 +206,22 @@ async function fetchNewsByCategory(category: MarketCategory, limit: number): Pro
         fmt: "json",
       });
       const url = `${BASE_URL}/news?${params}`;
-      const response = await fetch(url, { cache: "no-store" });
+      const response = await fetch(url, {});
       if (!response.ok) return [];
       const data = await response.json();
       if (!Array.isArray(data)) return [];
 
+      // Helper: clean up junk symbol values from EODHD
+      const junk = ["unknown", "null", "undefined", ""];
       return data.map((item: Record<string, unknown>, index: number) => {
         const articleSymbols = item.symbols as string[] | undefined;
-        const firstSymbol = articleSymbols?.[0] || undefined;
+        const rawSymbol = articleSymbols?.[0];
+        const firstSymbol = rawSymbol && !junk.includes(rawSymbol.toLowerCase().trim()) ? rawSymbol : undefined;
         return {
           id: `live-${category}-${s}-${index}-${Date.now()}`,
           title: (item.title as string) || "Untitled",
           description: (item.content as string)?.substring(0, 300) || (item.title as string) || "",
-          source: (item.source as string) || "Unknown",
+          source: extractSource(item),
           url: (item.link as string) || "#",
           publishedAt: (item.date as string) || new Date().toISOString(),
           category: category, // Force the category since we queried for it
@@ -235,7 +269,7 @@ async function fetchLiveNews(symbol: string | undefined, limit: number): Promise
   const searchParams = new URLSearchParams(params);
   const url = `${BASE_URL}/news?${searchParams}`;
 
-  const response = await fetch(url, { cache: "no-store" }); // Always fetch fresh news
+  const response = await fetch(url, {}); // Always fetch fresh news
   if (!response.ok) {
     throw new Error(`EODHD news API error: ${response.status}`);
   }
@@ -246,15 +280,22 @@ async function fetchLiveNews(symbol: string | undefined, limit: number): Promise
     throw new Error("Unexpected API response format");
   }
 
+  // Helper: clean up junk symbol values from EODHD
+  const junkValues = ["unknown", "null", "undefined", ""];
+  function cleanSymbolValue(raw: string | undefined): string | undefined {
+    if (!raw) return undefined;
+    return junkValues.includes(raw.toLowerCase().trim()) ? undefined : raw;
+  }
+
   return data.map((item: Record<string, unknown>, index: number) => {
     const symbols = item.symbols as string[] | undefined;
-    const firstSymbol = symbols?.[0] || undefined;
+    const firstSymbol = cleanSymbolValue(symbols?.[0]);
 
     return {
       id: `live-${index}-${Date.now()}`,
       title: (item.title as string) || "Untitled",
       description: (item.content as string)?.substring(0, 300) || (item.title as string) || "",
-      source: (item.source as string) || "Unknown",
+      source: extractSource(item),
       url: (item.link as string) || "#",
       publishedAt: (item.date as string) || new Date().toISOString(),
       category: inferCategory((item.title as string) || "", firstSymbol),

@@ -7,9 +7,12 @@ import { useMarketData } from "@/hooks/useMarketData";
 import { SessionTimes } from "@/components/dashboard/SessionTimes";
 import { Activity, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useUsageTracking } from "@/hooks/useUsageTracking";
+import { AISuggestions } from "@/components/dashboard/AISuggestions";
 
 export default function DashboardPage() {
-  const { prices, loading, error, refetch } = useMarketData(60000);
+  const { prices, loading, error, latency, lastUpdated, refetch } = useMarketData(15000);
+  const { tier } = useUsageTracking();
 
   return (
     <div className="space-y-8">
@@ -38,7 +41,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Status bar */}
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-secondary/50 px-4 py-2.5">
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-secondary/50 px-4 py-2.5">
         <div className="relative flex h-2 w-2 items-center justify-center">
           <span className="absolute h-2 w-2 animate-ping rounded-full bg-emerald-400 opacity-75" />
           <span className="relative h-2 w-2 rounded-full bg-emerald-500" />
@@ -49,6 +52,33 @@ export default function DashboardPage() {
         <span className="text-xs text-muted-foreground">
           {error ? "Connection error — retrying…" : "Real-time data updating"}
         </span>
+        {latency !== null && !error && (
+          <>
+            <span className="text-xs text-muted-foreground">|</span>
+            <span className={cn(
+              "inline-flex items-center gap-1 text-xs font-medium",
+              latency < 500 ? "text-emerald-600 dark:text-emerald-400" :
+              latency < 1500 ? "text-amber-600 dark:text-amber-400" :
+              "text-red-600 dark:text-red-400"
+            )}>
+              <span className={cn(
+                "h-1.5 w-1.5 rounded-full",
+                latency < 500 ? "bg-emerald-500" :
+                latency < 1500 ? "bg-amber-500" :
+                "bg-red-500"
+              )} />
+              {latency}ms
+            </span>
+          </>
+        )}
+        {lastUpdated && !error && (
+          <>
+            <span className="text-xs text-muted-foreground">|</span>
+            <span className="text-xs text-muted-foreground/60">
+              Updated {lastUpdated.toLocaleTimeString()}
+            </span>
+          </>
+        )}
       </div>
 
       {/* Market sessions */}
@@ -58,6 +88,9 @@ export default function DashboardPage() {
         </h2>
         <SessionTimes />
       </section>
+
+      {/* AI Market Suggestions */}
+      <AISuggestions tier={tier} />
 
       {/* Market cards by category */}
       {(
