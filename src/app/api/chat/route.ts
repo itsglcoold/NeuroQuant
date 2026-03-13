@@ -2,7 +2,6 @@ import { NextRequest } from "next/server";
 import { chatSystemPrompt, DISCLAIMER } from "@/lib/ai/prompts";
 import OpenAI from "openai";
 
-export const runtime = 'edge';
 
 function getDeepseek() {
   return new OpenAI({
