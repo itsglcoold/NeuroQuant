@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getEconomicCalendar } from "@/lib/market/economic-calendar";
 import OpenAI from "openai";
 
+export const runtime = "edge";
 
 function getDeepseek() {
   return new OpenAI({

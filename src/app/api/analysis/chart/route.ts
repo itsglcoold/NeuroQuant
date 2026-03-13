@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeChart } from "@/lib/ai/qwen";
 
+export const runtime = 'edge';
 
 export async function POST(request: NextRequest) {
   try {

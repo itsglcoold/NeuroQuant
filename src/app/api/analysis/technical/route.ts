@@ -6,6 +6,7 @@ import { analyzeTechnical as claudeAnalyze } from "@/lib/ai/claude";
 import { calculateConsensus } from "@/lib/ai/consensus";
 import type { ModelOutput } from "@/types/analysis";
 
+export const runtime = 'edge';
 
 export async function POST(request: NextRequest) {
   const { symbol, tier = "free" } = await request.json();

@@ -5,6 +5,7 @@ import { marketScreeningPrompt, DISCLAIMER } from "@/lib/ai/prompts";
 import type { MarketSuggestion, SuggestionsResponse } from "@/types/analysis";
 import OpenAI from "openai";
 
+export const runtime = "edge";
 
 const CACHE_TTL_SECONDS = 30 * 60; // 30 minutes
 const CACHE_KEY = "https://neuroquant.app/_internal/suggestions-cache";
