@@ -228,8 +228,8 @@ function TradingViewChartInner({ symbol, height = 500, interval: intervalProp = 
         </div>
       </div>
 
-      <div className="rounded-b-lg overflow-hidden border border-border bg-[#131722]">
-        <div ref={containerRef} style={{ height: `${height}px`, width: "100%" }} />
+      <div className="rounded-b-lg overflow-hidden border border-border bg-[#131722]" suppressHydrationWarning>
+        <div ref={containerRef} suppressHydrationWarning style={{ height: `${height}px`, width: "100%" }} />
       </div>
     </div>
   );

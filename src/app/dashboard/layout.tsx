@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Sidebar, MobileSidebar } from "@/components/dashboard/Sidebar";
 import { DisclaimerGate } from "@/components/dashboard/DisclaimerGate";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { BarChart3, Bell, User, Settings, CreditCard, LogOut, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -142,7 +143,9 @@ export default function DashboardLayout({
 
           {/* Page content */}
           <main className="min-h-0 flex-1 overflow-y-auto bg-background p-4 pb-12 lg:p-6 lg:pb-12">
-            {children}
+            <ErrorBoundary>
+              {children}
+            </ErrorBoundary>
           </main>
         </div>
       </div>
