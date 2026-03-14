@@ -26,7 +26,7 @@ export async function analyzeTechnical(marketData: {
   const context = buildMarketDataContext(marketData);
 
   const response = await getClient().chat.completions.create({
-    model: "qwen3.5-plus",
+    model: "qwen-plus",   // text-only model — faster than qwen3.5-plus (multimodal)
     messages: [
       { role: "system", content: technicalAnalysisPrompt("qwen", marketData.symbol) },
       { role: "user", content: `Analyze the following market data:\n\n${context}` },
