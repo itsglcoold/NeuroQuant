@@ -204,7 +204,7 @@ function LockedContent({ onUpgrade }: { onUpgrade: () => void }) {
 }
 
 export function AISuggestions({ tier }: AISuggestionsProps) {
-  const { suggestions, loading, error, lastUpdated, refetch } = useAISuggestions(tier);
+  const { suggestions, loading, error, lastUpdated, isStale, refetch } = useAISuggestions(tier);
   const [collapsed, setCollapsed] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("nq_suggestions_collapsed") === "true";
@@ -250,6 +250,12 @@ export function AISuggestions({ tier }: AISuggestionsProps) {
           {canAccess && lastUpdated && (
             <span className="text-[10px] text-muted-foreground">
               {lastUpdated.toLocaleTimeString()}
+              {isStale && (
+                <span className="ml-1.5 inline-flex items-center gap-1 text-amber-500">
+                  <RefreshCw className="inline h-2.5 w-2.5 animate-spin" />
+                  refreshing…
+                </span>
+              )}
             </span>
           )}
           {canAccess && !loading && (

@@ -11,7 +11,9 @@ export function useAISuggestions(tier: UserTier) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isStale, setIsStale] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const hasFetchedOnce = useRef(false);
 
   const fetchSuggestions = useCallback(async () => {
     if (tier === "free") {
@@ -24,7 +26,11 @@ export function useAISuggestions(tier: UserTier) {
     const controller = new AbortController();
     abortRef.current = controller;
 
-    setLoading(true);
+    // Only show loading spinner if we have NO data yet (first load)
+    // If we already have tiles, keep showing them while refreshing silently
+    if (suggestions.length === 0 && !hasFetchedOnce.current) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -44,14 +50,20 @@ export function useAISuggestions(tier: UserTier) {
       const data = await res.json();
       setSuggestions(data.suggestions || []);
       setLastUpdated(new Date());
+      setIsStale(data._stale === true);
       setError(null);
+      hasFetchedOnce.current = true;
     } catch (err) {
       // Don't show error for aborted requests
       if (err instanceof DOMException && err.name === "AbortError") return;
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      // Only show error if we have no data — otherwise keep stale tiles visible
+      if (suggestions.length === 0) {
+        setError(err instanceof Error ? err.message : "Something went wrong");
+      }
     } finally {
       setLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tier]);
 
   // Fetch on mount and on tier change
@@ -79,7 +91,8 @@ export function useAISuggestions(tier: UserTier) {
     }
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [tier, fetchSuggestions]);
 
   // Cleanup abort controller on unmount
@@ -87,5 +100,12 @@ export function useAISuggestions(tier: UserTier) {
     return () => abortRef.current?.abort();
   }, []);
 
-  return { suggestions, loading, error, lastUpdated, refetch: fetchSuggestions };
+  return {
+    suggestions,
+    loading,
+    error,
+    lastUpdated,
+    isStale,
+    refetch: fetchSuggestions,
+  };
 }
