@@ -4,7 +4,11 @@ import { analyzeTechnical as deepseekAnalyze } from "@/lib/ai/deepseek";
 import { analyzeTechnical as qwenAnalyze } from "@/lib/ai/qwen";
 import { analyzeTechnical as claudeAnalyze } from "@/lib/ai/claude";
 import { calculateConsensus } from "@/lib/ai/consensus";
+import { withTimeout, withRetry } from "@/lib/ai/timeout";
 import type { ModelOutput } from "@/types/analysis";
+
+/** Per-analyst timeout: 20 seconds max per AI call */
+const ANALYST_TIMEOUT_MS = 20_000;
 
 export const runtime = 'edge';
 
@@ -103,30 +107,42 @@ export async function POST(request: NextRequest) {
           ];
 
           // Create promises that send results as they resolve
+          // Each analyst gets a timeout + 1 retry to ensure all 3 complete
+          let successCount = 0;
+
           const promises = analysts.map(async (analyst, index) => {
             try {
-              const result = await analyst.fn(marketData);
+              const result = await withRetry(
+                () => withTimeout(analyst.fn(marketData), ANALYST_TIMEOUT_MS, analyst.name),
+                1,     // 1 retry on failure
+                500,   // 500ms delay before retry
+                analyst.name
+              );
               modelOutputs.push(result);
+              successCount++;
               send("analyst", { index, result });
               return result;
             } catch (err) {
-              console.error(`${analyst.name} failed:`, err);
+              console.error(`${analyst.name} failed after retry:`, err);
               const fallback: ModelOutput = {
                 model: `Analyst ${analyst.name}`,
                 sentiment: 0,
                 direction: "neutral",
                 confidence: 0, // 0 confidence → consensus redistributes weight to other models
                 keyLevels: { support: [], resistance: [] },
-                reasoning: "Analysis unavailable — model timed out. Remaining analysts have been reweighted for consensus.",
+                reasoning: "Analysis unavailable — model timed out after retry. Remaining analysts have been reweighted for consensus.",
                 timestamp: new Date().toISOString(),
               };
               modelOutputs.push(fallback);
-              send("analyst", { index, result: fallback });
+              send("analyst", { index, result: fallback, failed: true });
               return fallback;
             }
           });
 
           await Promise.all(promises);
+
+          // Report how many analysts succeeded
+          send("analysts_complete", { total: 3, success: successCount, failed: 3 - successCount });
         }
 
         // Step 3: Calculate consensus

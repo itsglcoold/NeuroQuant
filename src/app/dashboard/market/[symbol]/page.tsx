@@ -158,6 +158,7 @@ export default function MarketDetailPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisStatus, setAnalysisStatus] = useState<string>("");
   const [streamedAnalysts, setStreamedAnalysts] = useState<ModelOutput[]>([]);
+  const [analystFailures, setAnalystFailures] = useState(0);
   const [showIndicators, setShowIndicators] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [selectedInterval, setSelectedInterval] = useState(INTERVALS[5]); // Default: 1D
@@ -200,6 +201,7 @@ export default function MarketDetailPage() {
     setAnalysisStatus("Starting analysis…");
     setStreamedAnalysts([]);
     setConsensus(null);
+    setAnalystFailures(0);
     consumeAnalysis();
 
     const apiInterval = intervalOverride || selectedInterval.api;
@@ -247,7 +249,16 @@ export default function MarketDetailPage() {
                 next[data.index] = data.result;
                 return next;
               });
-              setAnalysisStatus(`${data.result.model} done — ${data.result.direction} (${data.result.confidence}%)`);
+              if (data.failed) {
+                setAnalystFailures((prev) => prev + 1);
+                setAnalysisStatus(`⚠ ${data.result.model} failed — retrying next time`);
+              } else {
+                setAnalysisStatus(`${data.result.model} done — ${data.result.direction} (${data.result.confidence}%)`);
+              }
+            } else if (event === "analysts_complete") {
+              if (data.failed > 0) {
+                setAnalysisStatus(`⚠ ${data.success}/${data.total} analysts completed — ${data.failed} failed`);
+              }
             } else if (event === "consensus") {
               setConsensus(data.consensus);
               if (data.price) setPrice(data.price);
@@ -453,6 +464,23 @@ export default function MarketDetailPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Analyst Tabs — left 2/3 */}
             <div className="lg:col-span-2 space-y-4">
+              {/* Warning if analysts failed */}
+              {analystFailures > 0 && !analyzing && (
+                <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm">
+                  <Shield className="h-4 w-4 text-amber-500 shrink-0" />
+                  <span className="text-amber-600 dark:text-amber-400">
+                    {analystFailures === 1
+                      ? "1 analyst timed out — consensus is based on 2 analysts. Try again for full accuracy."
+                      : `${analystFailures} analysts timed out — results may be less accurate. Try again.`}
+                  </span>
+                  <button
+                    onClick={() => runAnalysis()}
+                    className="ml-auto shrink-0 text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
               {analyses.length > 0 && (
                 <AnalystTabs
                   analyses={analyses}

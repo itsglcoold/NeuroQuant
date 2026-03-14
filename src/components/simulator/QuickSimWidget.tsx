@@ -440,7 +440,7 @@ export function QuickSimWidget({
           className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-blue-500/30 bg-blue-500/5 px-3 py-2 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 transition-colors"
         >
           <Zap className="h-3.5 w-3.5" />
-          Auto-fill via AI (Support/Resistance)
+          Auto-fill Stop Loss / Take Profit
         </button>
       ) : (
         <div className="flex items-center justify-center gap-1.5 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
