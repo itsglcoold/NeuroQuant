@@ -148,25 +148,42 @@ export async function GET(request: NextRequest) {
     const systemMessage = marketScreeningPrompt();
 
     // Step 3: Run DeepSeek + Qwen in parallel — dual AI screening
+    // Wrap each call with a 30-second timeout to prevent 3+ minute waits
+    const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> =>
+      Promise.race([
+        promise,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`AI screening timeout after ${ms}ms`)), ms)
+        ),
+      ]);
+
+    const AI_TIMEOUT = 30_000; // 30 seconds max per model
+
     const [deepseekRes, qwenRes] = await Promise.allSettled([
-      getDeepSeekClient().chat.completions.create({
-        model: "deepseek-chat",
-        messages: [
-          { role: "system", content: systemMessage },
-          { role: "user", content: userMessage },
-        ],
-        temperature: 0.2,
-        max_tokens: 2000,
-      }),
-      getQwenClient().chat.completions.create({
-        model: "qwen3.5-plus",
-        messages: [
-          { role: "system", content: systemMessage },
-          { role: "user", content: userMessage },
-        ],
-        temperature: 0.2,
-        max_tokens: 2000,
-      }),
+      withTimeout(
+        getDeepSeekClient().chat.completions.create({
+          model: "deepseek-chat",
+          messages: [
+            { role: "system", content: systemMessage },
+            { role: "user", content: userMessage },
+          ],
+          temperature: 0.2,
+          max_tokens: 1000,
+        }),
+        AI_TIMEOUT
+      ),
+      withTimeout(
+        getQwenClient().chat.completions.create({
+          model: "qwen3.5-plus",
+          messages: [
+            { role: "system", content: systemMessage },
+            { role: "user", content: userMessage },
+          ],
+          temperature: 0.2,
+          max_tokens: 1000,
+        }),
+        AI_TIMEOUT
+      ),
     ]);
 
     const deepseekSuggestions = deepseekRes.status === "fulfilled"

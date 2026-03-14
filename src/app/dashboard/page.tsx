@@ -9,10 +9,44 @@ import { Activity, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUsageTracking } from "@/hooks/useUsageTracking";
 import { AISuggestions } from "@/components/dashboard/AISuggestions";
+import { useMemo } from "react";
+
+/** Check if any major forex/commodity market is currently open */
+function useMarketStatus() {
+  // Re-evaluated on each render (every 15s via useMarketData refresh)
+  return useMemo(() => {
+    const now = new Date();
+    const utcDay = now.getUTCDay(); // 0=Sun, 6=Sat
+    const utcHour = now.getUTCHours();
+
+    // Forex market: Sun 21:00 UTC → Fri 21:00 UTC
+    // Closed: Fri 21:00 → Sun 21:00
+    if (utcDay === 6) return { open: false, label: "Markets are closed (weekend)" };
+    if (utcDay === 0 && utcHour < 21) return { open: false, label: "Markets are closed (weekend)" };
+    if (utcDay === 5 && utcHour >= 21) return { open: false, label: "Markets are closed (weekend)" };
+
+    // Determine which session(s) are active
+    const sessions: string[] = [];
+    // Sydney: 21:00–06:00 UTC
+    if (utcHour >= 21 || utcHour < 6) sessions.push("Sydney");
+    // Tokyo: 00:00–09:00 UTC
+    if (utcHour >= 0 && utcHour < 9) sessions.push("Tokyo");
+    // London: 07:00–16:00 UTC
+    if (utcHour >= 7 && utcHour < 16) sessions.push("London");
+    // New York: 13:00–22:00 UTC
+    if (utcHour >= 13 && utcHour < 22) sessions.push("New York");
+
+    if (sessions.length > 0) {
+      return { open: true, label: `Markets are open (${sessions.join(" & ")})` };
+    }
+    return { open: true, label: "Markets are open" };
+  }, []);
+}
 
 export default function DashboardPage() {
   const { prices, loading, error, latency, lastUpdated, refetch } = useMarketData(15000);
   const { tier } = useUsageTracking();
+  const marketStatus = useMarketStatus();
 
   return (
     <div className="space-y-8">
@@ -43,10 +77,15 @@ export default function DashboardPage() {
       {/* Status bar */}
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-secondary/50 px-4 py-2.5">
         <div className="relative flex h-2 w-2 items-center justify-center">
-          <span className="absolute h-2 w-2 animate-ping rounded-full bg-emerald-400 opacity-75" />
-          <span className="relative h-2 w-2 rounded-full bg-emerald-500" />
+          {marketStatus.open && (
+            <span className="absolute h-2 w-2 animate-ping rounded-full bg-emerald-400 opacity-75" />
+          )}
+          <span className={cn(
+            "relative h-2 w-2 rounded-full",
+            marketStatus.open ? "bg-emerald-500" : "bg-amber-500"
+          )} />
         </div>
-        <span className="text-xs text-foreground/80">Markets are open</span>
+        <span className="text-xs text-foreground/80">{marketStatus.label}</span>
         <span className="text-xs text-muted-foreground">|</span>
         <Activity className="h-3 w-3 text-muted-foreground" />
         <span className="text-xs text-muted-foreground">
