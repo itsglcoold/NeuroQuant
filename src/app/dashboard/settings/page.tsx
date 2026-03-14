@@ -5,9 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { LogOut, User, CreditCard, Shield } from "lucide-react";
+import { LogOut, User, CreditCard, Shield, ExternalLink } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -114,13 +115,40 @@ export default function SettingsPage() {
             Legal & Disclaimers
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
             All analyses provided by this platform are for educational and informational
             purposes only. They do not constitute investment advice, financial advice,
             trading advice, or any other sort of advice. You should not treat any of
             the content as such. Do your own due diligence and consult your financial
             advisor before making any investment decisions.
+          </p>
+          <Separator />
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
+            <Link
+              href="/legal/terms"
+              className="inline-flex items-center gap-1 text-sm text-blue-400 transition-colors hover:text-blue-300"
+            >
+              Terms of Service
+              <ExternalLink className="h-3 w-3" />
+            </Link>
+            <Link
+              href="/legal/privacy"
+              className="inline-flex items-center gap-1 text-sm text-blue-400 transition-colors hover:text-blue-300"
+            >
+              Privacy Policy
+              <ExternalLink className="h-3 w-3" />
+            </Link>
+            <Link
+              href="/legal/risk-disclosure"
+              className="inline-flex items-center gap-1 text-sm text-blue-400 transition-colors hover:text-blue-300"
+            >
+              Risk Disclosure
+              <ExternalLink className="h-3 w-3" />
+            </Link>
+          </div>
+          <p className="text-xs text-muted-foreground/60">
+            Contact: <a href="mailto:legal@neuroquant.app" className="underline hover:text-muted-foreground transition-colors">legal@neuroquant.app</a> · <a href="mailto:privacy@neuroquant.app" className="underline hover:text-muted-foreground transition-colors">privacy@neuroquant.app</a>
           </p>
         </CardContent>
       </Card>
