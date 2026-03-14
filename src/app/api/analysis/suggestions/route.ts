@@ -289,29 +289,10 @@ export async function GET(request: NextRequest) {
   }
 
   // ---------------------------------------------------------------------------
-  // 3. STALE but usable cache → return stale data + revalidate in background
-  //    On Cloudflare we can't reliably use waitUntil from next-on-pages,
-  //    so we return stale and let the next request (after 5-min auto-refresh)
-  //    trigger a fresh scan if cache has expired by then.
+  // 3. STALE but usable cache → return stale data immediately
+  //    The frontend auto-refreshes every 5 min, which will trigger a fresh scan
   // ---------------------------------------------------------------------------
   if (bestCached && bestIsUsable) {
-    // Try a non-blocking revalidation — if it fails, no big deal
-    // The next request will try again
-    try {
-      const { getRequestContext } = await import("@cloudflare/next-on-pages");
-      const ctx = getRequestContext();
-      ctx.ctx.waitUntil(
-        runScreening(90_000)
-          .then(async (fresh) => {
-            await setCachedResult(fresh);
-            memoryCache = { data: fresh, cachedAt: Date.now() };
-          })
-          .catch((err) => console.error("Background revalidation failed:", err))
-      );
-    } catch {
-      // waitUntil not available — that's fine, next request will refresh
-    }
-
     return NextResponse.json({
       ...bestCached,
       suggestions: bestCached.suggestions.slice(0, maxSuggestions),
@@ -320,10 +301,10 @@ export async function GET(request: NextRequest) {
   }
 
   // ---------------------------------------------------------------------------
-  // 4. NO cache → first-time load, must wait
+  // 4. NO usable cache → must scan now (first load or cache fully expired)
   // ---------------------------------------------------------------------------
   try {
-    const result = await runScreening(45_000);
+    const result = await runScreening(90_000);
 
     await setCachedResult(result);
     memoryCache = { data: result, cachedAt: Date.now() };
@@ -334,6 +315,14 @@ export async function GET(request: NextRequest) {
       _stale: false,
     });
   } catch (error) {
+    // If scan fails but we have ANY old cached data, return it rather than error
+    if (bestCached) {
+      return NextResponse.json({
+        ...bestCached,
+        suggestions: bestCached.suggestions.slice(0, maxSuggestions),
+        _stale: true,
+      });
+    }
     console.error("Suggestions API error:", error);
     return NextResponse.json(
       { error: "Suggestions temporarily unavailable" },

@@ -44,6 +44,10 @@ export function useAISuggestions(tier: UserTier) {
       }
 
       if (!res.ok) {
+        // If we already have data, don't throw — keep showing stale tiles
+        if (suggestions.length > 0) {
+          return;
+        }
         throw new Error("Failed to fetch suggestions");
       }
 
