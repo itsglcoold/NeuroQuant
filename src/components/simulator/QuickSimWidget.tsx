@@ -101,12 +101,12 @@ export function QuickSimWidget({
 
     setSubmitting(false);
     if (result.success) {
-      setSuccessMsg("Trade geopend!");
+      setSuccessMsg("Trade opened!");
       setSl("");
       setTp("");
       setTimeout(() => setSuccessMsg(""), 5000);
     } else {
-      setErrorMsg(result.error || "Er ging iets mis");
+      setErrorMsg(result.error || "Something went wrong");
     }
   };
 
@@ -123,7 +123,7 @@ export function QuickSimWidget({
           <div>
             <h3 className="text-sm font-bold">Quick Simulator</h3>
             <p className="text-[10px] text-muted-foreground">
-              Paper trade op basis van AI analyse
+              Paper trade based on AI analysis
             </p>
           </div>
         </div>
@@ -176,7 +176,7 @@ export function QuickSimWidget({
             <span className="relative group">
               <Info className="h-3 w-3 cursor-help" />
               <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-40 rounded-md bg-popover border border-border p-2 text-[10px] font-normal normal-case tracking-normal text-popover-foreground opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg z-50">
-                Je vangnet - de maximale verlies die je accepteert
+                Your safety net — the maximum loss you accept
               </span>
             </span>
           </label>
@@ -192,7 +192,7 @@ export function QuickSimWidget({
           />
           {sl && !slValid && (
             <p className="text-[10px] text-red-500 mt-0.5">
-              {side === "long" ? "Moet lager zijn dan entry" : "Moet hoger zijn dan entry"}
+              {side === "long" ? "Must be below entry price" : "Must be above entry price"}
             </p>
           )}
         </div>
@@ -202,7 +202,7 @@ export function QuickSimWidget({
             <span className="relative group">
               <Info className="h-3 w-3 cursor-help" />
               <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-40 rounded-md bg-popover border border-border p-2 text-[10px] font-normal normal-case tracking-normal text-popover-foreground opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg z-50">
-                Je winstdoel - hier sluit je trade automatisch
+                Your profit target — trade closes automatically here
               </span>
             </span>
           </label>
@@ -218,7 +218,7 @@ export function QuickSimWidget({
           />
           {tp && !tpValid && (
             <p className="text-[10px] text-red-500 mt-0.5">
-              {side === "long" ? "Moet hoger zijn dan entry" : "Moet lager zijn dan entry"}
+              {side === "long" ? "Must be above entry price" : "Must be below entry price"}
             </p>
           )}
         </div>
@@ -236,7 +236,7 @@ export function QuickSimWidget({
       ) : (
         <div className="flex items-center justify-center gap-1.5 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
           <Lock className="h-3 w-3" />
-          Auto-fill via AI — upgrade naar Pro
+          Auto-fill via AI — upgrade to Pro
         </div>
       )}
 
@@ -271,7 +271,7 @@ export function QuickSimWidget({
             href="/dashboard/simulator"
             className="flex items-center gap-1 font-semibold hover:underline"
           >
-            Bekijk trades <ArrowRight className="h-3 w-3" />
+            View trades <ArrowRight className="h-3 w-3" />
           </a>
         </div>
       )}
@@ -283,7 +283,7 @@ export function QuickSimWidget({
 
       {!canOpenTrade && (
         <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-2.5 text-xs text-amber-600 dark:text-amber-400">
-          Dagelijkse limiet bereikt ({dailyLimit} trades). Morgen kun je weer traden!
+          Daily limit reached ({dailyLimit} trades). You can trade again tomorrow!
         </div>
       )}
     </div>

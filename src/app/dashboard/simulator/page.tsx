@@ -127,7 +127,7 @@ export default function SimulatorPage() {
           }`}
         >
           <span>
-            {notif.symbol} trade gesloten: {formatPnl(notif.pnl)}
+            {notif.symbol} trade closed: {formatPnl(notif.pnl)}
           </span>
           <button
             onClick={() =>
@@ -143,8 +143,8 @@ export default function SimulatorPage() {
       <div>
         <h1 className="text-2xl font-bold">Trading Simulator</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Paper trading op basis van AI analyses - {tradesRemaining}/
-          {dailyLimit === Infinity ? "\u221E" : dailyLimit} trades vandaag
+          Paper trading based on AI analyses — {tradesRemaining}/
+          {dailyLimit === Infinity ? "\u221E" : dailyLimit} trades today
         </p>
       </div>
 
@@ -155,7 +155,7 @@ export default function SimulatorPage() {
             <div className="flex items-center gap-2 mb-1">
               <DollarSign className="h-4 w-4 text-blue-500" />
               <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Virtueel Saldo
+                Virtual Balance
               </span>
             </div>
             <p className="text-lg font-bold tabular-nums">
@@ -167,7 +167,7 @@ export default function SimulatorPage() {
                   stats.totalPnl >= 0 ? "text-green-500" : "text-red-500"
                 }`}
               >
-                {formatPnl(stats.totalPnl)} totaal
+                {formatPnl(stats.totalPnl)} total
               </p>
             )}
           </CardContent>
@@ -178,7 +178,7 @@ export default function SimulatorPage() {
             <div className="flex items-center gap-2 mb-1">
               <Trophy className="h-4 w-4 text-amber-500" />
               <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                AI-Accuraatheid
+                AI Accuracy
               </span>
             </div>
             <p className="text-lg font-bold tabular-nums">
@@ -195,12 +195,12 @@ export default function SimulatorPage() {
             <div className="flex items-center gap-2 mb-1">
               <Activity className="h-4 w-4 text-green-500" />
               <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Actieve Trades
+                Active Trades
               </span>
             </div>
             <p className="text-lg font-bold tabular-nums">{stats.activeTrades}</p>
             <p className="text-xs text-muted-foreground">
-              {stats.totalTrades} gesloten
+              {stats.totalTrades} closed
             </p>
           </CardContent>
         </Card>
@@ -210,7 +210,7 @@ export default function SimulatorPage() {
             <div className="flex items-center gap-2 mb-1">
               <Target className="h-4 w-4 text-purple-500" />
               <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Totaal P/L
+                Total P/L
               </span>
             </div>
             <p
@@ -228,17 +228,17 @@ export default function SimulatorPage() {
       <div>
         <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
           <Activity className="h-5 w-5 text-green-500" />
-          Actieve Trades
+          Active Trades
         </h2>
         {openTrades.length === 0 ? (
           <Card className="border border-dashed border-border">
             <CardContent className="py-8 text-center">
               <p className="text-sm text-muted-foreground">
-                Geen actieve trades. Ga naar een{" "}
+                No active trades. Go to a{" "}
                 <Link href="/dashboard" className="text-blue-500 hover:underline font-medium">
-                  marktpagina
+                  market page
                 </Link>{" "}
-                om een analyse te draaien en een trade te openen.
+                to run an analysis and open a trade.
               </p>
             </CardContent>
           </Card>
@@ -335,7 +335,7 @@ export default function SimulatorPage() {
                         }}
                         disabled={!livePrice}
                       >
-                        Sluit Trade
+                        Close Trade
                       </Button>
                       <Link href={`/dashboard/market/${encodeURIComponent(trade.symbol)}`}>
                         <Button variant="ghost" size="sm" className="text-xs h-7">
@@ -355,13 +355,13 @@ export default function SimulatorPage() {
       <div>
         <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
           <Target className="h-5 w-5 text-purple-500" />
-          Trade Historie
+          Trade History
         </h2>
         {closedTrades.length === 0 ? (
           <Card className="border border-dashed border-border">
             <CardContent className="py-8 text-center">
               <p className="text-sm text-muted-foreground">
-                Nog geen gesloten trades. Je historie verschijnt hier zodra je eerste trade sluit.
+                No closed trades yet. Your history will appear here once your first trade closes.
               </p>
             </CardContent>
           </Card>
@@ -369,13 +369,13 @@ export default function SimulatorPage() {
           <div className="rounded-xl border border-border/60 overflow-hidden">
             {/* Table Header */}
             <div className="grid grid-cols-7 gap-2 px-4 py-2 bg-muted/50 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border/40">
-              <span>Symbool</span>
+              <span>Symbol</span>
               <span>Side</span>
               <span className="text-right">Entry</span>
               <span className="text-right">Close</span>
               <span className="text-right">P/L</span>
-              <span>AI Richting</span>
-              <span className="text-right">Datum</span>
+              <span>AI Direction</span>
+              <span className="text-right">Date</span>
             </div>
 
             {/* Table Rows */}
@@ -436,7 +436,7 @@ export default function SimulatorPage() {
                 </span>
                 <span className="text-right text-muted-foreground">
                   {trade.closed_at
-                    ? new Date(trade.closed_at).toLocaleDateString("nl-NL", {
+                    ? new Date(trade.closed_at).toLocaleDateString("en-US", {
                         day: "numeric",
                         month: "short",
                       })
@@ -450,8 +450,8 @@ export default function SimulatorPage() {
 
       {/* Disclaimer */}
       <p className="text-[10px] text-muted-foreground text-center">
-        Dit is een educatieve simulator met virtueel geld. Geen echt geld wordt gebruikt.
-        Resultaten uit het verleden bieden geen garantie voor toekomstige resultaten.
+        This is an educational simulator using virtual funds. No real money is used.
+        Past results do not guarantee future performance.
       </p>
     </div>
   );

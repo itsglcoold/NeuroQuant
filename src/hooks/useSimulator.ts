@@ -44,7 +44,7 @@ export function useSimulator(tier: UserTier) {
       setTrades((data as PaperTrade[]) || []);
     } catch (err) {
       console.error("Failed to fetch trades:", err);
-      setError("Kon trades niet ophalen");
+      setError("Failed to fetch trades");
     } finally {
       setLoading(false);
     }
@@ -77,24 +77,24 @@ export function useSimulator(tier: UserTier) {
       if (!canOpenTrade) {
         return {
           success: false,
-          error: `Dagelijkse limiet bereikt (${dailyLimit} trades per dag)`,
+          error: `Daily limit reached (${dailyLimit} trades per day)`,
         };
       }
 
       // Validate SL/TP
       if (params.side === "long") {
         if (params.slPrice >= params.entryPrice) {
-          return { success: false, error: "Stop-Loss moet lager zijn dan de entry prijs (Long)" };
+          return { success: false, error: "Stop-Loss must be below entry price (Long)" };
         }
         if (params.tpPrice <= params.entryPrice) {
-          return { success: false, error: "Take-Profit moet hoger zijn dan de entry prijs (Long)" };
+          return { success: false, error: "Take-Profit must be above entry price (Long)" };
         }
       } else {
         if (params.slPrice <= params.entryPrice) {
-          return { success: false, error: "Stop-Loss moet hoger zijn dan de entry prijs (Short)" };
+          return { success: false, error: "Stop-Loss must be above entry price (Short)" };
         }
         if (params.tpPrice >= params.entryPrice) {
-          return { success: false, error: "Take-Profit moet lager zijn dan de entry prijs (Short)" };
+          return { success: false, error: "Take-Profit must be below entry price (Short)" };
         }
       }
 
@@ -102,7 +102,7 @@ export function useSimulator(tier: UserTier) {
         const {
           data: { user },
         } = await supabase.auth.getUser();
-        if (!user) return { success: false, error: "Je moet ingelogd zijn" };
+        if (!user) return { success: false, error: "You must be logged in" };
 
         const { data, error: insertError } = await supabase
           .from("paper_trades")
@@ -125,7 +125,7 @@ export function useSimulator(tier: UserTier) {
         return { success: true };
       } catch (err) {
         console.error("Failed to open trade:", err);
-        return { success: false, error: "Kon trade niet openen" };
+        return { success: false, error: "Failed to open trade" };
       }
     },
     [supabase, canOpenTrade, dailyLimit]
