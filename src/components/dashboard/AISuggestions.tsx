@@ -249,12 +249,10 @@ export function AISuggestions({ tier }: AISuggestionsProps) {
         <div className="ml-auto flex items-center gap-2">
           {canAccess && lastUpdated && (
             <span className="text-[10px] text-muted-foreground">
-              {lastUpdated.toLocaleTimeString()}
-              {refreshing && (
-                <span className="ml-1.5 inline-flex items-center gap-1 text-blue-500">
-                  <RefreshCw className="inline h-2.5 w-2.5 animate-spin" />
-                  scanning…
-                </span>
+              {refreshing ? (
+                <span className="text-blue-500">scanning…</span>
+              ) : (
+                lastUpdated.toLocaleTimeString()
               )}
             </span>
           )}

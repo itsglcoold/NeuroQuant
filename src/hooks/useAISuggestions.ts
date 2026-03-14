@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import type { UserTier } from "@/hooks/useUsageTracking";
 import type { MarketSuggestion } from "@/types/analysis";
 
-const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes (server caches 30 min)
+const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 export function useAISuggestions(tier: UserTier) {
   const [suggestions, setSuggestions] = useState<MarketSuggestion[]>([]);
@@ -23,13 +23,10 @@ export function useAISuggestions(tier: UserTier) {
         return;
       }
 
-      // Abort any in-flight request
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
 
-      // First load: show skeleton loading
-      // Manual refresh: show refreshing spinner (keep tiles visible)
       if (!hasFetchedOnce.current) {
         setLoading(true);
       }
@@ -60,9 +57,17 @@ export function useAISuggestions(tier: UserTier) {
         setLastUpdated(
           data.generatedAt ? new Date(data.generatedAt) : new Date()
         );
-        setIsStale(data._stale === true);
+        const stale = data._stale === true;
+        setIsStale(stale);
         setError(null);
         hasFetchedOnce.current = true;
+
+        // If server returned stale cached data on first load,
+        // automatically trigger a fresh scan in the background
+        if (stale && !force) {
+          // Small delay so the stale tiles render first, then refresh
+          setTimeout(() => fetchSuggestions(true), 500);
+        }
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
         if (suggestions.length === 0) {
@@ -77,12 +82,12 @@ export function useAISuggestions(tier: UserTier) {
     [tier]
   );
 
-  // Fetch on mount and on tier change (no force — use cache)
+  // Fetch on mount and on tier change
   useEffect(() => {
     fetchSuggestions(false);
   }, [fetchSuggestions]);
 
-  // Auto-refresh every 5 minutes for pro/premium (no force — use cache)
+  // Auto-refresh every 5 minutes
   useEffect(() => {
     if (tier === "free") return;
     const interval = setInterval(() => fetchSuggestions(false), REFRESH_INTERVAL);
@@ -102,7 +107,6 @@ export function useAISuggestions(tier: UserTier) {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [tier, fetchSuggestions]);
 
-  // Cleanup abort controller on unmount
   useEffect(() => {
     return () => abortRef.current?.abort();
   }, []);
@@ -114,7 +118,6 @@ export function useAISuggestions(tier: UserTier) {
     error,
     lastUpdated,
     isStale,
-    // Manual refresh always forces a fresh scan
     refetch: () => fetchSuggestions(true),
   };
 }
