@@ -49,7 +49,8 @@ export function useAISuggestions(tier: UserTier) {
 
       const data = await res.json();
       setSuggestions(data.suggestions || []);
-      setLastUpdated(new Date());
+      // Use server's generatedAt timestamp so user sees when data was actually scanned
+      setLastUpdated(data.generatedAt ? new Date(data.generatedAt) : new Date());
       setIsStale(data._stale === true);
       setError(null);
       hasFetchedOnce.current = true;

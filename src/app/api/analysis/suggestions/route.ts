@@ -10,7 +10,6 @@ export const runtime = "edge";
 const CACHE_TTL_SECONDS = 30 * 60; // 30 minutes — fresh window
 const STALE_TTL_SECONDS = 4 * 60 * 60; // 4 hours — serve stale up to this age
 const CACHE_KEY = "https://neuroquant.app/_internal/suggestions-cache";
-const REVALIDATE_LOCK_KEY = "https://neuroquant.app/_internal/suggestions-revalidating";
 
 // ---------------------------------------------------------------------------
 // Shared cache helpers — all edge isolates see the same data
@@ -36,41 +35,12 @@ async function setCachedResult(data: SuggestionsResponse): Promise<void> {
     const response = new Response(JSON.stringify(enriched), {
       headers: {
         "Content-Type": "application/json",
-        // Use stale TTL so the cache entry persists long enough for stale reads
         "Cache-Control": `public, max-age=${STALE_TTL_SECONDS}`,
       },
     });
     await cache.put(CACHE_KEY, response);
   } catch {
     // Silently fail — in-memory fallback below
-  }
-}
-
-// Simple lock to prevent multiple simultaneous revalidations
-async function isRevalidating(): Promise<boolean> {
-  try {
-    const cache = await caches.open("nq-suggestions");
-    const lock = await cache.match(REVALIDATE_LOCK_KEY);
-    return !!lock;
-  } catch {
-    return false;
-  }
-}
-
-async function setRevalidating(active: boolean): Promise<void> {
-  try {
-    const cache = await caches.open("nq-suggestions");
-    if (active) {
-      // Lock expires after 90 seconds (safety net)
-      await cache.put(
-        REVALIDATE_LOCK_KEY,
-        new Response("1", { headers: { "Cache-Control": "max-age=90" } })
-      );
-    } else {
-      await cache.delete(REVALIDATE_LOCK_KEY);
-    }
-  } catch {
-    // ignore
   }
 }
 
@@ -119,7 +89,6 @@ type RawSuggestion = {
 };
 
 function parseScreeningResponse(content: string): RawSuggestion[] {
-  // Strip markdown code blocks
   const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (codeBlockMatch) content = codeBlockMatch[1].trim();
 
@@ -132,16 +101,27 @@ function parseScreeningResponse(content: string): RawSuggestion[] {
 }
 
 // ---------------------------------------------------------------------------
-// Core screening logic — used for both foreground and background scans
+// Timeout helper
 // ---------------------------------------------------------------------------
 
-async function runScreening(): Promise<SuggestionsResponse> {
-  // Step 1: Fetch prices for all markets (single batch call — fast)
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
+// ---------------------------------------------------------------------------
+// Core screening logic
+// ---------------------------------------------------------------------------
+
+async function runScreening(timeoutMs: number = 90_000): Promise<SuggestionsResponse> {
   const allSymbols = MARKETS.map((m) => m.symbol);
   const pricesArray = await getPrices(allSymbols);
   const priceMap = new Map(pricesArray.map((p) => [p.symbol, p]));
 
-  // Step 2: Build compact screening context from price data only
   let context = `MARKET SCREENING DATA (${allSymbols.length} markets):\n`;
   context += `Symbol | Price | Change% | High | Low | Open | PrevClose\n`;
   context += `${"—".repeat(70)}\n`;
@@ -155,26 +135,34 @@ async function runScreening(): Promise<SuggestionsResponse> {
   const userMessage = `Screen these markets based on price action, momentum, and intraday range. Return the top 5 with the strongest signals:\n\n${context}`;
   const systemMessage = marketScreeningPrompt();
 
-  // Step 3: Run DeepSeek + Qwen in parallel — full deep scan (no tight timeout)
+  // Run DeepSeek + Qwen in parallel with individual timeouts
+  const perModelTimeout = Math.min(timeoutMs - 5000, 60_000);
+
   const [deepseekRes, qwenRes] = await Promise.allSettled([
-    getDeepSeekClient().chat.completions.create({
-      model: "deepseek-chat",
-      messages: [
-        { role: "system", content: systemMessage },
-        { role: "user", content: userMessage },
-      ],
-      temperature: 0.2,
-      max_tokens: 2000,
-    }),
-    getQwenClient().chat.completions.create({
-      model: "qwen3.5-plus",
-      messages: [
-        { role: "system", content: systemMessage },
-        { role: "user", content: userMessage },
-      ],
-      temperature: 0.2,
-      max_tokens: 2000,
-    }),
+    withTimeout(
+      getDeepSeekClient().chat.completions.create({
+        model: "deepseek-chat",
+        messages: [
+          { role: "system", content: systemMessage },
+          { role: "user", content: userMessage },
+        ],
+        temperature: 0.2,
+        max_tokens: 2000,
+      }),
+      perModelTimeout
+    ),
+    withTimeout(
+      getQwenClient().chat.completions.create({
+        model: "qwen3.5-plus",
+        messages: [
+          { role: "system", content: systemMessage },
+          { role: "user", content: userMessage },
+        ],
+        temperature: 0.2,
+        max_tokens: 2000,
+      }),
+      perModelTimeout
+    ),
   ]);
 
   const deepseekSuggestions =
@@ -190,7 +178,12 @@ async function runScreening(): Promise<SuggestionsResponse> {
         )
       : [];
 
-  // Step 4: Merge — symbols flagged by both models get boosted confidence
+  // If both models failed, throw so caller knows
+  if (deepseekSuggestions.length === 0 && qwenSuggestions.length === 0) {
+    throw new Error("Both AI models returned no results");
+  }
+
+  // Merge — symbols flagged by both models get boosted confidence
   const scoreMap = new Map<string, RawSuggestion & { sources: number }>();
 
   for (const s of deepseekSuggestions) {
@@ -215,12 +208,10 @@ async function runScreening(): Promise<SuggestionsResponse> {
     }
   }
 
-  // Sort: dual-model hits first, then by confidence
   const merged = Array.from(scoreMap.values())
     .sort((a, b) => b.sources - a.sources || b.confidence - a.confidence)
     .slice(0, 5);
 
-  // Enrich with market metadata
   const suggestions: MarketSuggestion[] = merged.map((raw) => {
     const market = MARKETS.find((m) => m.symbol === raw.symbol);
     return {
@@ -268,27 +259,26 @@ export async function GET(request: NextRequest) {
   const maxSuggestions = tier === "premium" ? 5 : 3;
 
   // ---------------------------------------------------------------------------
-  // 1. Try cache (shared Cache API, then in-memory fallback)
+  // 1. Check all caches
   // ---------------------------------------------------------------------------
   const cached = await getCachedResult();
   const cachedAt = cached?._cachedAt ?? 0;
   const ageMs = Date.now() - cachedAt;
-  const isFresh = ageMs < CACHE_TTL_SECONDS * 1000;
-  const isStale = !isFresh && ageMs < STALE_TTL_SECONDS * 1000;
+  const isFresh = cachedAt > 0 && ageMs < CACHE_TTL_SECONDS * 1000;
+  const isUsable = cachedAt > 0 && ageMs < STALE_TTL_SECONDS * 1000;
 
-  // Also check in-memory fallback
   const memCachedAt = memoryCache?.cachedAt ?? 0;
   const memAgeMs = Date.now() - memCachedAt;
-  const memIsFresh = memAgeMs < CACHE_TTL_SECONDS * 1000;
-  const memIsStale = !memIsFresh && memAgeMs < STALE_TTL_SECONDS * 1000;
+  const memIsFresh = memCachedAt > 0 && memAgeMs < CACHE_TTL_SECONDS * 1000;
+  const memIsUsable = memCachedAt > 0 && memAgeMs < STALE_TTL_SECONDS * 1000;
 
-  // Determine best available cached data
+  // Pick the best available data
   const bestCached = cached ?? memoryCache?.data ?? null;
   const bestIsFresh = cached ? isFresh : memIsFresh;
-  const bestIsStale = cached ? isStale : memIsStale;
+  const bestIsUsable = cached ? isUsable : memIsUsable;
 
   // ---------------------------------------------------------------------------
-  // 2. FRESH cache → return immediately, no revalidation needed
+  // 2. FRESH cache → return immediately
   // ---------------------------------------------------------------------------
   if (bestCached && bestIsFresh) {
     return NextResponse.json({
@@ -299,31 +289,27 @@ export async function GET(request: NextRequest) {
   }
 
   // ---------------------------------------------------------------------------
-  // 3. STALE cache → return immediately + trigger background revalidation
+  // 3. STALE but usable cache → return stale data + revalidate in background
+  //    On Cloudflare we can't reliably use waitUntil from next-on-pages,
+  //    so we return stale and let the next request (after 5-min auto-refresh)
+  //    trigger a fresh scan if cache has expired by then.
   // ---------------------------------------------------------------------------
-  if (bestCached && bestIsStale) {
-    // Kick off background revalidation (fire-and-forget on edge via waitUntil)
-    const alreadyRevalidating = await isRevalidating();
-    if (!alreadyRevalidating) {
-      // Use waitUntil if available (Cloudflare Workers / Edge), otherwise fire-and-forget
-      const ctx = (request as unknown as { waitUntil?: (p: Promise<unknown>) => void });
-      const revalidatePromise = (async () => {
-        await setRevalidating(true);
-        try {
-          const fresh = await runScreening();
-          await setCachedResult(fresh);
-          memoryCache = { data: fresh, cachedAt: Date.now() };
-        } catch (err) {
-          console.error("Background revalidation failed:", err);
-        } finally {
-          await setRevalidating(false);
-        }
-      })();
-
-      if (ctx.waitUntil) {
-        ctx.waitUntil(revalidatePromise);
-      }
-      // If no waitUntil, the promise runs but may be killed on edge — acceptable tradeoff
+  if (bestCached && bestIsUsable) {
+    // Try a non-blocking revalidation — if it fails, no big deal
+    // The next request will try again
+    try {
+      const { getRequestContext } = await import("@cloudflare/next-on-pages");
+      const ctx = getRequestContext();
+      ctx.ctx.waitUntil(
+        runScreening(90_000)
+          .then(async (fresh) => {
+            await setCachedResult(fresh);
+            memoryCache = { data: fresh, cachedAt: Date.now() };
+          })
+          .catch((err) => console.error("Background revalidation failed:", err))
+      );
+    } catch {
+      // waitUntil not available — that's fine, next request will refresh
     }
 
     return NextResponse.json({
@@ -334,23 +320,11 @@ export async function GET(request: NextRequest) {
   }
 
   // ---------------------------------------------------------------------------
-  // 4. NO cache at all → first-time load, must wait (with 45s safety timeout)
+  // 4. NO cache → first-time load, must wait
   // ---------------------------------------------------------------------------
   try {
-    const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> =>
-      Promise.race([
-        promise,
-        new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error(`AI screening timeout after ${ms}ms`)),
-            ms
-          )
-        ),
-      ]);
+    const result = await runScreening(45_000);
 
-    const result = await withTimeout(runScreening(), 45_000);
-
-    // Store in both caches
     await setCachedResult(result);
     memoryCache = { data: result, cachedAt: Date.now() };
 
