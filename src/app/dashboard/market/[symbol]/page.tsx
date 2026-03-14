@@ -33,6 +33,8 @@ import {
   Shield,
 } from "lucide-react";
 import type { ModelOutput } from "@/types/analysis";
+import { QuickSimWidget } from "@/components/simulator/QuickSimWidget";
+import { useSimulator } from "@/hooks/useSimulator";
 
 export const runtime = 'edge';
 
@@ -141,6 +143,7 @@ export default function MarketDetailPage() {
   const [showIndicators, setShowIndicators] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const { canRunAnalysis, consumeAnalysis, analysesRemaining, analysesTotal, tier } = useUsageTracking();
+  const simulator = useSimulator(tier);
 
   const fetchMarketData = useCallback(async () => {
     setLoading(true);
@@ -534,6 +537,22 @@ export default function MarketDetailPage() {
           </div>
         );
       })()}
+
+      {/* Quick Simulator Widget */}
+      {consensus && price && (
+        <QuickSimWidget
+          symbol={symbol}
+          currentPrice={price.price}
+          consensus={consensus}
+          tier={tier}
+          canOpenTrade={simulator.canOpenTrade}
+          tradesRemaining={simulator.tradesRemaining}
+          dailyLimit={simulator.dailyLimit}
+          onOpenTrade={simulator.openTrade}
+          decimals={decimals}
+          prefix={prefix}
+        />
+      )}
 
       {/* OHLC Price Bar */}
       {price && (

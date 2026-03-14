@@ -21,6 +21,8 @@ export const FEATURE_ACCESS: Record<string, UserTier> = {
   "ai-suggestions": "pro",
   "historical-reports": "premium",
   "api-access": "premium",
+  "simulator": "free",
+  "simulator-autofill": "pro",
 };
 
 interface UsageData {

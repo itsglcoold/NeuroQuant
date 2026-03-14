@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Home,
   Zap,
+  LineChart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -99,6 +100,11 @@ const navItems: NavItem[] = [
     label: "AI Chat",
     href: "/dashboard/chat",
     icon: MessageSquare,
+  },
+  {
+    label: "Simulator",
+    href: "/dashboard/simulator",
+    icon: LineChart,
   },
   {
     label: "Settings",
