@@ -248,15 +248,28 @@ export function buildMarketDataContext(data: {
     context += `${bar.datetime}: O=${bar.open} H=${bar.high} L=${bar.low} C=${bar.close}\n`;
   }
 
+  // Helper to safely format numbers — guards against NaN from bad API data
+  const sf = (val: number | null | undefined, decimals: number): string | null =>
+    val != null && !isNaN(val) ? val.toFixed(decimals) : null;
+
   context += `\nTechnical Indicators:\n`;
-  if (indicators.rsi !== null) context += `RSI(14): ${indicators.rsi.toFixed(2)}\n`;
+  const rsiStr = sf(indicators.rsi, 2);
+  if (rsiStr) context += `RSI(14): ${rsiStr}\n`;
   if (indicators.macd) {
-    context += `MACD: ${indicators.macd.macd.toFixed(4)}, Signal: ${indicators.macd.signal.toFixed(4)}, Histogram: ${indicators.macd.histogram.toFixed(4)}\n`;
+    const macdStr = sf(indicators.macd.macd, 4);
+    const sigStr = sf(indicators.macd.signal, 4);
+    const histStr = sf(indicators.macd.histogram, 4);
+    if (macdStr) context += `MACD: ${macdStr}, Signal: ${sigStr ?? "N/A"}, Histogram: ${histStr ?? "N/A"}\n`;
   }
-  if (indicators.sma20 !== null) context += `SMA(20): ${indicators.sma20.toFixed(4)}\n`;
-  if (indicators.sma50 !== null) context += `SMA(50): ${indicators.sma50.toFixed(4)}\n`;
+  const sma20Str = sf(indicators.sma20, 4);
+  if (sma20Str) context += `SMA(20): ${sma20Str}\n`;
+  const sma50Str = sf(indicators.sma50, 4);
+  if (sma50Str) context += `SMA(50): ${sma50Str}\n`;
   if (indicators.bollingerBands) {
-    context += `Bollinger Bands: Upper=${indicators.bollingerBands.upper.toFixed(4)}, Middle=${indicators.bollingerBands.middle.toFixed(4)}, Lower=${indicators.bollingerBands.lower.toFixed(4)}\n`;
+    const bbU = sf(indicators.bollingerBands.upper, 4);
+    const bbM = sf(indicators.bollingerBands.middle, 4);
+    const bbL = sf(indicators.bollingerBands.lower, 4);
+    if (bbU) context += `Bollinger Bands: Upper=${bbU}, Middle=${bbM ?? "N/A"}, Lower=${bbL ?? "N/A"}\n`;
   }
 
   return context;

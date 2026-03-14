@@ -9,7 +9,17 @@ import type { ModelOutput } from "@/types/analysis";
 export const runtime = 'edge';
 
 export async function POST(request: NextRequest) {
-  const { symbol, tier = "free", interval = "1day" } = await request.json();
+  let body: { symbol?: string; tier?: string; interval?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const { symbol, tier = "free", interval = "1day" } = body;
 
   if (!symbol) {
     return new Response(JSON.stringify({ error: "Symbol required" }), {

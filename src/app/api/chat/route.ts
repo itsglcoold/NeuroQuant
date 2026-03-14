@@ -13,7 +13,17 @@ function getDeepseek() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages } = await request.json();
+    let body: { messages?: unknown };
+    try {
+      body = await request.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const { messages } = body;
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: "Messages required" }), {
@@ -41,18 +51,25 @@ export async function POST(request: NextRequest) {
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
-        for await (const chunk of response) {
-          const content = chunk.choices[0]?.delta?.content || "";
-          if (content) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+        try {
+          for await (const chunk of response) {
+            const content = chunk.choices[0]?.delta?.content || "";
+            if (content) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+            }
           }
+          // Send disclaimer at the end
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ content: `\n\n---\n*${DISCLAIMER}*` })}\n\n`
+            )
+          );
+        } catch (streamErr) {
+          console.error("Chat stream error:", streamErr);
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ content: "\n\n[Stream interrupted — please try again]" })}\n\n`)
+          );
         }
-        // Send disclaimer at the end
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({ content: `\n\n---\n*${DISCLAIMER}*` })}\n\n`
-          )
-        );
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         controller.close();
       },

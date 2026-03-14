@@ -133,7 +133,7 @@ export async function getPrice(symbol: string): Promise<MarketPrice> {
     low: safeFloat(data.low),
     open: safeFloat(data.open),
     previousClose: safeFloat(data.previousClose),
-    timestamp: data.timestamp && data.timestamp !== "NA" ? data.timestamp * 1000 : 0,
+    timestamp: data.timestamp && data.timestamp !== "NA" ? Number(data.timestamp) * 1000 : 0,
   };
 }
 
@@ -180,7 +180,7 @@ export async function getPrices(symbols: string[]): Promise<MarketPrice[]> {
     low: safeFloat(item.low),
     open: safeFloat(item.open),
     previousClose: safeFloat(item.previousClose),
-    timestamp: item.timestamp && item.timestamp !== "NA" ? (item.timestamp as number) * 1000 : 0,
+    timestamp: item.timestamp && item.timestamp !== "NA" ? Number(item.timestamp) * 1000 : 0,
   });
 
   // When using ?s= param, response is an array (first symbol included)
@@ -259,10 +259,10 @@ export async function getTimeSeries(
 
   return data.slice(0, outputSize).map((bar: Record<string, string | number>) => ({
     datetime: bar.date as string,
-    open: parseFloat(String(bar.open)),
-    high: parseFloat(String(bar.high)),
-    low: parseFloat(String(bar.low)),
-    close: parseFloat(String(bar.close)) || parseFloat(String(bar.adjusted_close)),
+    open: safeFloat(bar.open),
+    high: safeFloat(bar.high),
+    low: safeFloat(bar.low),
+    close: safeFloat(bar.close) || safeFloat(bar.adjusted_close),
     volume: parseInt(String(bar.volume)) || 0,
   }));
 }
@@ -334,24 +334,31 @@ export async function getTechnicalIndicators(
   const sma50Latest = getLatest(sma50Data);
   const bbLatest = getLatest(bbData);
 
+  // Use safeFloat to prevent NaN propagation from bad API data (e.g. "NA" values)
+  const safeFloatOrNull = (val: unknown): number | null => {
+    if (val === "NA" || val === null || val === undefined) return null;
+    const n = parseFloat(String(val));
+    return isNaN(n) ? null : n;
+  };
+
   return {
-    rsi: rsiLatest ? parseFloat(String(rsiLatest.rsi)) : null,
+    rsi: rsiLatest ? safeFloatOrNull(rsiLatest.rsi) : null,
     macd: macdLatest
       ? {
-          macd: parseFloat(String(macdLatest.macd)),
-          signal: parseFloat(String(macdLatest.macd_signal)),
-          histogram: parseFloat(String(macdLatest.macd_hist)),
+          macd: safeFloat(macdLatest.macd),
+          signal: safeFloat(macdLatest.macd_signal),
+          histogram: safeFloat(macdLatest.macd_hist),
         }
       : null,
-    sma20: sma20Latest ? parseFloat(String(sma20Latest.sma)) : null,
-    sma50: sma50Latest ? parseFloat(String(sma50Latest.sma)) : null,
+    sma20: sma20Latest ? safeFloatOrNull(sma20Latest.sma) : null,
+    sma50: sma50Latest ? safeFloatOrNull(sma50Latest.sma) : null,
     ema12: null,
     ema26: null,
     bollingerBands: bbLatest
       ? {
-          upper: parseFloat(String(bbLatest.uband)),
-          middle: parseFloat(String(bbLatest.mband)),
-          lower: parseFloat(String(bbLatest.lband)),
+          upper: safeFloat(bbLatest.uband),
+          middle: safeFloat(bbLatest.mband),
+          lower: safeFloat(bbLatest.lband),
         }
       : null,
   };

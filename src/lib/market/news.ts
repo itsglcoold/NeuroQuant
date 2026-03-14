@@ -196,8 +196,8 @@ async function fetchNewsByCategory(category: MarketCategory, limit: number): Pro
     return fetchLiveNews(undefined, limit);
   }
 
-  // Fetch news for each symbol in the category and merge
-  const results = await Promise.all(
+  // Fetch news for each symbol in the category and merge — use allSettled so one failure doesn't crash all
+  const settled = await Promise.allSettled(
     symbols.map(async (s) => {
       const params = new URLSearchParams({
         api_token: API_KEY || "",
@@ -231,6 +231,11 @@ async function fetchNewsByCategory(category: MarketCategory, limit: number): Pro
       });
     })
   );
+
+  // Extract successful results, ignore failures
+  const results = settled
+    .filter((r): r is PromiseFulfilledResult<NewsArticle[]> => r.status === "fulfilled")
+    .map((r) => r.value);
 
   // Flatten and deduplicate
   const all = results.flat();
