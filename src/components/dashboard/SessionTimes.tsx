@@ -108,12 +108,14 @@ function getTimeUntil(session: MarketSession, nowUTC: Date, isOpen: boolean): st
   if (diffMs <= 0) return "";
 
   const totalSecs = Math.floor(diffMs / 1000);
-  const h = Math.floor(totalSecs / 3600);
+  const d = Math.floor(totalSecs / 86400);
+  const h = Math.floor((totalSecs % 86400) / 3600);
   const m = Math.floor((totalSecs % 3600) / 60);
   const s = totalSecs % 60;
 
   const pad = (n: number) => n.toString().padStart(2, "0");
 
+  if (d > 0) return `${d}d ${h}h ${pad(m)}m ${pad(s)}s`;
   if (h > 0) return `${h}h ${pad(m)}m ${pad(s)}s`;
   if (m > 0) return `${m}m ${pad(s)}s`;
   return `${s}s`;
