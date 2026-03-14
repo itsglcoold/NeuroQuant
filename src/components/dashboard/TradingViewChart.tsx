@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, memo } from "react";
 interface TradingViewChartProps {
   symbol: string;
   height?: number;
+  interval?: string; // TradingView interval: "1", "5", "15", "60", "240", "D"
 }
 
 // Data sources / brokers available in TradingView
@@ -80,7 +81,7 @@ function getTvSymbol(symbol: string, source: DataSourceId): string {
   return map[symbol] || `${source}:${symbol.replace("/", "")}`;
 }
 
-function TradingViewChartInner({ symbol, height = 500 }: TradingViewChartProps) {
+function TradingViewChartInner({ symbol, height = 500, interval: intervalProp = "D" }: TradingViewChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dataSource, setDataSource] = useState<DataSourceId>("FX");
   const [chartStyle, setChartStyle] = useState<number>(1);
@@ -138,7 +139,7 @@ function TradingViewChartInner({ symbol, height = 500 }: TradingViewChartProps) 
     script.textContent = JSON.stringify({
       autosize: true,
       symbol: tvSymbol,
-      interval: "1",
+      interval: intervalProp,
       timezone: "Etc/UTC",
       theme: "dark",
       style: String(chartStyle),
@@ -160,7 +161,7 @@ function TradingViewChartInner({ symbol, height = 500 }: TradingViewChartProps) 
         container.innerHTML = "";
       }
     };
-  }, [symbol, height, dataSource, chartStyle, activeIndicators]);
+  }, [symbol, height, dataSource, chartStyle, activeIndicators, intervalProp]);
 
   return (
     <div className="space-y-0">

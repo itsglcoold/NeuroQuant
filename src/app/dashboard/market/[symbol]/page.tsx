@@ -31,12 +31,30 @@ import {
   Crown,
   Sparkles,
   Shield,
+  Clock,
 } from "lucide-react";
 import type { ModelOutput } from "@/types/analysis";
 import { QuickSimWidget } from "@/components/simulator/QuickSimWidget";
+import { SimulatorOnboarding } from "@/components/simulator/SimulatorOnboarding";
 import { useSimulator } from "@/hooks/useSimulator";
 
 export const runtime = 'edge';
+
+// Interval mapping: display label → API value → TradingView value
+interface IntervalOption {
+  label: string;
+  api: string;
+  tv: string;
+}
+
+const INTERVALS: IntervalOption[] = [
+  { label: "1m", api: "1min", tv: "1" },
+  { label: "5m", api: "5min", tv: "5" },
+  { label: "15m", api: "15min", tv: "15" },
+  { label: "1H", api: "1h", tv: "60" },
+  { label: "4H", api: "4h", tv: "240" },
+  { label: "1D", api: "1day", tv: "D" },
+];
 
 // ---------------------------------------------------------------------------
 // External links per symbol
@@ -142,6 +160,7 @@ export default function MarketDetailPage() {
   const [streamedAnalysts, setStreamedAnalysts] = useState<ModelOutput[]>([]);
   const [showIndicators, setShowIndicators] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [selectedInterval, setSelectedInterval] = useState(INTERVALS[5]); // Default: 1D
   const { canRunAnalysis, consumeAnalysis, analysesRemaining, analysesTotal, tier } = useUsageTracking();
   const simulator = useSimulator(tier);
 
@@ -171,7 +190,7 @@ export default function MarketDetailPage() {
     fetchMarketData();
   }, [fetchMarketData]);
 
-  async function runAnalysis() {
+  async function runAnalysis(intervalOverride?: string) {
     if (!canRunAnalysis) {
       setShowUpgradeModal(true);
       return;
@@ -183,11 +202,13 @@ export default function MarketDetailPage() {
     setConsensus(null);
     consumeAnalysis();
 
+    const apiInterval = intervalOverride || selectedInterval.api;
+
     try {
       const res = await fetch("/api/analysis/technical", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ symbol, tier }),
+        body: JSON.stringify({ symbol, tier, interval: apiInterval }),
       });
 
       if (!res.ok || !res.body) {
@@ -316,12 +337,36 @@ export default function MarketDetailPage() {
       </div>
 
       {/* Chart — full width */}
-      <TradingViewChart symbol={symbol} height={500} />
+      <TradingViewChart symbol={symbol} height={500} interval={selectedInterval.tv} />
 
-      {/* Run Analysis Button */}
+      {/* Interval Selector + Run Analysis */}
+      <div className="flex flex-col gap-3">
+        {/* Interval pills */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
+            <Clock className="h-3.5 w-3.5" />
+            Timeframe:
+          </div>
+          <div className="flex gap-1">
+            {INTERVALS.map((iv) => (
+              <button
+                key={iv.api}
+                onClick={() => setSelectedInterval(iv)}
+                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                  selectedInterval.api === iv.api
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                {iv.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
         <Button
-          onClick={runAnalysis}
+          onClick={() => runAnalysis()}
           disabled={analyzing}
           className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg shadow-blue-500/20 h-11 text-sm font-semibold"
         >
@@ -355,6 +400,7 @@ export default function MarketDetailPage() {
             </Link>
           </div>
         )}
+      </div>
       </div>
 
       <UpgradeModal
@@ -540,18 +586,29 @@ export default function MarketDetailPage() {
 
       {/* Quick Simulator Widget */}
       {consensus && price && (
-        <QuickSimWidget
-          symbol={symbol}
-          currentPrice={price.price}
-          consensus={consensus}
-          tier={tier}
-          canOpenTrade={simulator.canOpenTrade}
-          tradesRemaining={simulator.tradesRemaining}
-          dailyLimit={simulator.dailyLimit}
-          onOpenTrade={simulator.openTrade}
-          decimals={decimals}
-          prefix={prefix}
-        />
+        <>
+          <QuickSimWidget
+            symbol={symbol}
+            currentPrice={price.price}
+            consensus={consensus}
+            tier={tier}
+            canOpenTrade={simulator.canOpenTrade}
+            tradesRemaining={simulator.tradesRemaining}
+            dailyLimit={simulator.dailyLimit}
+            onOpenTrade={simulator.openTrade}
+            decimals={decimals}
+            prefix={prefix}
+            analysisTimeframe={consensus.timeframe}
+            onSwitchTimeframe={(newApi) => {
+              const iv = INTERVALS.find((i) => i.api === newApi);
+              if (iv) {
+                setSelectedInterval(iv);
+                runAnalysis(newApi);
+              }
+            }}
+          />
+          <SimulatorOnboarding />
+        </>
       )}
 
       {/* OHLC Price Bar */}

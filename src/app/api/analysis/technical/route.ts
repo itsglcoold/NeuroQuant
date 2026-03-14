@@ -9,7 +9,7 @@ import type { ModelOutput } from "@/types/analysis";
 export const runtime = 'edge';
 
 export async function POST(request: NextRequest) {
-  const { symbol, tier = "free" } = await request.json();
+  const { symbol, tier = "free", interval = "1day" } = await request.json();
 
   if (!symbol) {
     return new Response(JSON.stringify({ error: "Symbol required" }), {
@@ -30,9 +30,14 @@ export async function POST(request: NextRequest) {
         // Step 1: Fetch market data in parallel
         send("status", { message: "Fetching live market data…" });
 
+        // Adjust bar count based on interval — shorter intervals need more bars
+        const barCount = ["1min", "5min"].includes(interval) ? 60 : ["15min", "1h"].includes(interval) ? 40 : 30;
+
         const [price, timeSeries, indicators] = await Promise.all([
           getPrice(symbol),
-          getTimeSeries(symbol, "1day", 30),
+          getTimeSeries(symbol, interval, barCount),
+          // Technical indicators endpoint only supports daily data;
+          // for intraday intervals we still fetch daily indicators as supplementary context
           getTechnicalIndicators(symbol, "1day"),
         ]);
 
@@ -106,7 +111,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Step 3: Calculate consensus
-        const consensus = calculateConsensus(modelOutputs);
+        const consensus = calculateConsensus(modelOutputs, interval);
 
         send("consensus", {
           symbol,

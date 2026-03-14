@@ -48,7 +48,7 @@ function getProbabilityScore(outputs: ModelOutput[]): number {
   return Math.round(weightedConfidence * directionFactor);
 }
 
-export function calculateConsensus(outputs: ModelOutput[]): ConsensusResult {
+export function calculateConsensus(outputs: ModelOutput[], timeframe: string = "1day"): ConsensusResult {
   if (outputs.length === 0) {
     return emptyConsensus();
   }
@@ -120,6 +120,7 @@ export function calculateConsensus(outputs: ModelOutput[]): ConsensusResult {
     individualAnalyses: outputs,
     mergedKeyLevels,
     summary,
+    timeframe,
     disclaimer: DISCLAIMER,
     generatedAt: now.toISOString(),
     expiresAt: expiresAt.toISOString(),

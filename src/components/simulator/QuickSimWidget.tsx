@@ -1,13 +1,38 @@
 "use client";
 
 import { useState } from "react";
-import { Info, Zap, TrendingUp, TrendingDown, ArrowRight, Lock } from "lucide-react";
+import {
+  Info,
+  Zap,
+  TrendingUp,
+  TrendingDown,
+  ArrowRight,
+  Lock,
+  AlertTriangle,
+  Lightbulb,
+  Clock,
+  RefreshCw,
+  CheckCircle2,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ConsensusResult } from "@/types/analysis";
 import type { AnalysisSnapshot } from "@/types/simulator";
 import type { UserTier } from "@/hooks/useUsageTracking";
+
+// Human-readable timeframe labels
+const TIMEFRAME_LABELS: Record<string, string> = {
+  "1min": "1 minute",
+  "5min": "5 minutes",
+  "15min": "15 minutes",
+  "1h": "1 hour",
+  "4h": "4 hours",
+  "1day": "Daily",
+};
+
+// Short timeframes that warrant a warning
+const SHORT_TIMEFRAMES = ["1min", "5min"];
 
 interface QuickSimWidgetProps {
   symbol: string;
@@ -27,6 +52,8 @@ interface QuickSimWidgetProps {
   }) => Promise<{ success: boolean; error?: string }>;
   decimals: number;
   prefix: string;
+  analysisTimeframe?: string;
+  onSwitchTimeframe?: (newInterval: string) => void;
 }
 
 export function QuickSimWidget({
@@ -40,15 +67,20 @@ export function QuickSimWidget({
   onOpenTrade,
   decimals,
   prefix,
+  analysisTimeframe,
+  onSwitchTimeframe,
 }: QuickSimWidgetProps) {
-  const [side, setSide] = useState<"long" | "short">(
-    consensus.consensusDirection === "bearish" ? "short" : "long"
-  );
+  const aiSide: "long" | "short" =
+    consensus.consensusDirection === "bearish" ? "short" : "long";
+
+  const [side, setSide] = useState<"long" | "short">(aiSide);
   const [sl, setSl] = useState("");
   const [tp, setTp] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [switching, setSwitching] = useState(false);
+  const [switchedConfirmation, setSwitchedConfirmation] = useState("");
 
   const slNum = parseFloat(sl);
   const tpNum = parseFloat(tp);
@@ -64,10 +96,38 @@ export function QuickSimWidget({
     (side === "long" ? tpNum > currentPrice : tpNum < currentPrice);
   const formValid = slValid && tpValid && canOpenTrade;
 
+  // Detect if user is trading against the AI consensus
+  const isAgainstConsensus =
+    (consensus.consensusDirection === "bullish" && side === "short") ||
+    (consensus.consensusDirection === "bearish" && side === "long");
+
+  // Timeframe awareness
+  const timeframe = analysisTimeframe || consensus.timeframe || "1day";
+  const timeframeLabel = TIMEFRAME_LABELS[timeframe] || timeframe;
+  const isShortTimeframe = SHORT_TIMEFRAMES.includes(timeframe);
+
+  // Support/resistance helper values for free-tier guidance
+  const { support, resistance } = consensus.mergedKeyLevels;
+  const suggestedSl =
+    side === "long"
+      ? support.length > 0
+        ? Math.min(...support)
+        : null
+      : resistance.length > 0
+        ? Math.max(...resistance)
+        : null;
+  const suggestedTp =
+    side === "long"
+      ? resistance.length > 0
+        ? Math.max(...resistance)
+        : null
+      : support.length > 0
+        ? Math.min(...support)
+        : null;
+
   // Auto-fill AI levels (Pro+)
   const canAutoFill = tier === "pro" || tier === "premium";
   const handleAutoFill = () => {
-    const { support, resistance } = consensus.mergedKeyLevels;
     if (side === "long") {
       if (support.length > 0) setSl(Math.min(...support).toFixed(decimals));
       if (resistance.length > 0) setTp(Math.max(...resistance).toFixed(decimals));
@@ -75,6 +135,22 @@ export function QuickSimWidget({
       if (resistance.length > 0) setSl(Math.max(...resistance).toFixed(decimals));
       if (support.length > 0) setTp(Math.min(...support).toFixed(decimals));
     }
+  };
+
+  const handleSwitchTimeframe = () => {
+    if (!onSwitchTimeframe) return;
+    setSwitching(true);
+    setSl("");
+    setTp("");
+    setSwitchedConfirmation("");
+    onSwitchTimeframe("15min");
+    // The parent will re-run analysis, which will unmount/remount this widget
+    // with the new timeframe. Show confirmation after a delay.
+    setTimeout(() => {
+      setSwitching(false);
+      setSwitchedConfirmation("Now on 15m: Optimal levels for medium-term trades.");
+      setTimeout(() => setSwitchedConfirmation(""), 6000);
+    }, 2000);
   };
 
   const handleSubmit = async () => {
@@ -112,6 +188,13 @@ export function QuickSimWidget({
 
   const formatPrice = (p: number) => `${prefix}${p.toFixed(decimals)}`;
 
+  const sentimentLabel =
+    consensus.consensusDirection === "bullish"
+      ? "Bullish"
+      : consensus.consensusDirection === "bearish"
+        ? "Bearish"
+        : "Neutral";
+
   return (
     <div className="rounded-xl border border-border/60 bg-card/80 backdrop-blur-md p-4 space-y-3 shadow-sm">
       {/* Header */}
@@ -127,36 +210,134 @@ export function QuickSimWidget({
             </p>
           </div>
         </div>
-        <Badge variant="outline" className="text-[10px]">
-          {tradesRemaining}/{dailyLimit === Infinity ? "\u221E" : dailyLimit} trades
-        </Badge>
+        <div className="flex items-center gap-2">
+          {/* Timeframe tag */}
+          <Badge variant="secondary" className="text-[10px] gap-1">
+            <Clock className="h-2.5 w-2.5" />
+            {timeframeLabel}
+          </Badge>
+          <Badge variant="outline" className="text-[10px]">
+            {tradesRemaining}/{dailyLimit === Infinity ? "\u221E" : dailyLimit} trades
+          </Badge>
+        </div>
       </div>
+
+      {/* Timeframe Awareness Warning — short timeframes */}
+      {isShortTimeframe && (
+        <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-3 space-y-2 animate-[pulse_2s_ease-in-out_1]">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+            <div className="space-y-1.5">
+              <p className="text-[11px] text-amber-600 dark:text-amber-400 leading-relaxed">
+                <span className="font-bold">Heads up:</span> This analysis is based on
+                the <span className="font-bold">{timeframeLabel}</span> chart. The
+                suggested SL/TP levels are very tight and best suited for quick scalp
+                trades. For &quot;Set &amp; Forget&quot; trades, we recommend a higher
+                timeframe (15m+).
+              </p>
+              <div className="flex items-center gap-2">
+                {onSwitchTimeframe && (
+                  <button
+                    onClick={handleSwitchTimeframe}
+                    disabled={switching}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 px-3 py-1.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300 transition-colors"
+                  >
+                    {switching ? (
+                      <>
+                        <RefreshCw className="h-3 w-3 animate-spin" />
+                        Switching...
+                      </>
+                    ) : (
+                      <>
+                        <Clock className="h-3 w-3" />
+                        Switch to 15 min
+                      </>
+                    )}
+                  </button>
+                )}
+                <span className="relative group">
+                  <Info className="h-3.5 w-3.5 text-amber-500/60 cursor-help" />
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-52 rounded-md bg-popover border border-border p-2.5 text-[10px] font-normal text-popover-foreground opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg z-50">
+                    Short-timeframe charts show a lot of &quot;noise&quot; (small temporary
+                    spikes and dips). A Stop-Loss at this level gets hit more often by
+                    chance. A 15-minute analysis looks at the bigger trend, giving your
+                    trade more breathing room.
+                  </span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Switched confirmation */}
+      {switchedConfirmation && (
+        <div className="flex items-center gap-2 rounded-lg bg-green-500/10 border border-green-500/20 p-2.5">
+          <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" />
+          <p className="text-[11px] text-green-600 dark:text-green-400 font-medium">
+            {switchedConfirmation}
+          </p>
+        </div>
+      )}
+
+      {/* AI Pre-selection Context */}
+      {consensus.consensusDirection !== "neutral" && (
+        <div className="flex items-start gap-2 rounded-lg bg-blue-500/5 border border-blue-500/20 p-2.5">
+          <Lightbulb className="h-3.5 w-3.5 text-blue-500 mt-0.5 shrink-0" />
+          <p className="text-[11px] text-blue-600 dark:text-blue-400">
+            AI analysis is <span className="font-bold">{sentimentLabel}</span>, so we
+            pre-selected{" "}
+            <span className="font-bold">
+              {aiSide === "long" ? "Buy" : "Sell"}
+            </span>{" "}
+            for you.
+          </p>
+        </div>
+      )}
 
       {/* Side Toggle */}
       <div className="grid grid-cols-2 gap-2">
         <button
           onClick={() => setSide("long")}
-          className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold transition-all ${
+          className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 transition-all ${
             side === "long"
               ? "border-green-500 bg-green-500/10 text-green-600 dark:text-green-400 shadow-sm"
               : "border-border text-muted-foreground hover:border-green-500/40"
           }`}
         >
-          <TrendingUp className="h-3.5 w-3.5" />
-          Buy (Long)
+          <span className="flex items-center gap-1.5 text-xs font-bold">
+            <TrendingUp className="h-3.5 w-3.5" />
+            BUY
+          </span>
+          <span className="text-[9px] opacity-70 font-medium">Bet on rise</span>
         </button>
         <button
           onClick={() => setSide("short")}
-          className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold transition-all ${
+          className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 transition-all ${
             side === "short"
               ? "border-red-500 bg-red-500/10 text-red-600 dark:text-red-400 shadow-sm"
               : "border-border text-muted-foreground hover:border-red-500/40"
           }`}
         >
-          <TrendingDown className="h-3.5 w-3.5" />
-          Sell (Short)
+          <span className="flex items-center gap-1.5 text-xs font-bold">
+            <TrendingDown className="h-3.5 w-3.5" />
+            SELL
+          </span>
+          <span className="text-[9px] opacity-70 font-medium">Bet on decline</span>
         </button>
       </div>
+
+      {/* Consensus Deviation Warning */}
+      {isAgainstConsensus && (
+        <div className="flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/30 p-2.5">
+          <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
+          <p className="text-[11px] text-amber-600 dark:text-amber-400">
+            <span className="font-semibold">Heads up:</span> AI analysts expect a{" "}
+            {consensus.consensusDirection === "bullish" ? "rise" : "decline"}.
+            You&apos;re trading against the consensus — make sure this is intentional.
+          </p>
+        </div>
+      )}
 
       {/* Entry Price */}
       <div>
@@ -175,8 +356,8 @@ export function QuickSimWidget({
             Stop-Loss
             <span className="relative group">
               <Info className="h-3 w-3 cursor-help" />
-              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-40 rounded-md bg-popover border border-border p-2 text-[10px] font-normal normal-case tracking-normal text-popover-foreground opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg z-50">
-                Your safety net — the maximum loss you accept
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-44 rounded-md bg-popover border border-border p-2 text-[10px] font-normal normal-case tracking-normal text-popover-foreground opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg z-50">
+                Your safety net — if the price moves against you and hits this level, the trade closes automatically to limit your loss.
               </span>
             </span>
           </label>
@@ -195,14 +376,28 @@ export function QuickSimWidget({
               {side === "long" ? "Must be below entry price" : "Must be above entry price"}
             </p>
           )}
+          {/* Free-tier helper: show suggested SL value */}
+          {!canAutoFill && suggestedSl !== null && !sl && (
+            <p className="text-[10px] text-red-500/80 mt-1 flex items-center gap-1">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-red-500/60" />
+              AI {side === "long" ? "support" : "resistance"}:{" "}
+              <button
+                type="button"
+                onClick={() => setSl(suggestedSl.toFixed(decimals))}
+                className="font-bold tabular-nums underline decoration-dotted underline-offset-2 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+              >
+                {formatPrice(suggestedSl)}
+              </button>
+            </p>
+          )}
         </div>
         <div>
           <label className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
             Take-Profit
             <span className="relative group">
               <Info className="h-3 w-3 cursor-help" />
-              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-40 rounded-md bg-popover border border-border p-2 text-[10px] font-normal normal-case tracking-normal text-popover-foreground opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg z-50">
-                Your profit target — trade closes automatically here
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-44 rounded-md bg-popover border border-border p-2 text-[10px] font-normal normal-case tracking-normal text-popover-foreground opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg z-50">
+                Your profit target — when the price reaches this level, the trade closes automatically and you lock in your gains.
               </span>
             </span>
           </label>
@@ -219,6 +414,20 @@ export function QuickSimWidget({
           {tp && !tpValid && (
             <p className="text-[10px] text-red-500 mt-0.5">
               {side === "long" ? "Must be above entry price" : "Must be below entry price"}
+            </p>
+          )}
+          {/* Free-tier helper: show suggested TP value */}
+          {!canAutoFill && suggestedTp !== null && !tp && (
+            <p className="text-[10px] text-green-500/80 mt-1 flex items-center gap-1">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500/60" />
+              AI {side === "long" ? "resistance" : "support"}:{" "}
+              <button
+                type="button"
+                onClick={() => setTp(suggestedTp.toFixed(decimals))}
+                className="font-bold tabular-nums underline decoration-dotted underline-offset-2 hover:text-green-600 dark:hover:text-green-400 transition-colors"
+              >
+                {formatPrice(suggestedTp)}
+              </button>
             </p>
           )}
         </div>

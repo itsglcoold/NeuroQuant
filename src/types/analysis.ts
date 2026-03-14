@@ -24,6 +24,7 @@ export interface ConsensusResult {
   };
   summary: string;
   disclaimer: string;
+  timeframe?: string; // e.g. "1min", "5min", "1day"
   generatedAt: string;
   expiresAt: string;
 }
