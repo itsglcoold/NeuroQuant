@@ -204,7 +204,7 @@ function LockedContent({ onUpgrade }: { onUpgrade: () => void }) {
 }
 
 export function AISuggestions({ tier }: AISuggestionsProps) {
-  const { suggestions, loading, error, lastUpdated, isStale, refetch } = useAISuggestions(tier);
+  const { suggestions, loading, refreshing, error, lastUpdated, isStale, refetch } = useAISuggestions(tier);
   const [collapsed, setCollapsed] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("nq_suggestions_collapsed") === "true";
@@ -250,18 +250,26 @@ export function AISuggestions({ tier }: AISuggestionsProps) {
           {canAccess && lastUpdated && (
             <span className="text-[10px] text-muted-foreground">
               {lastUpdated.toLocaleTimeString()}
-              {isStale && (
-                <span className="ml-1.5 inline-flex items-center gap-1 text-amber-500">
+              {refreshing && (
+                <span className="ml-1.5 inline-flex items-center gap-1 text-blue-500">
                   <RefreshCw className="inline h-2.5 w-2.5 animate-spin" />
-                  refreshing…
+                  scanning…
                 </span>
               )}
             </span>
           )}
           {canAccess && !loading && (
             <RefreshCw
-              className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground cursor-pointer"
-              onClick={(e) => { e.stopPropagation(); refetch(); }}
+              className={cn(
+                "h-3.5 w-3.5 cursor-pointer",
+                refreshing
+                  ? "animate-spin text-blue-500"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!refreshing) refetch();
+              }}
             />
           )}
           {collapsed ? (

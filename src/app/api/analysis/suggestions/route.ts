@@ -248,6 +248,7 @@ async function runScreening(timeoutMs: number = 90_000): Promise<SuggestionsResp
 
 export async function GET(request: NextRequest) {
   const tier = request.nextUrl.searchParams.get("tier") || "free";
+  const forceRefresh = request.nextUrl.searchParams.get("force") === "true";
 
   if (tier === "free") {
     return NextResponse.json(
@@ -259,21 +260,21 @@ export async function GET(request: NextRequest) {
   const maxSuggestions = tier === "premium" ? 5 : 3;
 
   // ---------------------------------------------------------------------------
-  // 1. Check all caches
+  // 1. Check all caches (skip if force refresh)
   // ---------------------------------------------------------------------------
-  const cached = await getCachedResult();
+  const cached = forceRefresh ? null : await getCachedResult();
   const cachedAt = cached?._cachedAt ?? 0;
   const ageMs = Date.now() - cachedAt;
   const isFresh = cachedAt > 0 && ageMs < CACHE_TTL_SECONDS * 1000;
   const isUsable = cachedAt > 0 && ageMs < STALE_TTL_SECONDS * 1000;
 
-  const memCachedAt = memoryCache?.cachedAt ?? 0;
+  const memCachedAt = forceRefresh ? 0 : (memoryCache?.cachedAt ?? 0);
   const memAgeMs = Date.now() - memCachedAt;
   const memIsFresh = memCachedAt > 0 && memAgeMs < CACHE_TTL_SECONDS * 1000;
   const memIsUsable = memCachedAt > 0 && memAgeMs < STALE_TTL_SECONDS * 1000;
 
   // Pick the best available data
-  const bestCached = cached ?? memoryCache?.data ?? null;
+  const bestCached = forceRefresh ? null : (cached ?? memoryCache?.data ?? null);
   const bestIsFresh = cached ? isFresh : memIsFresh;
   const bestIsUsable = cached ? isUsable : memIsUsable;
 
