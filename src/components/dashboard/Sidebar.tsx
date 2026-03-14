@@ -116,6 +116,9 @@ const navItems: NavItem[] = [
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const [expandedItems, setExpandedItems] = useState<string[]>(["Markets"]);
+  const { tier } = useUsageTracking();
+  const tierOrder = ["free", "pro", "premium"];
+  const userTierIndex = tierOrder.indexOf(tier);
 
   const toggleExpand = (label: string) => {
     setExpandedItems((prev) =>
@@ -232,7 +235,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
               >
                 <item.icon className="h-4 w-4" />
                 <span className="flex-1">{item.label}</span>
-                {item.badge && (
+                {item.badge && userTierIndex < tierOrder.indexOf(item.badge.toLowerCase()) && (
                   <span className={cn(
                     "rounded px-1 py-0.5 text-[9px] font-bold leading-none",
                     item.badge === "PRO"
