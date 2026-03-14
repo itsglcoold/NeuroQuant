@@ -20,21 +20,32 @@ export default function SettingsPage() {
     async function load() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setEmail(user.email ?? null);
-        // Try to get tier from profiles
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("subscription_tier")
-          .eq("id", user.id)
-          .single();
-        if (profile?.subscription_tier) {
-          setTier(profile.subscription_tier);
-        }
+      if (!user) {
+        // Session expired or signed out in another tab
+        router.push("/auth/login");
+        return;
+      }
+      setEmail(user.email ?? null);
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("subscription_tier")
+        .eq("id", user.id)
+        .single();
+      if (profile?.subscription_tier) {
+        setTier(profile.subscription_tier);
       }
     }
     load();
-  }, []);
+
+    // Listen for auth changes (e.g. sign-out in another tab)
+    const supabase = createClient();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        router.push("/auth/login");
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [router]);
 
   async function handleSignOut() {
     setSigningOut(true);

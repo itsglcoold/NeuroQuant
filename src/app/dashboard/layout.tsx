@@ -29,9 +29,10 @@ export default function DashboardLayout({
   // Client-side auth guard — needed because Cloudflare Pages serves
   // static pages directly via CDN, bypassing the middleware.
   useEffect(() => {
+    const supabase = createClient();
+
     const checkAuth = async () => {
       try {
-        const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           router.replace("/auth/login");
@@ -44,6 +45,14 @@ export default function DashboardLayout({
       setAuthChecked(true);
     };
     checkAuth();
+
+    // Listen for sign-out in other tabs — redirect immediately
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        router.replace("/auth/login");
+      }
+    });
+    return () => subscription.unsubscribe();
   }, [router]);
 
   if (!authChecked) {
