@@ -82,7 +82,7 @@ export default function DashboardPage() {
           )}
           <span className={cn(
             "relative h-2 w-2 rounded-full",
-            marketStatus.open ? "bg-emerald-500" : "bg-amber-500"
+            marketStatus.open ? "bg-emerald-500" : "bg-red-500"
           )} />
         </div>
         <span className="text-xs text-foreground/80">{marketStatus.label}</span>
@@ -98,13 +98,13 @@ export default function DashboardPage() {
               "inline-flex items-center gap-1 text-xs font-medium",
               latency < 500 ? "text-emerald-600 dark:text-emerald-400" :
               latency < 1500 ? "text-amber-600 dark:text-amber-400" :
-              "text-red-600 dark:text-red-400"
+              "text-orange-600 dark:text-orange-400"
             )}>
               <span className={cn(
                 "h-1.5 w-1.5 rounded-full",
                 latency < 500 ? "bg-emerald-500" :
                 latency < 1500 ? "bg-amber-500" :
-                "bg-red-500"
+                "bg-orange-500"
               )} />
               {latency}ms
             </span>
