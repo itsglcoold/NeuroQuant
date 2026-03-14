@@ -562,7 +562,7 @@ export default function MarketDetailPage() {
 
                   {/* Summary */}
                   <div className="text-xs text-foreground/80 leading-relaxed space-y-1">
-                    {consensus.summary.split("\n").map((line, i) => {
+                    {(consensus.summary || "").split("\n").map((line, i) => {
                       const parts = line.split(/(\*\*[^*]+\*\*)/g);
                       return (
                         <p key={i}>

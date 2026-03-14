@@ -33,13 +33,22 @@ export async function POST(request: NextRequest) {
         // Adjust bar count based on interval — shorter intervals need more bars
         const barCount = ["1min", "5min"].includes(interval) ? 60 : ["15min", "1h"].includes(interval) ? 40 : 30;
 
-        const [price, timeSeries, indicators] = await Promise.all([
+        // Fetch market data — use allSettled so one failure doesn't crash everything
+        const [priceResult, timeSeriesResult, indicatorsResult] = await Promise.allSettled([
           getPrice(symbol),
           getTimeSeries(symbol, interval, barCount),
-          // Technical indicators endpoint only supports daily data;
-          // for intraday intervals we still fetch daily indicators as supplementary context
           getTechnicalIndicators(symbol, "1day"),
         ]);
+
+        if (priceResult.status === "rejected") {
+          throw new Error(`Failed to fetch price for ${symbol}`);
+        }
+
+        const price = priceResult.value;
+        const timeSeries = timeSeriesResult.status === "fulfilled" ? timeSeriesResult.value : [];
+        const indicators = indicatorsResult.status === "fulfilled" ? indicatorsResult.value : {
+          rsi: null, macd: null, sma20: null, sma50: null, ema12: null, ema26: null, bollingerBands: null,
+        };
 
         const marketData = {
           symbol,

@@ -174,6 +174,7 @@ function emptyConsensus(): ConsensusResult {
     individualAnalyses: [],
     mergedKeyLevels: { support: [], resistance: [] },
     summary: "No analysis data available.",
+    timeframe: "1day",
     disclaimer: DISCLAIMER,
     generatedAt: new Date().toISOString(),
     expiresAt: new Date().toISOString(),
