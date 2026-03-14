@@ -78,6 +78,32 @@ function getTimeUntil(session: MarketSession, nowUTC: Date, isOpen: boolean): st
     target.setUTCDate(target.getUTCDate() + 1);
   }
 
+  // Skip weekends — markets don't open on Saturday or Sunday
+  // Forex market closes Friday ~22:00 UTC and reopens Sunday ~21:00 UTC (Sydney)
+  if (!isOpen) {
+    let targetDay = target.getUTCDay();
+    // If target lands on Saturday, push to Monday (unless Sydney which opens Sunday 21:00 UTC)
+    if (targetDay === 6) {
+      // Saturday → skip to Sunday first
+      if (session.openHourUTC === 21) {
+        // Sydney opens Sunday evening UTC — just push 1 day
+        target.setUTCDate(target.getUTCDate() + 1);
+      } else {
+        // All other sessions open Monday
+        target.setUTCDate(target.getUTCDate() + 2);
+      }
+    } else if (targetDay === 0) {
+      // Sunday
+      if (session.openHourUTC === 21) {
+        // Sydney opens Sunday evening — keep it (if target hour hasn't passed)
+        // Already correct
+      } else {
+        // All other sessions open Monday
+        target.setUTCDate(target.getUTCDate() + 1);
+      }
+    }
+  }
+
   const diffMs = target.getTime() - nowUTC.getTime();
   if (diffMs <= 0) return "";
 
