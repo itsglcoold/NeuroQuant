@@ -44,7 +44,7 @@ function useMarketStatus() {
 }
 
 export default function DashboardPage() {
-  const { prices, loading, error, latency, lastUpdated, refetch } = useMarketData(15000);
+  const { prices, loading, error, latency, lastUpdated, refetch } = useMarketData(60000);
   const { tier } = useUsageTracking();
   const marketStatus = useMarketStatus();
 

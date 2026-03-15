@@ -6,9 +6,9 @@ import { createClient } from "@/lib/supabase/client";
 export type UserTier = "free" | "pro" | "premium";
 
 const TIER_LIMITS: Record<UserTier, { analysesPerDay: number; refreshMs: number }> = {
-  free: { analysesPerDay: 3, refreshMs: 30000 },      // 30s — decent for free
-  pro: { analysesPerDay: 50, refreshMs: 10000 },       // 10s — fast for traders
-  premium: { analysesPerDay: Infinity, refreshMs: 5000 }, // 5s — near real-time
+  free: { analysesPerDay: 3, refreshMs: 60000 },       // 60s — decent for free
+  pro: { analysesPerDay: 50, refreshMs: 30000 },       // 30s — fast for traders
+  premium: { analysesPerDay: Infinity, refreshMs: 15000 }, // 15s — near real-time
 };
 
 // Features locked behind tiers

@@ -137,81 +137,55 @@ export async function getPrice(symbol: string): Promise<MarketPrice> {
   };
 }
 
+// ----- In-memory server-side cache -----
+// Prevents multiple users / re-renders from hitting EODHD repeatedly
+const priceCache = new Map<string, { data: MarketPrice; ts: number }>();
+const PRICE_CACHE_TTL = 15_000; // 15 seconds
+
+function getCachedPrice(symbol: string): MarketPrice | null {
+  const entry = priceCache.get(symbol);
+  if (entry && Date.now() - entry.ts < PRICE_CACHE_TTL) return entry.data;
+  return null;
+}
+
+function setCachedPrice(price: MarketPrice) {
+  priceCache.set(price.symbol, { data: price, ts: Date.now() });
+}
+
 export async function getPrices(symbols: string[]): Promise<MarketPrice[]> {
   if (symbols.length === 0) return [];
-  if (symbols.length === 1) return [await getPrice(symbols[0])];
 
-  // Use EODHD batch endpoint: /real-time/{first}?s={rest,comma,separated}
-  const eodSymbols = symbols.map((s) => ({ original: s, eod: toEodhdSymbol(s) }));
-  const first = eodSymbols[0];
-  const rest = eodSymbols.slice(1);
+  // Split into cached vs needs-fetch
+  const cached: MarketPrice[] = [];
+  const toFetch: string[] = [];
 
-  const searchParams = new URLSearchParams({
-    api_token: API_KEY || "",
-    fmt: "json",
-    s: rest.map((s) => s.eod).join(","),
-  });
-
-  const url = `${BASE_URL}/real-time/${first.eod}?${searchParams}`;
-  const response = await fetch(url, { next: { revalidate: 0 } });
-
-  if (!response.ok) {
-    // Fallback to individual fetches
-    const results = await Promise.allSettled(symbols.map((s) => getPrice(s)));
-    return results
-      .filter((r): r is PromiseFulfilledResult<MarketPrice> => r.status === "fulfilled")
-      .map((r) => r.value);
+  for (const s of symbols) {
+    const c = getCachedPrice(s);
+    if (c) {
+      cached.push(c);
+    } else {
+      toFetch.push(s);
+    }
   }
 
-  const data = await response.json();
-
-  // Build reverse map: EODHD symbol → app symbol
-  const reverseMap: Record<string, string> = {};
-  for (const s of eodSymbols) {
-    reverseMap[s.eod] = s.original;
-  }
-
-  const parseItem = (item: Record<string, unknown>, fallbackSymbol: string): MarketPrice => ({
-    symbol: reverseMap[item.code as string] || fallbackSymbol,
-    price: safeFloat(item.close) || safeFloat(item.previousClose),
-    change: safeFloat(item.change),
-    changePercent: safeFloat(item.change_p),
-    high: safeFloat(item.high),
-    low: safeFloat(item.low),
-    open: safeFloat(item.open),
-    previousClose: safeFloat(item.previousClose),
-    timestamp: item.timestamp && item.timestamp !== "NA" ? Number(item.timestamp) * 1000 : 0,
-  });
-
-  // When using ?s= param, response is an array (first symbol included)
-  let results: MarketPrice[];
-  if (Array.isArray(data)) {
-    results = data.map((item: Record<string, unknown>) => {
-      const code = (item.code as string) || "";
-      return parseItem(item, reverseMap[code] || code);
-    });
-  } else {
-    // Single-item fallback (shouldn't happen with ?s= but just in case)
-    results = [parseItem(data, first.original)];
-  }
-
-  // For any items with price 0 (e.g. Crude Oil outside trading hours),
-  // try EOD fallback with alternative ticker
-  const needsFallback = results.filter((r) => r.price === 0 && EOD_SYMBOL_MAP[r.symbol]);
-  if (needsFallback.length > 0) {
-    const fallbacks = await Promise.allSettled(
-      needsFallback.map((r) => getPrice(r.symbol))
-    );
-    const fallbackMap = new Map<string, MarketPrice>();
-    fallbacks.forEach((f, i) => {
-      if (f.status === "fulfilled" && f.value.price > 0) {
-        fallbackMap.set(needsFallback[i].symbol, f.value);
+  // Fetch uncached symbols individually (short URLs = fewer API call "characters")
+  // EODHD counts each character in the request as 1 API call for Live API,
+  // so individual short requests are cheaper than one long batch request.
+  const fetched: MarketPrice[] = [];
+  if (toFetch.length > 0) {
+    const results = await Promise.allSettled(toFetch.map((s) => getPrice(s)));
+    for (const r of results) {
+      if (r.status === "fulfilled") {
+        setCachedPrice(r.value);
+        fetched.push(r.value);
       }
-    });
-    results = results.map((r) => fallbackMap.get(r.symbol) || r);
+    }
   }
 
-  return results;
+  // Return in original order
+  const priceMap = new Map<string, MarketPrice>();
+  for (const p of [...cached, ...fetched]) priceMap.set(p.symbol, p);
+  return symbols.map((s) => priceMap.get(s)).filter((p): p is MarketPrice => !!p);
 }
 
 // EODHD intraday interval mapping

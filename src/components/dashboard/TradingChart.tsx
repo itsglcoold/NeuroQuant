@@ -18,6 +18,16 @@ import {
 } from "lightweight-charts";
 import { OHLCVBar } from "@/types/market";
 
+// Check if forex markets are open (Sun 21:00 – Fri 21:00 UTC)
+function isMarketOpen(): boolean {
+  const now = new Date();
+  const d = now.getUTCDay(), h = now.getUTCHours();
+  if (d === 6) return false;
+  if (d === 0 && h < 21) return false;
+  if (d === 5 && h >= 21) return false;
+  return true;
+}
+
 interface TradingChartProps {
   symbol: string;
   height?: number;
@@ -51,7 +61,8 @@ const CANDLE_REFRESH: Record<Interval, number> = {
 };
 
 // How often to tick the last candle with live price (seconds)
-const TICK_RATE = 3;
+// Keep conservative to stay within EODHD daily API limits
+const TICK_RATE = 30;
 
 function transformData(bars: OHLCVBar[], isIntraday: boolean): {
   candles: CandlestickData<Time>[];
@@ -278,9 +289,9 @@ export function TradingChart({ symbol, height = 400 }: TradingChartProps) {
 
     fetchCandles();
 
-    // Periodically refetch full candle data
+    // Periodically refetch full candle data (skip when markets closed)
     const candleTimer = globalThis.setInterval(() => {
-      if (!cancelled) fetchCandles();
+      if (!cancelled && isMarketOpen()) fetchCandles();
     }, CANDLE_REFRESH[interval] * 1000);
 
     return () => {
@@ -297,6 +308,8 @@ export function TradingChart({ symbol, height = 400 }: TradingChartProps) {
     let cancelled = false;
 
     async function tickPrice() {
+      // Skip API calls when markets are closed (weekend)
+      if (!isMarketOpen()) return;
       try {
         const res = await fetch(
           `/api/market-data?symbol=${encodeURIComponent(symbol)}&type=quote`

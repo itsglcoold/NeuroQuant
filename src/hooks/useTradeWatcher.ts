@@ -3,6 +3,16 @@
 import { useEffect, useRef, useCallback } from "react";
 import type { PaperTrade } from "@/types/simulator";
 
+// Check if forex markets are open (Sun 21:00 – Fri 21:00 UTC)
+function isMarketOpen(): boolean {
+  const now = new Date();
+  const d = now.getUTCDay(), h = now.getUTCHours();
+  if (d === 6) return false;
+  if (d === 0 && h < 21) return false;
+  if (d === 5 && h >= 21) return false;
+  return true;
+}
+
 interface TradeWatcherProps {
   openTrades: PaperTrade[];
   refreshMs: number;
@@ -113,7 +123,9 @@ export function useTradeWatcher({
       return;
     }
 
-    intervalRef.current = setInterval(checkTrades, refreshMs);
+    intervalRef.current = setInterval(() => {
+      if (isMarketOpen()) checkTrades();
+    }, refreshMs);
 
     return () => {
       if (intervalRef.current) {
