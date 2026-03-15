@@ -32,14 +32,15 @@ export interface ConsensusResult {
 export interface ChartAnalysisResult {
   detectedSymbol: string | null;
   detectedTimeframe: string | null;
+  detectedStyle?: "scalping" | "daytrading" | "swing";
   patterns: string[];
   direction: "bullish" | "bearish" | "neutral";
   confidence: number; // 0-100
   supportLevels: number[];
   resistanceLevels: number[];
   indicators: string[];
-  scalpOutlook?: string;
-  swingOutlook?: string;
+  scalpOutlook?: string | null;
+  swingOutlook?: string | null;
   analysis: string;
   disclaimer: string;
 }
@@ -70,8 +71,18 @@ export interface MarketSuggestion {
   keyLevel: number;
 }
 
-export interface SuggestionsResponse {
+export interface SuggestionRow {
+  key: string;
+  label: string;
+  subtitle: string;
+  timeframeFocus: string;
+  badgeColor: string;
   suggestions: MarketSuggestion[];
+}
+
+export interface SuggestionsResponse {
+  rows: SuggestionRow[];
+  suggestions: MarketSuggestion[];  // backwards compat: all combined
   generatedAt: string;
   expiresAt: string;
   disclaimer: string;

@@ -31,8 +31,14 @@ import {
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { MARKETS, MARKET_CATEGORIES, CATEGORY_COLORS } from "@/lib/market/symbols";
+import { MARKETS, MARKET_CATEGORIES, CATEGORY_COLORS, getSymbolTradingStyle } from "@/lib/market/symbols";
 import type { MarketCategory } from "@/types/market";
+
+const SIDEBAR_STYLE_COLORS: Record<string, string> = {
+  red: "bg-red-500/10 text-red-500 dark:text-red-400 border border-red-500/20",
+  blue: "bg-blue-500/10 text-blue-500 dark:text-blue-400 border border-blue-500/20",
+  amber: "bg-amber-500/10 text-amber-500 dark:text-amber-400 border border-amber-500/20",
+};
 
 interface MarketChild {
   label: string;
@@ -42,6 +48,7 @@ interface MarketChild {
   colorBg?: string;
   colorText?: string;
   category?: string;
+  styleBadge?: { label: string; badgeColor: string };
 }
 
 interface NavItem {
@@ -58,15 +65,20 @@ const marketChildren: MarketChild[] = (
   Object.keys(MARKET_CATEGORIES) as MarketCategory[]
 ).flatMap((cat) => {
   const colors = CATEGORY_COLORS[cat];
-  return MARKETS.filter((m) => m.category === cat).map((m) => ({
-    label: cat === "forex" ? m.symbol : m.name,
-    href: `/dashboard/market/${encodeURIComponent(m.symbol)}`,
-    icon: m.icon,
-    emoji: m.emoji,
-    colorBg: colors.bg,
-    colorText: colors.text,
-    category: cat,
-  }));
+  return MARKETS.filter((m) => m.category === cat).map((m) => {
+    const style = getSymbolTradingStyle(m.symbol);
+    const styleParam = style ? `?style=${style.key}` : "";
+    return {
+      label: cat === "forex" ? m.symbol : m.name,
+      href: `/dashboard/market/${encodeURIComponent(m.symbol)}${styleParam}`,
+      icon: m.icon,
+      emoji: m.emoji,
+      colorBg: colors.bg,
+      colorText: colors.text,
+      category: cat,
+      styleBadge: style ? { label: style.label, badgeColor: style.badgeColor } : undefined,
+    };
+  });
 });
 
 const navItems: NavItem[] = [
@@ -211,6 +223,11 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                                 </span>
                               ) : null}
                               <span className="truncate text-xs">{child.label}</span>
+                              {child.styleBadge && (
+                                <span className={cn("ml-auto shrink-0 rounded px-1 py-0.5 text-[8px] font-semibold leading-none", SIDEBAR_STYLE_COLORS[child.styleBadge.badgeColor] || SIDEBAR_STYLE_COLORS.blue)}>
+                                  {child.styleBadge.label === "Scalping" ? "Scalp" : child.styleBadge.label === "Day Trading" ? "Day" : "Swing"}
+                                </span>
+                              )}
                             </Link>
                           </div>
                         );

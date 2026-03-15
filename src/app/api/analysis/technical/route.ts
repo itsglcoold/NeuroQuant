@@ -13,7 +13,7 @@ const ANALYST_TIMEOUT_MS = 20_000;
 export const runtime = 'edge';
 
 export async function POST(request: NextRequest) {
-  let body: { symbol?: string; tier?: string; interval?: string };
+  let body: { symbol?: string; tier?: string; interval?: string; tradingStyle?: string };
   try {
     body = await request.json();
   } catch {
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const { symbol, tier = "free", interval = "1day" } = body;
+  const { symbol, tier = "free", interval = "1day", tradingStyle } = body;
 
   if (!symbol) {
     return new Response(JSON.stringify({ error: "Symbol required" }), {
@@ -83,6 +83,7 @@ export async function POST(request: NextRequest) {
             sma50: indicators.sma50,
             bollingerBands: indicators.bollingerBands,
           },
+          tradingStyle: tradingStyle as "scalping" | "daytrading" | "swing" | undefined,
         };
 
         send("market_data", { price, indicators });

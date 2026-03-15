@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { FundamentalAnalysis, ModelOutput } from "@/types/analysis";
-import { fundamentalAnalysisPrompt, technicalAnalysisPrompt, buildMarketDataContext, DISCLAIMER } from "./prompts";
+import { fundamentalAnalysisPrompt, technicalAnalysisPrompt, buildMarketDataContext, DISCLAIMER, type TradingStyle } from "./prompts";
 
 const client = new Anthropic({
   apiKey: process.env.CLAUDE_API_KEY,
@@ -19,13 +19,14 @@ export async function analyzeTechnical(marketData: {
     sma50: number | null;
     bollingerBands: { upper: number; middle: number; lower: number } | null;
   };
+  tradingStyle?: TradingStyle;
 }): Promise<ModelOutput> {
   const context = buildMarketDataContext(marketData);
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-20250514",
     max_tokens: 1500,
-    system: technicalAnalysisPrompt("claude", marketData.symbol),
+    system: technicalAnalysisPrompt("claude", marketData.symbol, marketData.tradingStyle),
     messages: [
       {
         role: "user",

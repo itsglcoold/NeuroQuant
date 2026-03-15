@@ -1,6 +1,6 @@
 "use client";
 
-import { MARKETS, MARKET_CATEGORIES, CATEGORY_COLORS } from "@/lib/market/symbols";
+import { MARKETS, MARKET_CATEGORIES, CATEGORY_COLORS, getSymbolTradingStyle } from "@/lib/market/symbols";
 import { MarketCard } from "@/components/dashboard/MarketCard";
 import { MarketCategory } from "@/types/market";
 import { useMarketData } from "@/hooks/useMarketData";
@@ -64,13 +64,14 @@ export default function DashboardPage() {
         <button
           onClick={() => refetch()}
           disabled={loading}
+          title="Refresh all market prices"
           className={cn(
             "flex items-center gap-2 rounded-lg border border-border bg-secondary px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
             loading && "pointer-events-none opacity-50"
           )}
         >
           <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
-          Refresh
+          Refresh Prices
         </button>
       </div>
 
@@ -178,6 +179,7 @@ export default function DashboardPage() {
                     price={priceData?.price}
                     change={priceData?.change}
                     changePercent={priceData?.changePercent}
+                    tradingStyle={getSymbolTradingStyle(market.symbol)}
                   />
                 );
               })}

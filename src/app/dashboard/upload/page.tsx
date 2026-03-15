@@ -33,6 +33,12 @@ function renderMarkdown(text: string): React.ReactNode[] {
   });
 }
 
+const STYLE_BADGE_COLORS: Record<string, { border: string; bg: string; text: string; label: string }> = {
+  scalping:    { border: "border-red-500/20",   bg: "bg-red-500/10",   text: "text-red-500",   label: "Scalping (1m / 5m)" },
+  daytrading:  { border: "border-blue-500/20",  bg: "bg-blue-500/10",  text: "text-blue-500",  label: "Day Trading (15m / 1H)" },
+  swing:       { border: "border-amber-500/20", bg: "bg-amber-500/10", text: "text-amber-500", label: "Swing Trading (4H / Daily)" },
+};
+
 export default function ChartUploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -147,8 +153,13 @@ export default function ChartUploadPage() {
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Analysis failed");
+        // Guard against non-JSON error responses (e.g. Cloudflare error pages)
+        const contentType = res.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const data = await res.json();
+          throw new Error(data.error || "Analysis failed");
+        }
+        throw new Error(`Analysis failed (HTTP ${res.status}). Please try again.`);
       }
 
       const data = await res.json();
@@ -302,6 +313,11 @@ export default function ChartUploadPage() {
                 {result.detectedTimeframe && (
                   <Badge variant="secondary">⏱ {result.detectedTimeframe}</Badge>
                 )}
+                {result.detectedStyle && STYLE_BADGE_COLORS[result.detectedStyle] && (
+                  <Badge className={`${STYLE_BADGE_COLORS[result.detectedStyle].bg} ${STYLE_BADGE_COLORS[result.detectedStyle].text} ${STYLE_BADGE_COLORS[result.detectedStyle].border} border`}>
+                    {STYLE_BADGE_COLORS[result.detectedStyle].label}
+                  </Badge>
+                )}
               </div>
 
               {/* Sentiment strength label */}
@@ -368,18 +384,46 @@ export default function ChartUploadPage() {
                 </div>
               )}
 
-              {/* Scalp Outlook */}
-              {result.scalpOutlook && (
-                <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
-                  <h4 className="text-sm font-semibold text-amber-600 dark:text-amber-400 mb-1">📊 Scalp / Intraday Outlook</h4>
+              {/* Scalp / Intraday Outlook — hide for swing style */}
+              {result.scalpOutlook && result.detectedStyle !== "swing" && (
+                <div className={`rounded-lg border p-3 ${
+                  result.detectedStyle === "scalping"
+                    ? "border-red-500/20 bg-red-500/5"
+                    : result.detectedStyle === "daytrading"
+                      ? "border-blue-500/20 bg-blue-500/5"
+                      : "border-blue-500/20 bg-blue-500/5"
+                }`}>
+                  <h4 className={`text-sm font-semibold mb-1 ${
+                    result.detectedStyle === "scalping"
+                      ? "text-red-600 dark:text-red-400"
+                      : "text-blue-600 dark:text-blue-400"
+                  }`}>
+                    {result.detectedStyle === "scalping" ? "📊 Scalp Outlook (1m / 5m)"
+                      : result.detectedStyle === "daytrading" ? "📊 Intraday Setup (15m / 1H)"
+                      : "📊 Scalp / Intraday Outlook"}
+                  </h4>
                   <div className="text-sm text-foreground/80 leading-relaxed space-y-1">{renderMarkdown(result.scalpOutlook)}</div>
                 </div>
               )}
 
-              {/* Swing Outlook */}
-              {result.swingOutlook && (
-                <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
-                  <h4 className="text-sm font-semibold text-blue-600 dark:text-blue-400 mb-1">📈 Swing / Position Outlook</h4>
+              {/* Swing Outlook — hide for scalping style */}
+              {result.swingOutlook && result.detectedStyle !== "scalping" && (
+                <div className={`rounded-lg border p-3 ${
+                  result.detectedStyle === "swing"
+                    ? "border-amber-500/20 bg-amber-500/5"
+                    : result.detectedStyle === "daytrading"
+                      ? "border-blue-500/10 bg-blue-500/5"
+                      : "border-blue-500/20 bg-blue-500/5"
+                }`}>
+                  <h4 className={`text-sm font-semibold mb-1 ${
+                    result.detectedStyle === "swing"
+                      ? "text-amber-600 dark:text-amber-400"
+                      : "text-blue-600 dark:text-blue-400"
+                  }`}>
+                    {result.detectedStyle === "swing" ? "📈 Swing Outlook (4H / Daily)"
+                      : result.detectedStyle === "daytrading" ? "📈 Short-Term Context (4H)"
+                      : "📈 Swing / Position Outlook"}
+                  </h4>
                   <div className="text-sm text-foreground/80 leading-relaxed space-y-1">{renderMarkdown(result.swingOutlook)}</div>
                 </div>
               )}

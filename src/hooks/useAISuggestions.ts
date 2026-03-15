@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { UserTier } from "@/hooks/useUsageTracking";
-import type { MarketSuggestion } from "@/types/analysis";
+import type { MarketSuggestion, SuggestionRow } from "@/types/analysis";
 
 const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 export function useAISuggestions(tier: UserTier) {
   const [suggestions, setSuggestions] = useState<MarketSuggestion[]>([]);
+  const [rows, setRows] = useState<SuggestionRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +21,7 @@ export function useAISuggestions(tier: UserTier) {
     async (force = false) => {
       if (tier === "free") {
         setSuggestions([]);
+        setRows([]);
         return;
       }
 
@@ -44,6 +46,7 @@ export function useAISuggestions(tier: UserTier) {
 
         if (res.status === 403) {
           setSuggestions([]);
+          setRows([]);
           return;
         }
 
@@ -54,6 +57,7 @@ export function useAISuggestions(tier: UserTier) {
 
         const data = await res.json();
         setSuggestions(data.suggestions || []);
+        setRows(data.rows || []);
         setLastUpdated(
           data.generatedAt ? new Date(data.generatedAt) : new Date()
         );
@@ -113,6 +117,7 @@ export function useAISuggestions(tier: UserTier) {
 
   return {
     suggestions,
+    rows,
     loading,
     refreshing,
     error,

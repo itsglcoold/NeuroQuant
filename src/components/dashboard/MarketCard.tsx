@@ -6,6 +6,12 @@ import { cn } from "@/lib/utils";
 import { MarketCategory } from "@/types/market";
 import { CATEGORY_COLORS } from "@/lib/market/symbols";
 
+const STYLE_BADGE_COLORS: Record<string, string> = {
+  red: "bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20",
+  blue: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20",
+  amber: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20",
+};
+
 interface MarketCardProps {
   symbol: string;
   name: string;
@@ -15,6 +21,7 @@ interface MarketCardProps {
   price?: number;
   change?: number;
   changePercent?: number;
+  tradingStyle?: { key: string; label: string; badgeColor: string; timeframeFocus: string };
 }
 
 export function MarketCard({
@@ -26,13 +33,15 @@ export function MarketCard({
   price,
   change,
   changePercent,
+  tradingStyle,
 }: MarketCardProps) {
   const isPositive = change !== undefined && change >= 0;
   const hasData = price !== undefined && price > 0;
   const colors = category ? CATEGORY_COLORS[category] : null;
+  const styleParam = tradingStyle ? `?style=${tradingStyle.key}` : "";
 
   return (
-    <Link href={`/dashboard/market/${encodeURIComponent(symbol)}`}>
+    <Link href={`/dashboard/market/${encodeURIComponent(symbol)}${styleParam}`}>
       <Card className={cn("group border border-border bg-card transition-all hover:bg-accent", colors ? `border-l-4 ${colors.border}` : "")}>
         <CardContent className="p-4">
           <div className="flex items-start justify-between">
@@ -46,7 +55,14 @@ export function MarketCard({
               </div>
               <div>
                 <p className="text-sm font-medium text-foreground">{name}</p>
-                <p className="text-xs text-muted-foreground">{symbol}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs text-muted-foreground">{symbol}</p>
+                  {tradingStyle && (
+                    <span className={cn("rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none", STYLE_BADGE_COLORS[tradingStyle.badgeColor] || STYLE_BADGE_COLORS.blue)}>
+                      {tradingStyle.label}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 

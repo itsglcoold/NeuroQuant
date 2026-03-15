@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -146,10 +146,19 @@ function getPriceDecimals(price: number | null | undefined): number {
   return price > 100 ? 2 : 4;
 }
 
+// Map trading style to a sensible default interval
+const STYLE_DEFAULT_INTERVAL: Record<string, number> = {
+  scalping: 1,   // 5m
+  daytrading: 3, // 1H
+  swing: 5,      // 1D
+};
+
 export default function MarketDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const symbol = decodeURIComponent(params.symbol as string);
   const market = getMarketBySymbol(symbol);
+  const tradingStyle = searchParams.get("style") || undefined; // scalping | daytrading | swing
 
   const [price, setPrice] = useState<MarketPrice | null>(null);
   const [indicators, setIndicators] = useState<TechnicalIndicators | null>(null);
@@ -161,7 +170,9 @@ export default function MarketDetailPage() {
   const [analystFailures, setAnalystFailures] = useState(0);
   const [showIndicators, setShowIndicators] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [selectedInterval, setSelectedInterval] = useState(INTERVALS[5]); // Default: 1D
+  const [selectedInterval, setSelectedInterval] = useState(
+    INTERVALS[tradingStyle ? (STYLE_DEFAULT_INTERVAL[tradingStyle] ?? 5) : 5]
+  ); // Default based on trading style
   const { canRunAnalysis, consumeAnalysis, analysesRemaining, analysesTotal, tier } = useUsageTracking();
   const simulator = useSimulator(tier);
 
@@ -210,7 +221,7 @@ export default function MarketDetailPage() {
       const res = await fetch("/api/analysis/technical", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ symbol, tier, interval: apiInterval }),
+        body: JSON.stringify({ symbol, tier, interval: apiInterval, tradingStyle }),
       });
 
       if (!res.ok || !res.body) {
@@ -816,7 +827,7 @@ function formatReasoning(text: string): React.ReactNode[] {
   if (!text) return [];
 
   // Split on known section markers
-  const sectionPattern = /(📊\s*(?:Intraday\/Scalp Outlook|Scalp\/Intraday Outlook)[:\s]*|📈\s*(?:Swing\/Daily Outlook|Swing\/Position Outlook)[:\s]*|(?:Overall Assessment|In summary|Conclusion)[:\s]*)/gi;
+  const sectionPattern = /(📊\s*(?:Intraday\/Scalp Outlook|Scalp\/Intraday Outlook|Scalp Outlook[^:]*|Intraday Setup[^:]*)[:\s]*|📈\s*(?:Swing\/Daily Outlook|Swing\/Position Outlook|Swing Outlook[^:]*|Short-Term Context[^:]*)[:\s]*|(?:Overall Assessment|In summary|Conclusion)[:\s]*)/gi;
 
   const parts = text.split(sectionPattern).filter(Boolean);
 

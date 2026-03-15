@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { ModelOutput, ChartAnalysisResult } from "@/types/analysis";
-import { technicalAnalysisPrompt, chartAnalysisPrompt, buildMarketDataContext, DISCLAIMER } from "./prompts";
+import { technicalAnalysisPrompt, chartAnalysisPrompt, buildMarketDataContext, DISCLAIMER, type TradingStyle } from "./prompts";
 
 function getClient() {
   return new OpenAI({
@@ -22,13 +22,14 @@ export async function analyzeTechnical(marketData: {
     sma50: number | null;
     bollingerBands: { upper: number; middle: number; lower: number } | null;
   };
+  tradingStyle?: TradingStyle;
 }): Promise<ModelOutput> {
   const context = buildMarketDataContext(marketData);
 
   const response = await getClient().chat.completions.create({
     model: "qwen-plus",   // text-only model — faster than qwen3.5-plus (multimodal)
     messages: [
-      { role: "system", content: technicalAnalysisPrompt("qwen", marketData.symbol) },
+      { role: "system", content: technicalAnalysisPrompt("qwen", marketData.symbol, marketData.tradingStyle) },
       { role: "user", content: `Analyze the following market data:\n\n${context}` },
     ],
     temperature: 0.3,

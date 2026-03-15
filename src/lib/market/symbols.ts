@@ -93,3 +93,73 @@ export function getMarketEmoji(symbol: string): string {
   const market = MARKETS.find((m) => m.symbol === symbol);
   return market?.emoji ?? "";
 }
+
+/** Fixed asset groups for AI Market Research screening */
+export const SCREENING_ROWS = [
+  {
+    key: "scalping" as const,
+    label: "Scalping",
+    subtitle: "The Hit-and-Run",
+    timeframeFocus: "1m / 5m",
+    badgeColor: "red",
+    symbols: ["IXIC", "SPX", "XAU/USD", "DXY", "EUR/USD"],
+  },
+  {
+    key: "daytrading" as const,
+    label: "Day Trading",
+    subtitle: "The Daily Trader",
+    timeframeFocus: "15m / 1H",
+    badgeColor: "blue",
+    symbols: ["GBP/USD", "USD/JPY", "CL", "EUR/JPY", "GBP/JPY"],
+  },
+  {
+    key: "swing" as const,
+    label: "Swing Trading",
+    subtitle: "The Trend Follower",
+    timeframeFocus: "4H / Daily",
+    badgeColor: "amber",
+    symbols: ["XAG/USD", "AUD/USD", "USD/CAD", "NZD/USD", "USD/CHF"],
+  },
+] as const;
+
+/** Extra crosses mapped to a trading style (not in SCREENING_ROWS but still get a badge + style) */
+const CROSS_STYLE_MAP: Record<string, "daytrading" | "swing"> = {
+  // JPY crosses → Day Trading
+  "AUD/JPY": "daytrading",
+  "NZD/JPY": "daytrading",
+  "CAD/JPY": "daytrading",
+  // All other crosses → Swing Trading
+  "EUR/GBP": "swing",
+  "GBP/AUD": "swing",
+  "GBP/NZD": "swing",
+  "GBP/CAD": "swing",
+  "GBP/CHF": "swing",
+  "AUD/CAD": "swing",
+  "AUD/CHF": "swing",
+  "AUD/NZD": "swing",
+  "EUR/AUD": "swing",
+  "NZD/CAD": "swing",
+};
+
+const STYLE_META: Record<string, { label: string; badgeColor: string; timeframeFocus: string }> = {
+  scalping:    { label: "Scalping",       badgeColor: "red",   timeframeFocus: "1m / 5m" },
+  daytrading:  { label: "Day Trading",    badgeColor: "blue",  timeframeFocus: "15m / 1H" },
+  swing:       { label: "Swing Trading",  badgeColor: "amber", timeframeFocus: "4H / Daily" },
+};
+
+/** Lookup: symbol → trading style info (covers SCREENING_ROWS + extra crosses) */
+export function getSymbolTradingStyle(symbol: string): { key: string; label: string; badgeColor: string; timeframeFocus: string } | undefined {
+  // First check SCREENING_ROWS
+  for (const row of SCREENING_ROWS) {
+    if ((row.symbols as readonly string[]).includes(symbol)) {
+      return { key: row.key, label: row.label, badgeColor: row.badgeColor, timeframeFocus: row.timeframeFocus };
+    }
+  }
+  // Then check extra crosses
+  const crossStyle = CROSS_STYLE_MAP[symbol];
+  if (crossStyle) {
+    const meta = STYLE_META[crossStyle];
+    return { key: crossStyle, ...meta };
+  }
+  return undefined;
+}

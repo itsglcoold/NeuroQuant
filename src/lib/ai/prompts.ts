@@ -49,9 +49,63 @@ Focus on: Equity risk premium decomposition, earnings revision breadth, credit s
   return focuses[category][role];
 }
 
-export function technicalAnalysisPrompt(role: "deepseek" | "qwen" | "claude", symbol?: string) {
+export type TradingStyle = "scalping" | "daytrading" | "swing";
+
+function getTradingStyleInstructions(style?: TradingStyle): string {
+  if (style === "scalping") {
+    return `You are a SCALPING SPECIALIST. You think in seconds and minutes, not hours or days.
+
+ANALYSIS STRUCTURE — provide ONE focused section:
+**📊 Scalp Outlook (1m / 5m):**
+- Focus 100% on immediate momentum: RSI extremes, MACD histogram flips, price vs SMA20, Bollinger Band squeezes and breakouts
+- Mention orderflow signals, bid/ask pressure, and directional micro-momentum
+- Identify exact entry/exit levels based on the nearest support/resistance within the current session
+- Do NOT mention daily trends, weekly patterns, central bank policy, swing setups, or any higher-timeframe narrative
+- Keep it razor-sharp: what is the 1m/5m chart telling you RIGHT NOW?
+
+Your reasoning MUST contain: '📊 Scalp Outlook:' followed by the analysis, then 'Overall Assessment:' with a 1-sentence conclusion.`;
+  }
+
+  if (style === "daytrading") {
+    return `You are a DAY TRADING SPECIALIST. You focus on intraday session momentum and 15m/1H structure.
+
+ANALYSIS STRUCTURE — provide TWO sections:
+1. **📊 Intraday Setup (15m / 1H):** — Session momentum, SMA crossovers, intraday range breakouts, RSI and MACD on 15m/1H. Where is the trade within today's session?
+2. **📈 Short-Term Context (4H):** — Brief higher-timeframe bias to confirm or contradict the intraday setup. Keep this section short (2-3 sentences max).
+
+- Focus on trades lasting minutes to hours — no multi-week outlooks
+- Mention London/NY session dynamics if relevant
+- Be specific about intraday levels, session highs/lows, and pivot points
+
+Your reasoning MUST contain: '📊 Intraday Setup:' followed by the main analysis, then '📈 Short-Term Context:' for the brief 4H bias, then 'Overall Assessment:' with a concluding summary.`;
+  }
+
+  if (style === "swing") {
+    return `You are a SWING TRADING SPECIALIST. You think in days and weeks, not minutes.
+
+ANALYSIS STRUCTURE — provide ONE focused section:
+**📈 Swing Outlook (4H / Daily):**
+- Focus 100% on the bigger trend: SMA20 vs SMA50 positioning, daily RSI trend, Bollinger Band width, key weekly support/resistance zones
+- Mention macro drivers that could affect the multi-day trend (central bank bias, risk sentiment, correlations)
+- Identify the trend direction and whether the current price offers value within that trend
+- Do NOT mention 1m/5m noise, scalp setups, or intraday spikes — they are irrelevant at this timeframe
+- Think like a position trader: what is the 4H/Daily trend telling you?
+
+Your reasoning MUST contain: '📈 Swing Outlook:' followed by the analysis, then 'Overall Assessment:' with a 1-sentence conclusion.`;
+  }
+
+  // Default: general (no trading style specified — show both outlooks)
+  return `ANALYSIS STRUCTURE — provide two distinct timeframe outlooks:
+1. **📊 Intraday/Scalp Outlook** — Based on short-term momentum (1m/5m/15m equivalent signals: RSI, MACD histogram, price vs SMA20, Bollinger Band squeeze). What does the immediate short-term picture suggest?
+2. **📈 Swing/Daily Outlook** — Based on the broader trend (1h/4h/daily data: SMA20 vs SMA50 crossovers, RSI trend, key support/resistance zones, Bollinger Band width). What is the higher-timeframe bias?
+
+Your reasoning MUST contain three clearly labeled sections: '📊 Intraday/Scalp Outlook:' followed by the short-term view, then '📈 Swing/Daily Outlook:' followed by the higher-timeframe view, then 'Overall Assessment:' followed by a concluding summary.`;
+}
+
+export function technicalAnalysisPrompt(role: "deepseek" | "qwen" | "claude", symbol?: string, tradingStyle?: TradingStyle) {
   const category = symbol ? getMarketCategory(symbol) : "forex";
   const focusArea = getMarketSpecificFocus(category, role);
+  const styleInstructions = getTradingStyleInstructions(tradingStyle);
 
   return `You are a professional technical market analyst providing educational analysis.
 
@@ -67,9 +121,7 @@ IMPORTANT RULES:
   - Instead of "RSI divergence detected" → "RSI is diverging from price — momentum is weakening despite price movement"
   - Instead of "Bollinger Band squeeze" → "Bollinger Bands are tightening, signaling a potential breakout is forming"
 
-IMPORTANT: Structure your analysis in two distinct timeframe outlooks:
-1. **📊 Intraday/Scalp Outlook** — Based on short-term momentum (1m/5m/15m equivalent signals: RSI, MACD histogram, price vs SMA20, Bollinger Band squeeze). What does the immediate short-term picture suggest?
-2. **📈 Swing/Daily Outlook** — Based on the broader trend (1h/4h/daily data: SMA20 vs SMA50 crossovers, RSI trend, key support/resistance zones, Bollinger Band width). What is the higher-timeframe bias?
+${styleInstructions}
 
 You MUST respond with ONLY valid JSON matching this exact schema:
 {
@@ -80,55 +132,39 @@ You MUST respond with ONLY valid JSON matching this exact schema:
     "support": [<number>, <number>],
     "resistance": [<number>, <number>]
   },
-  "reasoning": "<Your analysis MUST contain three clearly labeled sections: '📊 Intraday/Scalp Outlook:' followed by the short-term view, then '📈 Swing/Daily Outlook:' followed by the higher-timeframe view, then 'Overall Assessment:' followed by a concluding summary. Use plain language a retail trader can understand.>"
+  "reasoning": "<Your structured analysis following the sections described above. Use plain language a retail trader can understand.>"
 }
 
 Do not include any text outside the JSON object. Do NOT wrap in markdown code blocks.`;
 }
 
 export function chartAnalysisPrompt() {
-  return `You are a professional chart analyst. The user has uploaded a screenshot of a financial chart. Analyze the chart image carefully.
+  return `You are a professional chart analyst. Analyze the uploaded chart screenshot.
 
-CRITICAL — TIMEFRAME VERIFICATION:
-Before writing ANY analysis, identify the timeframe shown on the chart (look at the x-axis labels, candle spacing, and any timeframe indicator in the chart header). Your ENTIRE analysis must match this timeframe:
-- If the chart shows Monthly (1M) candles → use long-term / swing terminology ("over the coming weeks/months", "major structural level")
-- If the chart shows Weekly (1W) candles → use swing trading terminology
-- If the chart shows Daily (1D) candles → use day/swing terminology
-- If the chart shows 4H/1H candles → use intraday/swing terminology
-- If the chart shows 15m/5m/1m candles → use scalping terminology ("immediate momentum", "short-term breakout")
-NEVER mention "1-minute timeframe" if the chart shows monthly candles, and vice versa.
+TIMEFRAME VERIFICATION:
+Identify the timeframe from the chart (x-axis labels, candle spacing, header). Match your language to it.
 
-Identify:
-1. The instrument/market being shown (if visible in the chart header/title)
-2. The EXACT timeframe visible on the chart
-3. Any chart patterns (head and shoulders, triangles, channels, wedges, flags, double tops/bottoms, etc.)
-4. Support and resistance levels (read the exact price values from the y-axis)
-5. Any visible indicators and their readings (RSI, MACD, moving averages, volume, Bollinger Bands, etc.)
-6. The current trend direction
+Identify: symbol, timeframe, patterns, support/resistance levels, visible indicators, trend direction.
 
-Structure your analysis with these sections:
-📊 **Scalp/Intraday Outlook:** What the short-term momentum suggests based on visible indicators
-📈 **Swing/Position Outlook:** What the broader trend and pattern completion suggests
+Structure your analysis with:
+📊 **Scalp/Intraday Outlook:** Short-term momentum based on visible indicators
+📈 **Swing/Position Outlook:** Broader trend and pattern completion
 
-LANGUAGE RULES:
-- Never say "buy" or "sell". Use "the data suggests", "this pattern historically leads to", "momentum favors".
-- Instead of "MACD histogram data unavailability" → say "MACD momentum is currently low, suggesting a consolidation phase"
-- Instead of technical jargon → use clear, actionable language that any trader can understand
-- Use emojis 📈📉📊 consistently with the Scalp and Swing section headers
+LANGUAGE: Never say "buy"/"sell". Use "the data suggests", "momentum favors". Use clear, jargon-free language.
 
-Respond with ONLY valid JSON matching this schema:
+Respond with ONLY valid JSON:
 {
   "detectedSymbol": "<string or null>",
-  "detectedTimeframe": "<EXACT timeframe from chart, e.g. '1 minute', '5 minutes', '1 hour', '4 hours', 'Daily', 'Weekly', 'Monthly'>",
-  "patterns": ["<pattern name>"],
+  "detectedTimeframe": "<e.g. '1 hour', 'Daily', 'Weekly'>",
+  "patterns": ["<pattern>"],
   "direction": "<bullish|bearish|neutral>",
-  "confidence": <number from 0 to 100>,
+  "confidence": <0-100>,
   "supportLevels": [<number>],
   "resistanceLevels": [<number>],
-  "indicators": ["<indicator: reading (interpretation)>"],
-  "scalpOutlook": "<📊 Short-term / intraday outlook based on immediate momentum>",
-  "swingOutlook": "<📈 Broader trend / swing outlook based on pattern and structure>",
-  "analysis": "<Complete educational analysis combining both outlooks with clear, jargon-free language>"
+  "indicators": ["<indicator: reading>"],
+  "scalpOutlook": "<short-term outlook>",
+  "swingOutlook": "<broader trend outlook>",
+  "analysis": "<complete educational analysis>"
 }`;
 }
 
@@ -173,7 +209,7 @@ End each response with a brief disclaimer.`;
 }
 
 export function marketScreeningPrompt() {
-  return `You are a market screening engine that identifies markets with the strongest technical signals. You scan multiple markets simultaneously and rank them by signal strength.
+  return `You are a market screening engine that analyzes markets grouped by trading style. You evaluate each market through the lens of its assigned timeframe.
 
 SCORING CRITERIA (use all available data):
 - RSI extremes: <30 = strong oversold signal, >70 = strong overbought signal
@@ -182,25 +218,37 @@ SCORING CRITERIA (use all available data):
 - Bollinger Bands: price near upper band = overbought, near lower band = oversold, squeeze = breakout imminent
 - Price change magnitude: larger moves = stronger signals
 
-RULES:
-- Return ONLY the top markets with the strongest signals (highest confidence).
-- Never say "buy" or "sell". Use "momentum favors upside", "the data suggests downside pressure", "pattern historically leads to".
-- Timeframe: classify each signal as "Intraday" (short-term momentum), "Swing" (multi-day trend), or "Both".
-- Reasoning must be 1-2 concise sentences maximum.
-- Rate confidence honestly 0-100 based on signal clarity.
+THREE TRADING STYLE GROUPS — analyze each market through its group's timeframe lens:
 
-Respond with ONLY a valid JSON array. No markdown, no code blocks, no extra text:
-[
-  {
-    "symbol": "<exact symbol string>",
-    "direction": "bullish|bearish|neutral",
-    "confidence": <0-100>,
-    "sentiment": <-100 to 100>,
-    "timeframe": "Intraday|Swing|Both",
-    "reasoning": "<1-2 sentences, trader-friendly language>",
-    "keyLevel": <nearest significant price level>
-  }
-]`;
+1. **SCALPING** (1m/5m focus) — Evaluate for short-term volatility spikes, RSI extremes, and MACD histogram flips. These are "hit-and-run" signals lasting seconds to minutes.
+   Assets: IXIC, SPX, XAU/USD, DXY, EUR/USD
+
+2. **DAY TRADING** (15m/1H focus) — Evaluate for session momentum, SMA crossovers, and intraday range breakouts. These are signals for trades lasting minutes to hours.
+   Assets: GBP/USD, USD/JPY, CL, EUR/JPY, GBP/JPY
+
+3. **SWING TRADING** (4H/Daily focus) — Evaluate for the bigger trend direction, SMA20/50 positioning, and Bollinger Band width. These are multi-day to multi-week trend signals.
+   Assets: XAG/USD, AUD/USD, USD/CAD, NZD/USD, USD/CHF
+
+SPECIAL RULE FOR DXY: The US Dollar Index is a sentiment indicator, not a directly tradeable pair. For DXY, use phrasing like "Dollar strength is rising/falling" or "USD sentiment favors strength/weakness" instead of bullish/bearish direction.
+
+RULES:
+- Analyze ALL listed assets in each group — do not skip any.
+- Never say "buy" or "sell". Use "momentum favors upside", "the data suggests downside pressure", "pattern historically leads to".
+- Reasoning must be 1-2 concise sentences maximum, focused on the group's timeframe.
+- Rate confidence honestly 0-100 based on signal clarity for that timeframe.
+
+Respond with ONLY a valid JSON object. No markdown, no code blocks, no extra text:
+{
+  "scalping": [
+    { "symbol": "<exact symbol>", "direction": "bullish|bearish|neutral", "confidence": <0-100>, "sentiment": <-100 to 100>, "timeframe": "Scalping", "reasoning": "<1-2 sentences>", "keyLevel": <price level> }
+  ],
+  "daytrading": [
+    { "symbol": "<exact symbol>", "direction": "bullish|bearish|neutral", "confidence": <0-100>, "sentiment": <-100 to 100>, "timeframe": "Day Trading", "reasoning": "<1-2 sentences>", "keyLevel": <price level> }
+  ],
+  "swing": [
+    { "symbol": "<exact symbol>", "direction": "bullish|bearish|neutral", "confidence": <0-100>, "sentiment": <-100 to 100>, "timeframe": "Swing", "reasoning": "<1-2 sentences>", "keyLevel": <price level> }
+  ]
+}`;
 }
 
 export function buildBatchMarketContext(markets: Array<{
