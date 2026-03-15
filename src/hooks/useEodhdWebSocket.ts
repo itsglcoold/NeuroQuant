@@ -64,6 +64,28 @@ interface WebSocketState {
   error: string | null;
 }
 
+// Cache the WS config so we only fetch it once
+let wsConfigCache: { forex: string; us: string } | null = null;
+let wsConfigPromise: Promise<{ forex: string; us: string } | null> | null = null;
+
+async function getWsConfig(): Promise<{ forex: string; us: string } | null> {
+  if (wsConfigCache) return wsConfigCache;
+  if (wsConfigPromise) return wsConfigPromise;
+
+  wsConfigPromise = fetch("/api/ws-config")
+    .then((res) => res.json())
+    .then((config) => {
+      wsConfigCache = config;
+      return config;
+    })
+    .catch(() => null)
+    .finally(() => {
+      wsConfigPromise = null;
+    });
+
+  return wsConfigPromise;
+}
+
 /**
  * Shared WebSocket connection to EODHD for real-time price streaming.
  * Connects to /ws/forex for all forex/metals/energy symbols.
@@ -83,10 +105,11 @@ export function useEodhdWebSocket(symbols: string[]) {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pricesRef = useRef<Record<string, MarketPrice>>({});
   const batchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+  const reconnectCountRef = useRef(0);
 
-  // Group symbols by endpoint
-  const forexSymbols = symbols.filter((s) => WS_SYMBOL_MAP[s]?.endpoint === "forex");
-  const usSymbols = symbols.filter((s) => WS_SYMBOL_MAP[s]?.endpoint === "us");
+  // Stable symbol key to prevent re-renders
+  const symbolKey = symbols.join(",");
 
   const handleMessage = useCallback((event: MessageEvent) => {
     try {
@@ -99,8 +122,7 @@ export function useEodhdWebSocket(symbols: string[]) {
       if (!appSymbol) return;
 
       // EODHD forex WS format: { s, a (ask), b (bid), dc (daily change %), dd (daily diff), t (ms) }
-      const price = data.a || data.p || 0; // ask price for forex, or price for stocks
-      const bid = data.b || price;
+      const price = data.a || data.p || 0;
 
       // Update price in ref (batched state update below)
       const existing = pricesRef.current[appSymbol];
@@ -119,10 +141,12 @@ export function useEodhdWebSocket(symbols: string[]) {
       // Batch state updates: max every 500ms to avoid excessive re-renders
       if (!batchTimerRef.current) {
         batchTimerRef.current = setTimeout(() => {
-          setState((prev) => ({
-            ...prev,
-            prices: { ...pricesRef.current },
-          }));
+          if (mountedRef.current) {
+            setState((prev) => ({
+              ...prev,
+              prices: { ...pricesRef.current },
+            }));
+          }
           batchTimerRef.current = null;
         }, 500);
       }
@@ -131,25 +155,28 @@ export function useEodhdWebSocket(symbols: string[]) {
     }
   }, []);
 
-  const connectEndpoint = useCallback(
-    async (endpoint: "forex" | "us", wsSymbols: string[]) => {
-      if (wsSymbols.length === 0) return null;
+  useEffect(() => {
+    mountedRef.current = true;
+    reconnectCountRef.current = 0;
 
-      // Get WebSocket URL from server (keeps API key server-side)
-      let wsUrl: string;
-      try {
-        const res = await fetch("/api/ws-config");
-        const config = await res.json();
-        wsUrl = config[endpoint];
-        if (!wsUrl) return null;
-      } catch {
-        return null;
-      }
+    if (symbols.length === 0 || !isMarketOpen()) return;
+
+    const forexSymbols = symbols.filter((s) => WS_SYMBOL_MAP[s]?.endpoint === "forex");
+    const usSymbols = symbols.filter((s) => WS_SYMBOL_MAP[s]?.endpoint === "us");
+
+    async function connect(endpoint: "forex" | "us", wsSymbols: string[]): Promise<WebSocket | null> {
+      if (wsSymbols.length === 0 || !mountedRef.current) return null;
+
+      const config = await getWsConfig();
+      if (!config || !mountedRef.current) return null;
+
+      const wsUrl = config[endpoint];
+      if (!wsUrl) return null;
 
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        // Subscribe to all symbols
+        reconnectCountRef.current = 0;
         const wsNames = wsSymbols
           .map((s) => WS_SYMBOL_MAP[s]?.ws)
           .filter(Boolean)
@@ -157,49 +184,51 @@ export function useEodhdWebSocket(symbols: string[]) {
 
         ws.send(JSON.stringify({ action: "subscribe", symbols: wsNames }));
 
-        setState((prev) => ({ ...prev, connected: true, error: null }));
+        if (mountedRef.current) {
+          setState((prev) => ({ ...prev, connected: true, error: null }));
+        }
       };
 
       ws.onmessage = handleMessage;
 
       ws.onerror = () => {
-        setState((prev) => ({ ...prev, error: "WebSocket connection error" }));
+        if (mountedRef.current) {
+          setState((prev) => ({ ...prev, error: "WebSocket connection error" }));
+        }
       };
 
       ws.onclose = () => {
+        if (!mountedRef.current) return;
+
         setState((prev) => ({ ...prev, connected: false }));
-        // Auto-reconnect after 5 seconds if markets are open
-        if (isMarketOpen()) {
+
+        // Auto-reconnect with exponential backoff (max 60s), max 10 retries
+        if (isMarketOpen() && reconnectCountRef.current < 10) {
+          const delay = Math.min(5000 * Math.pow(2, reconnectCountRef.current), 60000);
+          reconnectCountRef.current++;
           reconnectTimerRef.current = setTimeout(() => {
-            connectEndpoint(endpoint, wsSymbols);
-          }, 5000);
+            connect(endpoint, wsSymbols).then((newWs) => {
+              if (endpoint === "forex") wsForexRef.current = newWs;
+              else wsUsRef.current = newWs;
+            });
+          }, delay);
         }
       };
 
       return ws;
-    },
-    [handleMessage]
-  );
-
-  useEffect(() => {
-    if (symbols.length === 0 || !isMarketOpen()) return;
-
-    // Connect forex endpoint
-    if (forexSymbols.length > 0) {
-      connectEndpoint("forex", forexSymbols).then((ws) => {
-        wsForexRef.current = ws;
-      });
     }
 
-    // Connect US endpoint for indices
-    if (usSymbols.length > 0) {
-      connectEndpoint("us", usSymbols).then((ws) => {
-        wsUsRef.current = ws;
-      });
-    }
+    // Connect to both endpoints
+    connect("forex", forexSymbols).then((ws) => {
+      wsForexRef.current = ws;
+    });
+    connect("us", usSymbols).then((ws) => {
+      wsUsRef.current = ws;
+    });
 
     return () => {
-      // Cleanup
+      mountedRef.current = false;
+
       if (wsForexRef.current) {
         wsForexRef.current.close();
         wsForexRef.current = null;
@@ -216,7 +245,7 @@ export function useEodhdWebSocket(symbols: string[]) {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [symbols.join(",")]);
+  }, [symbolKey, handleMessage]);
 
   return state;
 }
