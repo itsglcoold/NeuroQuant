@@ -19,9 +19,9 @@ function getMarketStatus() {
 
   // Forex market: Sun 21:00 UTC → Fri 21:00 UTC
   // Closed: Fri 21:00 → Sun 21:00
-  if (utcDay === 6) return { open: false, label: "Markets are closed (weekend)" };
-  if (utcDay === 0 && utcHour < 21) return { open: false, label: "Markets are closed (weekend)" };
-  if (utcDay === 5 && utcHour >= 21) return { open: false, label: "Markets are closed (weekend)" };
+  if (utcDay === 6) return { open: false, label: "Closed (weekend)" };
+  if (utcDay === 0 && utcHour < 21) return { open: false, label: "Closed (weekend)" };
+  if (utcDay === 5 && utcHour >= 21) return { open: false, label: "Closed (weekend)" };
 
   // Determine which session(s) are active
   const sessions: string[] = [];
@@ -34,8 +34,11 @@ function getMarketStatus() {
   // New York: 13:00–22:00 UTC
   if (utcHour >= 13 && utcHour < 22) sessions.push("New York");
 
-  if (sessions.length > 0) {
-    return { open: true, label: `Markets are open (${sessions.join(" & ")})` };
+  if (sessions.length === 1) {
+    return { open: true, label: `${sessions[0]} session is open` };
+  }
+  if (sessions.length > 1) {
+    return { open: true, label: `${sessions.join(" & ")} sessions are open` };
   }
   return { open: true, label: "Markets are open" };
 }
