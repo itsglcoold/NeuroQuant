@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { MarketPrice } from "@/types/market";
 import { MARKETS } from "@/lib/market/symbols";
+import { useEodhdWebSocket } from "./useEodhdWebSocket";
 
 // Check if any major market session is currently open (UTC-based)
 // Forex trades Sun 21:00 UTC – Fri 21:00 UTC
@@ -21,16 +22,33 @@ function isAnyMarketOpen(): boolean {
   return true;
 }
 
+const ALL_SYMBOLS = MARKETS.map((m) => m.symbol);
+
 export function useMarketData(refreshInterval = 60000) {
   const [prices, setPrices] = useState<Record<string, MarketPrice>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [latency, setLatency] = useState<number | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const initialFetchDone = useRef(false);
 
+  // ── WebSocket streaming (0 REST API calls) ──
+  const ws = useEodhdWebSocket(ALL_SYMBOLS);
+
+  // Merge WebSocket prices into state whenever they update
+  useEffect(() => {
+    if (Object.keys(ws.prices).length > 0) {
+      setPrices((prev) => ({ ...prev, ...ws.prices }));
+      setLastUpdated(new Date());
+      setLoading(false);
+      setError(null);
+    }
+  }, [ws.prices]);
+
+  // ── REST fallback: initial load + periodic refresh for symbols not on WS ──
   const fetchPrices = useCallback(async () => {
     try {
-      const symbols = MARKETS.map((m) => m.symbol).join(",");
+      const symbols = ALL_SYMBOLS.join(",");
       const start = performance.now();
       const res = await fetch(`/api/market-data?symbols=${encodeURIComponent(symbols)}&type=quote`);
       const elapsed = Math.round(performance.now() - start);
@@ -45,7 +63,7 @@ export function useMarketData(refreshInterval = 60000) {
         for (const price of data) {
           priceMap[price.symbol] = price;
         }
-        setPrices(priceMap);
+        setPrices((prev) => ({ ...prev, ...priceMap }));
       }
 
       setLastUpdated(new Date());
@@ -57,18 +75,32 @@ export function useMarketData(refreshInterval = 60000) {
   }, []);
 
   useEffect(() => {
-    // Always fetch once on mount to show latest data
-    fetchPrices();
+    // Always fetch once on mount to get initial data (open/high/low/previousClose)
+    if (!initialFetchDone.current) {
+      initialFetchDone.current = true;
+      fetchPrices();
+    }
 
-    // Only poll when markets are open; check every interval
+    // If WebSocket is connected, only poll REST every 5 minutes as backup
+    // If WebSocket is not connected, poll REST at normal interval
+    const actualInterval = ws.connected ? Math.max(refreshInterval, 300000) : refreshInterval;
+
     const interval = setInterval(() => {
       if (isAnyMarketOpen()) {
         fetchPrices();
       }
-    }, refreshInterval);
+    }, actualInterval);
 
     return () => clearInterval(interval);
-  }, [fetchPrices, refreshInterval]);
+  }, [fetchPrices, refreshInterval, ws.connected]);
 
-  return { prices, loading, error, latency, lastUpdated, refetch: fetchPrices };
+  return {
+    prices,
+    loading,
+    error: ws.error || error,
+    latency,
+    lastUpdated,
+    refetch: fetchPrices,
+    wsConnected: ws.connected,
+  };
 }

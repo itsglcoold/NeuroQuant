@@ -31,6 +31,8 @@ function isMarketOpen(): boolean {
 interface TradingChartProps {
   symbol: string;
   height?: number;
+  /** Live price from WebSocket — avoids REST API calls for ticking */
+  wsPrice?: number;
 }
 
 type Interval = "1min" | "5min" | "15min" | "1h" | "4h" | "1day" | "1week" | "1month";
@@ -103,7 +105,7 @@ function calcSMA(candles: CandlestickData<Time>[], period: number): LineData<Tim
   return result;
 }
 
-export function TradingChart({ symbol, height = 400 }: TradingChartProps) {
+export function TradingChart({ symbol, height = 400, wsPrice }: TradingChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -301,14 +303,37 @@ export function TradingChart({ symbol, height = 400 }: TradingChartProps) {
   }, [symbol, interval]);
 
   // =============================================
-  // LIVE TICK: Fetch real-time price every few seconds
-  // and update the last candle so the chart "moves"
+  // LIVE TICK: Use WebSocket price if available,
+  // otherwise fall back to REST API polling
   // =============================================
+
+  // WebSocket-driven tick: update candle whenever wsPrice changes
   useEffect(() => {
+    if (typeof wsPrice !== "number" || wsPrice <= 0) return;
+
+    setLivePrice(wsPrice);
+
+    const lastCandle = lastCandleRef.current;
+    if (lastCandle && candleSeriesRef.current) {
+      const updated: CandlestickData<Time> = {
+        ...lastCandle,
+        close: wsPrice,
+        high: Math.max(lastCandle.high, wsPrice),
+        low: Math.min(lastCandle.low, wsPrice),
+      };
+      candleSeriesRef.current.update(updated);
+      lastCandleRef.current = updated;
+    }
+  }, [wsPrice]);
+
+  // REST fallback tick: only when no WebSocket price is available
+  useEffect(() => {
+    // If wsPrice is active, skip REST polling entirely
+    if (typeof wsPrice === "number" && wsPrice > 0) return;
+
     let cancelled = false;
 
     async function tickPrice() {
-      // Skip API calls when markets are closed (weekend)
       if (!isMarketOpen()) return;
       try {
         const res = await fetch(
@@ -322,7 +347,6 @@ export function TradingChart({ symbol, height = 400 }: TradingChartProps) {
 
         setLivePrice(price);
 
-        // Update the last candle in-place
         const lastCandle = lastCandleRef.current;
         if (lastCandle && candleSeriesRef.current) {
           const updated: CandlestickData<Time> = {
@@ -339,7 +363,6 @@ export function TradingChart({ symbol, height = 400 }: TradingChartProps) {
       }
     }
 
-    // Start ticking immediately
     tickPrice();
     const tickTimer = globalThis.setInterval(tickPrice, TICK_RATE * 1000);
 
@@ -347,7 +370,7 @@ export function TradingChart({ symbol, height = 400 }: TradingChartProps) {
       cancelled = true;
       clearInterval(tickTimer);
     };
-  }, [symbol]);
+  }, [symbol, wsPrice]);
 
   return (
     <div className="relative">

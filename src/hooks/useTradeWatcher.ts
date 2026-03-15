@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import type { PaperTrade } from "@/types/simulator";
+import type { MarketPrice } from "@/types/market";
 
 // Check if forex markets are open (Sun 21:00 – Fri 21:00 UTC)
 function isMarketOpen(): boolean {
@@ -18,6 +19,8 @@ interface TradeWatcherProps {
   refreshMs: number;
   closeTrade: (tradeId: string, closePrice: number) => Promise<boolean>;
   onTradeClosed?: (trade: PaperTrade, closePrice: number, pnl: number) => void;
+  /** WebSocket prices from useEodhdWebSocket — avoids REST API calls */
+  wsPrices?: Record<string, MarketPrice>;
 }
 
 async function fetchCurrentPrices(
@@ -53,6 +56,7 @@ export function useTradeWatcher({
   refreshMs,
   closeTrade,
   onTradeClosed,
+  wsPrices,
 }: TradeWatcherProps) {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const checkingRef = useRef(false);
@@ -63,7 +67,24 @@ export function useTradeWatcher({
 
     try {
       const uniqueSymbols = [...new Set(openTrades.map((t) => t.symbol))];
-      const prices = await fetchCurrentPrices(uniqueSymbols);
+
+      // Use WebSocket prices if available, otherwise fall back to REST
+      let prices: Record<string, number> = {};
+      if (wsPrices && Object.keys(wsPrices).length > 0) {
+        for (const sym of uniqueSymbols) {
+          if (wsPrices[sym]?.price) {
+            prices[sym] = wsPrices[sym].price;
+          }
+        }
+        // Fetch any missing symbols via REST
+        const missing = uniqueSymbols.filter((s) => !prices[s]);
+        if (missing.length > 0) {
+          const restPrices = await fetchCurrentPrices(missing);
+          prices = { ...prices, ...restPrices };
+        }
+      } else {
+        prices = await fetchCurrentPrices(uniqueSymbols);
+      }
 
       for (const trade of openTrades) {
         const currentPrice = prices[trade.symbol];
@@ -106,7 +127,7 @@ export function useTradeWatcher({
     } finally {
       checkingRef.current = false;
     }
-  }, [openTrades, closeTrade, onTradeClosed]);
+  }, [openTrades, closeTrade, onTradeClosed, wsPrices]);
 
   // Check on mount (page load)
   useEffect(() => {

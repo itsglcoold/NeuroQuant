@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useUsageTracking } from "@/hooks/useUsageTracking";
 import { useSimulator } from "@/hooks/useSimulator";
 import { useTradeWatcher } from "@/hooks/useTradeWatcher";
+import { useMarketData } from "@/hooks/useMarketData";
 import { INITIAL_VIRTUAL_BALANCE } from "@/types/simulator";
 import type { PaperTrade } from "@/types/simulator";
 import {
@@ -59,11 +60,15 @@ export default function SimulatorPage() {
     { symbol: string; pnl: number }[]
   >([]);
 
-  // Trade watcher for auto-closing
+  // WebSocket prices for trade watcher (avoids REST polling)
+  const { prices: wsPrices } = useMarketData();
+
+  // Trade watcher for auto-closing — uses WebSocket prices
   useTradeWatcher({
     openTrades,
     refreshMs,
     closeTrade,
+    wsPrices,
     onTradeClosed: (trade, _closePrice, pnl) => {
       setClosedNotifications((prev) => [
         { symbol: trade.symbol, pnl },
