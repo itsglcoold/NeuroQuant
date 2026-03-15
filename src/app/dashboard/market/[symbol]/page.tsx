@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TradingViewChart } from "@/components/dashboard/TradingViewChart";
 import { MarketSwitcher } from "@/components/dashboard/MarketSwitcher";
 import { UpgradeModal } from "@/components/dashboard/UpgradeModal";
-import { getMarketBySymbol, getMarketEmoji, CATEGORY_COLORS } from "@/lib/market/symbols";
+import { getMarketBySymbol, getMarketEmoji, CATEGORY_COLORS, getSymbolTradingStyle } from "@/lib/market/symbols";
 import { cn } from "@/lib/utils";
 import { useUsageTracking } from "@/hooks/useUsageTracking";
 import { ConsensusResult } from "@/types/analysis";
@@ -322,9 +322,25 @@ export default function MarketDetailPage() {
             </div>
           )}
           <div>
-            <h1 className="text-xl font-bold leading-tight">
-              {market?.name || symbol}
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold leading-tight">
+                {market?.name || symbol}
+              </h1>
+              {(() => {
+                const style = getSymbolTradingStyle(symbol);
+                if (!style) return null;
+                const colors: Record<string, string> = {
+                  scalping: "bg-red-500/10 text-red-500 border-red-500/20",
+                  daytrading: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+                  swing: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+                };
+                return (
+                  <Badge className={`${colors[style.key] || ""} border text-[10px] px-1.5 py-0`}>
+                    {style.label}
+                  </Badge>
+                );
+              })()}
+            </div>
             <p className="text-xs text-muted-foreground">{symbol}</p>
           </div>
         </div>
