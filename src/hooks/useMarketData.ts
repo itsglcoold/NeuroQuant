@@ -36,9 +36,23 @@ export function useMarketData(refreshInterval = 60000) {
   const ws = useEodhdWebSocket(ALL_SYMBOLS);
 
   // Merge WebSocket prices into state whenever they update
+  // Preserve change/changePercent from REST if WebSocket sends 0
   useEffect(() => {
     if (Object.keys(ws.prices).length > 0) {
-      setPrices((prev) => ({ ...prev, ...ws.prices }));
+      setPrices((prev) => {
+        const merged = { ...prev };
+        for (const [sym, wsPrice] of Object.entries(ws.prices)) {
+          const existing = prev[sym];
+          merged[sym] = {
+            ...existing,
+            ...wsPrice,
+            // Keep REST change values if WS sends 0/undefined
+            change: wsPrice.change || existing?.change || 0,
+            changePercent: wsPrice.changePercent || existing?.changePercent || 0,
+          };
+        }
+        return merged;
+      });
       setLastUpdated(new Date());
       setLoading(false);
       setError(null);
