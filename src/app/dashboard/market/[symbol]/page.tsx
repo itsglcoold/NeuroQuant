@@ -335,8 +335,8 @@ export default function MarketDetailPage() {
                   swing: "bg-amber-500/10 text-amber-500 border-amber-500/20",
                 };
                 return (
-                  <Badge className={`${colors[style.key] || ""} border text-[10px] px-1.5 py-0`}>
-                    {style.label}
+                  <Badge className={`${colors[style.key] || ""} border text-xs font-semibold px-2.5 py-0.5`}>
+                    {style.label} · {style.timeframeFocus}
                   </Badge>
                 );
               })()}
