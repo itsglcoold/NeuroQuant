@@ -27,23 +27,39 @@ function normalizeSymbol(raw: string): string {
   const direct = MARKETS.find((m) => m.symbol.toUpperCase() === cleaned);
   if (direct) return direct.symbol;
 
-  // Strip slashes/dashes and try matching without separators (e.g. "EURUSD" → "EUR/USD")
-  const stripped = cleaned.replace(/[/\-_]/g, "");
-  const match = MARKETS.find((m) => m.symbol.replace(/[/\-_]/g, "").toUpperCase() === stripped);
+  // Strip slashes/dashes/dots and try matching without separators (e.g. "EURUSD" → "EUR/USD")
+  const stripped = cleaned.replace(/[/\-_.]/g, "");
+  const match = MARKETS.find((m) => m.symbol.replace(/[/\-_.]/g, "").toUpperCase() === stripped);
   if (match) return match.symbol;
 
-  // Common aliases
+  // Common aliases — covers TradingView naming, broker names, common abbreviations
   const ALIASES: Record<string, string> = {
-    "GOLD": "XAU/USD", "XAUUSD": "XAU/USD",
-    "SILVER": "XAG/USD", "XAGUSD": "XAG/USD",
+    // Gold
+    "GOLD": "XAU/USD", "XAUUSD": "XAU/USD", "GOLDSPOT": "XAU/USD",
+    "GOLDSPOTUS DOLLAR": "XAU/USD", "GOLDSPOT/USDOLLAR": "XAU/USD",
+    // Silver
+    "SILVER": "XAG/USD", "XAGUSD": "XAG/USD", "SILVERSPOT": "XAG/USD",
+    "SILVER/USDOLLAR": "XAG/USD",
+    // Oil
     "OIL": "CL", "CRUDEOIL": "CL", "WTI": "CL", "USOIL": "CL",
+    "WTICRUDEOIL": "CL", "CFDSONWTICRUDEOIL": "CL", "CRUDE": "CL",
+    // NASDAQ
     "NAS100": "IXIC", "NASDAQ": "IXIC", "NASDAQ100": "IXIC", "NDX": "IXIC", "NQ": "IXIC",
-    "SP500": "SPX", "SPX500": "SPX", "US500": "SPX",
-    "DOLLARINDEX": "DXY", "USDX": "DXY",
-    "GOLDSPOT": "XAU/USD", "GOLDSPOT/U.S.DOLLAR": "XAU/USD",
-    "SILVERSPOT": "XAG/USD",
+    "USNAS100": "IXIC", "US100": "IXIC", "USTEC": "IXIC", "USTEC100": "IXIC",
+    "NASDAQCOMPOSITE": "IXIC",
+    // S&P 500
+    "SP500": "SPX", "SPX500": "SPX", "US500": "SPX", "S&P500": "SPX",
+    "SP500INDEX": "SPX", "S&P500INDEX": "SPX",
+    // DXY
+    "DOLLARINDEX": "DXY", "USDX": "DXY", "USDOLLARINDEX": "DXY",
   };
   if (ALIASES[stripped]) return ALIASES[stripped];
+
+  // Fuzzy: check if any alias is contained in the stripped string
+  // Handles "CFDSONWTICRUDEOIL" or "USNASDAQ100INDEX" etc.
+  for (const [alias, symbol] of Object.entries(ALIASES)) {
+    if (stripped.includes(alias) && alias.length >= 4) return symbol;
+  }
 
   // Return original if no match
   return raw.trim();
