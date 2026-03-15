@@ -20,7 +20,8 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
  * We need to match against our MARKETS list which uses "EUR/USD", "XAU/USD", etc.
  */
 function normalizeSymbol(raw: string): string {
-  const cleaned = raw.trim().toUpperCase().replace(/\s+/g, "");
+  // Strip parenthetical descriptions: "XAU/USD (Gold Spot / U.S. Dollar)" → "XAU/USD"
+  let cleaned = raw.trim().replace(/\s*\(.*\)$/, "").trim().toUpperCase().replace(/\s+/g, "");
 
   // Already in our format? (e.g. "EUR/USD")
   const direct = MARKETS.find((m) => m.symbol.toUpperCase() === cleaned);
@@ -39,6 +40,8 @@ function normalizeSymbol(raw: string): string {
     "NAS100": "IXIC", "NASDAQ": "IXIC", "NASDAQ100": "IXIC", "NDX": "IXIC", "NQ": "IXIC",
     "SP500": "SPX", "SPX500": "SPX", "US500": "SPX",
     "DOLLARINDEX": "DXY", "USDX": "DXY",
+    "GOLDSPOT": "XAU/USD", "GOLDSPOT/U.S.DOLLAR": "XAU/USD",
+    "SILVERSPOT": "XAG/USD",
   };
   if (ALIASES[stripped]) return ALIASES[stripped];
 
