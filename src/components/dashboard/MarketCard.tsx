@@ -80,9 +80,11 @@ export function MarketCard({
                 ) : (
                   <TrendingDown className="h-3 w-3" />
                 )}
-                {changePercent !== undefined
+                {changePercent !== undefined && typeof changePercent === "number"
                   ? `${isPositive ? "+" : ""}${changePercent.toFixed(2)}%`
-                  : `${isPositive ? "+" : ""}${change.toFixed(2)}`}
+                  : change !== undefined && typeof change === "number"
+                    ? `${isPositive ? "+" : ""}${change.toFixed(2)}`
+                    : "0.00"}
               </div>
             )}
           </div>
@@ -101,7 +103,7 @@ export function MarketCard({
                     )}
                   >
                     {isPositive ? "+" : ""}
-                    {change.toFixed(2)}
+                    {typeof change === "number" ? change.toFixed(2) : "0.00"}
                   </span>
                 )}
               </div>
@@ -137,19 +139,20 @@ function getCurrencyPrefix(symbol: string): string {
 }
 
 function formatPrice(price: number, symbol: string): string {
+  const p = typeof price === "number" && !isNaN(price) ? price : 0;
   const prefix = getCurrencyPrefix(symbol);
   if (symbol.includes("JPY")) {
-    return `${prefix}${price.toFixed(3)}`;
+    return `${prefix}${p.toFixed(3)}`;
   }
   if (symbol === "SPX" || symbol === "IXIC") {
-    return `${prefix}${price.toLocaleString("en-US", {
+    return `${prefix}${p.toLocaleString("en-US", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })}`;
   }
   // Forex majors with 4-5 decimal places
   if (symbol.includes("/") && !symbol.includes("JPY")) {
-    return `${prefix}${price.toFixed(price < 10 ? 5 : 4)}`;
+    return `${prefix}${p.toFixed(p < 10 ? 5 : 4)}`;
   }
-  return `${prefix}${price.toFixed(2)}`;
+  return `${prefix}${p.toFixed(2)}`;
 }
