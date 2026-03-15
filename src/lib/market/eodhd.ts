@@ -73,9 +73,23 @@ async function fetchEodhd(
     next: { revalidate: cacheSecs },
   });
   if (!response.ok) {
+    // Check for rate limit error
+    const text = await response.text().catch(() => "");
+    if (text.includes("exceeded") || text.includes("limit")) {
+      throw new Error(`EODHD API rate limit exceeded`);
+    }
     throw new Error(`EODHD API error: ${response.status}`);
   }
-  return response.json();
+  // Check if response is JSON (rate limit returns plain text even with 200)
+  const text = await response.text();
+  if (text.includes("exceeded") || text.includes("limit")) {
+    throw new Error(`EODHD API rate limit exceeded`);
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`EODHD API returned invalid response`);
+  }
 }
 
 function safeFloat(val: unknown): number {

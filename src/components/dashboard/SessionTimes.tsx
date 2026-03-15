@@ -56,10 +56,26 @@ function isSessionOpen(session: MarketSession, nowUTC: Date): boolean {
   const hour = nowUTC.getUTCHours();
   const day = nowUTC.getUTCDay(); // 0=Sun, 6=Sat
 
-  // Markets closed on weekends (Sat & Sun)
-  if (day === 0 || day === 6) return false;
+  // Saturday: always closed
+  if (day === 6) return false;
 
-  // Handle sessions that cross midnight UTC (e.g., Sydney: 21-06)
+  // Sunday: forex opens at 21:00 UTC (Sydney session)
+  // Before 21:00 UTC Sunday = closed for all
+  // After 21:00 UTC Sunday = Sydney is open, others still closed
+  if (day === 0) {
+    if (hour < 21) return false;
+    // Sunday 21:00+ UTC: only sessions that cross midnight are open
+    if (session.openHourUTC > session.closeHourUTC) {
+      return hour >= session.openHourUTC; // e.g. Sydney opens at 21
+    }
+    return false; // Tokyo (0-9), London (7-16), NY (13-22) not yet open
+  }
+
+  // Friday: closed after 21:00 UTC (market close)
+  if (day === 5 && hour >= 21) return false;
+
+  // Monday: sessions that cross midnight opened Sunday evening
+  // e.g., Sydney opened Sun 21:00 UTC, still open Mon 00:00-06:00
   if (session.openHourUTC > session.closeHourUTC) {
     return hour >= session.openHourUTC || hour < session.closeHourUTC;
   }

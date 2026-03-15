@@ -9,38 +9,47 @@ import { Activity, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUsageTracking } from "@/hooks/useUsageTracking";
 import { AISuggestions } from "@/components/dashboard/AISuggestions";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 /** Check if any major forex/commodity market is currently open */
+function getMarketStatus() {
+  const now = new Date();
+  const utcDay = now.getUTCDay(); // 0=Sun, 6=Sat
+  const utcHour = now.getUTCHours();
+
+  // Forex market: Sun 21:00 UTC → Fri 21:00 UTC
+  // Closed: Fri 21:00 → Sun 21:00
+  if (utcDay === 6) return { open: false, label: "Markets are closed (weekend)" };
+  if (utcDay === 0 && utcHour < 21) return { open: false, label: "Markets are closed (weekend)" };
+  if (utcDay === 5 && utcHour >= 21) return { open: false, label: "Markets are closed (weekend)" };
+
+  // Determine which session(s) are active
+  const sessions: string[] = [];
+  // Sydney: 21:00–06:00 UTC
+  if (utcHour >= 21 || utcHour < 6) sessions.push("Sydney");
+  // Tokyo: 00:00–09:00 UTC
+  if (utcHour >= 0 && utcHour < 9) sessions.push("Tokyo");
+  // London: 07:00–16:00 UTC
+  if (utcHour >= 7 && utcHour < 16) sessions.push("London");
+  // New York: 13:00–22:00 UTC
+  if (utcHour >= 13 && utcHour < 22) sessions.push("New York");
+
+  if (sessions.length > 0) {
+    return { open: true, label: `Markets are open (${sessions.join(" & ")})` };
+  }
+  return { open: true, label: "Markets are open" };
+}
+
 function useMarketStatus() {
-  // Re-evaluated on each render (every 15s via useMarketData refresh)
-  return useMemo(() => {
-    const now = new Date();
-    const utcDay = now.getUTCDay(); // 0=Sun, 6=Sat
-    const utcHour = now.getUTCHours();
+  const [status, setStatus] = useState(getMarketStatus);
 
-    // Forex market: Sun 21:00 UTC → Fri 21:00 UTC
-    // Closed: Fri 21:00 → Sun 21:00
-    if (utcDay === 6) return { open: false, label: "Markets are closed (weekend)" };
-    if (utcDay === 0 && utcHour < 21) return { open: false, label: "Markets are closed (weekend)" };
-    if (utcDay === 5 && utcHour >= 21) return { open: false, label: "Markets are closed (weekend)" };
-
-    // Determine which session(s) are active
-    const sessions: string[] = [];
-    // Sydney: 21:00–06:00 UTC
-    if (utcHour >= 21 || utcHour < 6) sessions.push("Sydney");
-    // Tokyo: 00:00–09:00 UTC
-    if (utcHour >= 0 && utcHour < 9) sessions.push("Tokyo");
-    // London: 07:00–16:00 UTC
-    if (utcHour >= 7 && utcHour < 16) sessions.push("London");
-    // New York: 13:00–22:00 UTC
-    if (utcHour >= 13 && utcHour < 22) sessions.push("New York");
-
-    if (sessions.length > 0) {
-      return { open: true, label: `Markets are open (${sessions.join(" & ")})` };
-    }
-    return { open: true, label: "Markets are open" };
+  // Recalculate every 60 seconds so session changes are reflected
+  useEffect(() => {
+    const interval = setInterval(() => setStatus(getMarketStatus()), 60_000);
+    return () => clearInterval(interval);
   }, []);
+
+  return status;
 }
 
 export default function DashboardPage() {
