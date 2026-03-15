@@ -41,7 +41,7 @@ export function MarketCard({
   const styleParam = tradingStyle ? `?style=${tradingStyle.key}` : "";
 
   return (
-    <Link href={`/dashboard/market/${encodeURIComponent(symbol)}${styleParam}`}>
+    <Link href={`/dashboard/market/${encodeURIComponent(symbol)}${styleParam}`} prefetch={false}>
       <Card className={cn("group border border-border bg-card transition-all hover:bg-accent", colors ? `border-l-4 ${colors.border}` : "")}>
         <CardContent className="p-4">
           <div className="flex items-start justify-between">

@@ -85,6 +85,7 @@ function SuggestionCard({ suggestion, hoverColor = "blue", tradingStyle }: { sug
   return (
     <Link
       href={`/dashboard/market/${encodeURIComponent(suggestion.symbol)}${styleParam}`}
+      prefetch={false}
       className={cn("group flex min-w-[220px] flex-col rounded-lg border border-border bg-card p-4 transition-all hover:shadow-md snap-start", hoverClass)}
     >
       {/* Header */}

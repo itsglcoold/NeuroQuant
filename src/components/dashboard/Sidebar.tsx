@@ -205,6 +205,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                             )}
                             <Link
                               href={child.href}
+                              prefetch={false}
                               onClick={onNavigate}
                               className={cn(
                                 "flex items-center gap-2.5 rounded-lg px-3 py-1 text-sm transition-colors",
@@ -242,6 +243,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
               <Link
                 key={item.label}
                 href={item.href!}
+                prefetch={false}
                 onClick={onNavigate}
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",

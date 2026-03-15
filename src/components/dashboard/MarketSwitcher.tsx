@@ -54,6 +54,7 @@ export function MarketSwitcher({ currentSymbol }: MarketSwitcherProps) {
                 <Link
                   key={market.symbol}
                   ref={isActive ? activeRef : undefined}
+                  prefetch={false}
                   href={`/dashboard/market/${encodeURIComponent(market.symbol)}`}
                   className={`flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
                     isActive
