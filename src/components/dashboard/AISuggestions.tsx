@@ -142,8 +142,9 @@ function SuggestionCard({ suggestion, hoverColor = "blue", tradingStyle }: { sug
           {suggestion.timeframe}
         </span>
         {suggestion.keyLevel > 0 && (
-          <span className="ml-auto text-[10px] font-mono text-muted-foreground">
-            Key Level: {suggestion.keyLevel.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+          <span className="ml-auto flex flex-col items-end text-[10px] font-mono text-muted-foreground leading-tight">
+            <span>Key Level:</span>
+            <span className="font-semibold text-foreground/80">{suggestion.keyLevel.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>
           </span>
         )}
       </div>
