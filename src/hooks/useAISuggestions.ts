@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import type { UserTier } from "@/hooks/useUsageTracking";
 import type { MarketSuggestion, SuggestionRow } from "@/types/analysis";
 
-const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const REFRESH_INTERVAL = 30 * 60 * 1000; // 30 minutes (matches server-side cache TTL)
 
 export function useAISuggestions(tier: UserTier) {
   const [suggestions, setSuggestions] = useState<MarketSuggestion[]>([]);

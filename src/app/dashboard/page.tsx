@@ -44,7 +44,7 @@ function useMarketStatus() {
 }
 
 export default function DashboardPage() {
-  const { prices, loading, error, latency, lastUpdated, refetch } = useMarketData(60000);
+  const { prices, loading, error, latency, lastUpdated, refetch, wsConnected } = useMarketData(60000);
   const { tier } = useUsageTracking();
   const marketStatus = useMarketStatus();
 
@@ -90,7 +90,7 @@ export default function DashboardPage() {
         <span className="text-xs text-muted-foreground">|</span>
         <Activity className="h-3 w-3 text-muted-foreground" />
         <span className="text-xs text-muted-foreground">
-          {error ? "Connection error — retrying…" : "Real-time data updating"}
+          {error ? "Connection error — retrying…" : wsConnected ? "WebSocket streaming" : "Real-time data updating"}
         </span>
         {latency !== null && !error && (
           <>
