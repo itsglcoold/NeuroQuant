@@ -5,8 +5,8 @@ import { MarketPrice } from "@/types/market";
 import { MARKETS } from "@/lib/market/symbols";
 import { useEodhdWebSocket } from "./useEodhdWebSocket";
 
-// Check if any major market session is currently open (UTC-based)
-// Forex trades Sun 21:00 UTC – Fri 21:00 UTC
+// Check if any major market session is currently open (GMT-based)
+// Forex trades Sun 22:00 GMT – Fri 22:00 GMT
 function isAnyMarketOpen(): boolean {
   const now = new Date();
   const utcDay = now.getUTCDay(); // 0=Sun, 6=Sat
@@ -14,10 +14,10 @@ function isAnyMarketOpen(): boolean {
 
   // Saturday: always closed
   if (utcDay === 6) return false;
-  // Sunday: closed until 21:00 UTC (Sydney open)
-  if (utcDay === 0 && utcHour < 21) return false;
-  // Friday: closed after 21:00 UTC
-  if (utcDay === 5 && utcHour >= 21) return false;
+  // Sunday: closed until 22:00 GMT (Sydney open)
+  if (utcDay === 0 && utcHour < 22) return false;
+  // Friday: closed after 22:00 GMT
+  if (utcDay === 5 && utcHour >= 22) return false;
 
   return true;
 }

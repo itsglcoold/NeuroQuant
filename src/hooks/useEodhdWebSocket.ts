@@ -48,13 +48,13 @@ for (const [appSym, { ws }] of Object.entries(WS_SYMBOL_MAP)) {
   WS_REVERSE_MAP[ws] = appSym;
 }
 
-// Check if forex markets are open (Sun 21:00 – Fri 21:00 UTC)
+// Check if forex markets are open (Sun 22:00 – Fri 22:00 GMT)
 function isMarketOpen(): boolean {
   const now = new Date();
   const d = now.getUTCDay(), h = now.getUTCHours();
   if (d === 6) return false;
-  if (d === 0 && h < 21) return false;
-  if (d === 5 && h >= 21) return false;
+  if (d === 0 && h < 22) return false;
+  if (d === 5 && h >= 22) return false;
   return true;
 }
 

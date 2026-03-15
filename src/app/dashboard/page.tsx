@@ -17,21 +17,20 @@ function getMarketStatus() {
   const utcDay = now.getUTCDay(); // 0=Sun, 6=Sat
   const utcHour = now.getUTCHours();
 
-  // Forex market: Sun 21:00 UTC → Fri 21:00 UTC
-  // Closed: Fri 21:00 → Sun 21:00
+  // Forex market: Sun 22:00 GMT → Fri 22:00 GMT
   if (utcDay === 6) return { open: false, label: "Closed (weekend)" };
-  if (utcDay === 0 && utcHour < 21) return { open: false, label: "Closed (weekend)" };
-  if (utcDay === 5 && utcHour >= 21) return { open: false, label: "Closed (weekend)" };
+  if (utcDay === 0 && utcHour < 22) return { open: false, label: "Closed (weekend)" };
+  if (utcDay === 5 && utcHour >= 22) return { open: false, label: "Closed (weekend)" };
 
   // Determine which session(s) are active
   const sessions: string[] = [];
-  // Sydney: 21:00–06:00 UTC
-  if (utcHour >= 21 || utcHour < 6) sessions.push("Sydney");
-  // Tokyo: 00:00–09:00 UTC
+  // Sydney: 22:00–07:00 GMT
+  if (utcHour >= 22 || utcHour < 7) sessions.push("Sydney");
+  // Tokyo: 00:00–09:00 GMT
   if (utcHour >= 0 && utcHour < 9) sessions.push("Tokyo");
-  // London: 07:00–16:00 UTC
-  if (utcHour >= 7 && utcHour < 16) sessions.push("London");
-  // New York: 13:00–22:00 UTC
+  // London: 08:00–16:00 GMT
+  if (utcHour >= 8 && utcHour < 16) sessions.push("London");
+  // New York: 13:00–22:00 GMT
   if (utcHour >= 13 && utcHour < 22) sessions.push("New York");
 
   if (sessions.length === 1) {

@@ -177,6 +177,27 @@ export function useSimulator(tier: UserTier) {
     [supabase, trades]
   );
 
+  // Delete a trade (open or closed)
+  const deleteTrade = useCallback(
+    async (tradeId: string): Promise<boolean> => {
+      try {
+        const { error: deleteError } = await supabase
+          .from("paper_trades")
+          .delete()
+          .eq("id", tradeId);
+
+        if (deleteError) throw deleteError;
+
+        setTrades((prev) => prev.filter((t) => t.id !== tradeId));
+        return true;
+      } catch (err) {
+        console.error("Failed to delete trade:", err);
+        return false;
+      }
+    },
+    [supabase]
+  );
+
   // Calculate stats
   const stats: SimulatorStats = (() => {
     const closedTrades = trades.filter((t) => t.status === "closed");
@@ -212,6 +233,7 @@ export function useSimulator(tier: UserTier) {
     todayTradeCount,
     openTrade,
     closeTrade,
+    deleteTrade,
     refetch: fetchTrades,
   };
 }

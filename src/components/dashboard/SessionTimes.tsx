@@ -17,8 +17,8 @@ const SESSIONS: MarketSession[] = [
   {
     name: "Sydney",
     city: "Sydney",
-    openHourUTC: 21, // 21:00 UTC (previous day) = 08:00 AEDT
-    closeHourUTC: 6,  // 06:00 UTC = 17:00 AEDT
+    openHourUTC: 22, // 22:00 GMT = 09:00 AEDT
+    closeHourUTC: 7,  // 07:00 GMT = 18:00 AEDT
     emoji: "\u{1F1E6}\u{1F1FA}",
     color: "text-cyan-500",
     colorBg: "bg-cyan-500",
@@ -26,8 +26,8 @@ const SESSIONS: MarketSession[] = [
   {
     name: "Tokyo",
     city: "Tokyo",
-    openHourUTC: 0,   // 00:00 UTC = 09:00 JST
-    closeHourUTC: 9,   // 09:00 UTC = 18:00 JST
+    openHourUTC: 0,   // 00:00 GMT = 09:00 JST
+    closeHourUTC: 9,   // 09:00 GMT = 18:00 JST
     emoji: "\u{1F1EF}\u{1F1F5}",
     color: "text-red-500",
     colorBg: "bg-red-500",
@@ -35,8 +35,8 @@ const SESSIONS: MarketSession[] = [
   {
     name: "London",
     city: "London",
-    openHourUTC: 7,   // 07:00 UTC = 08:00 GMT/BST
-    closeHourUTC: 16,  // 16:00 UTC = 17:00 GMT/BST
+    openHourUTC: 8,   // 08:00 GMT
+    closeHourUTC: 16,  // 16:00 GMT
     emoji: "\u{1F1EC}\u{1F1E7}",
     color: "text-blue-500",
     colorBg: "bg-blue-500",
@@ -44,8 +44,8 @@ const SESSIONS: MarketSession[] = [
   {
     name: "New York",
     city: "New York",
-    openHourUTC: 13,  // 13:00 UTC = 08:00 EST
-    closeHourUTC: 22,  // 22:00 UTC = 17:00 EST
+    openHourUTC: 13,  // 13:00 GMT = 08:00 EST
+    closeHourUTC: 22,  // 22:00 GMT = 17:00 EST
     emoji: "\u{1F1FA}\u{1F1F8}",
     color: "text-emerald-500",
     colorBg: "bg-emerald-500",
@@ -59,11 +59,11 @@ function isSessionOpen(session: MarketSession, nowUTC: Date): boolean {
   // Saturday: always closed
   if (day === 6) return false;
 
-  // Sunday: forex opens at 21:00 UTC (Sydney session)
-  // Before 21:00 UTC Sunday = closed for all
-  // After 21:00 UTC Sunday = Sydney is open, others still closed
+  // Sunday: forex opens at 22:00 GMT (Sydney session)
+  // Before 22:00 GMT Sunday = closed for all
+  // After 22:00 GMT Sunday = Sydney is open, others still closed
   if (day === 0) {
-    if (hour < 21) return false;
+    if (hour < 22) return false;
     // Sunday 21:00+ UTC: only sessions that cross midnight are open
     if (session.openHourUTC > session.closeHourUTC) {
       return hour >= session.openHourUTC; // e.g. Sydney opens at 21
@@ -71,8 +71,8 @@ function isSessionOpen(session: MarketSession, nowUTC: Date): boolean {
     return false; // Tokyo (0-9), London (7-16), NY (13-22) not yet open
   }
 
-  // Friday: closed after 21:00 UTC (market close)
-  if (day === 5 && hour >= 21) return false;
+  // Friday: closed after 22:00 GMT (market close)
+  if (day === 5 && hour >= 22) return false;
 
   // Monday: sessions that cross midnight opened Sunday evening
   // e.g., Sydney opened Sun 21:00 UTC, still open Mon 00:00-06:00
@@ -139,7 +139,7 @@ function getTimeUntil(session: MarketSession, nowUTC: Date, isOpen: boolean): st
 
 function formatSessionTime(hourUTC: number): string {
   const h = hourUTC % 24;
-  return `${h.toString().padStart(2, "0")}:00 UTC`;
+  return `${h.toString().padStart(2, "0")}:00 GMT`;
 }
 
 function SessionCard({ session }: { session: MarketSession }) {

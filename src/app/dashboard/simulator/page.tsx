@@ -20,6 +20,7 @@ import {
   Activity,
   ExternalLink,
   X,
+  Trash2,
   ArrowUpRight,
   ArrowDownRight,
 } from "lucide-react";
@@ -52,6 +53,7 @@ export default function SimulatorPage() {
     tradesRemaining,
     dailyLimit,
     closeTrade,
+    deleteTrade,
     refetch,
   } = useSimulator(tier);
 
@@ -347,6 +349,18 @@ export default function SimulatorPage() {
                           <ExternalLink className="h-3 w-3" />
                         </Button>
                       </Link>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs h-7 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                        onClick={async () => {
+                          if (confirm("Delete this trade?")) {
+                            await deleteTrade(trade.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -373,7 +387,7 @@ export default function SimulatorPage() {
         ) : (
           <div className="rounded-xl border border-border/60 overflow-hidden">
             {/* Table Header */}
-            <div className="grid grid-cols-7 gap-2 px-4 py-2 bg-muted/50 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border/40">
+            <div className="grid grid-cols-8 gap-2 px-4 py-2 bg-muted/50 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border/40">
               <span>Symbol</span>
               <span>Side</span>
               <span className="text-right">Entry</span>
@@ -381,16 +395,18 @@ export default function SimulatorPage() {
               <span className="text-right">P/L</span>
               <span>AI Direction</span>
               <span className="text-right">Date</span>
+              <span></span>
             </div>
 
             {/* Table Rows */}
             {closedTrades.slice(0, 50).map((trade) => (
-              <Link
+              <div
                 key={trade.id}
-                href={`/dashboard/market/${encodeURIComponent(trade.symbol)}`}
-                className="grid grid-cols-7 gap-2 px-4 py-2.5 text-xs border-b border-border/20 hover:bg-muted/30 transition-colors items-center"
+                className="grid grid-cols-8 gap-2 px-4 py-2.5 text-xs border-b border-border/20 hover:bg-muted/30 transition-colors items-center"
               >
-                <span className="font-bold">{trade.symbol}</span>
+                <Link href={`/dashboard/market/${encodeURIComponent(trade.symbol)}`} className="font-bold hover:underline">
+                  {trade.symbol}
+                </Link>
                 <span>
                   <Badge
                     variant="outline"
@@ -447,7 +463,20 @@ export default function SimulatorPage() {
                       })
                     : "—"}
                 </span>
-              </Link>
+                <span className="text-right">
+                  <button
+                    onClick={async () => {
+                      if (confirm("Delete this trade from history?")) {
+                        await deleteTrade(trade.id);
+                      }
+                    }}
+                    className="text-muted-foreground/40 hover:text-red-500 transition-colors"
+                    title="Delete trade"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </span>
+              </div>
             ))}
           </div>
         )}
