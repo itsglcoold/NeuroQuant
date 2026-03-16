@@ -275,7 +275,7 @@ export default function SimulatorPage() {
                           ) : (
                             <TrendingDown className="h-3 w-3 mr-1" />
                           )}
-                          {trade.side.toUpperCase()}
+                          {trade.side === "long" ? "BULLISH" : "BEARISH"}
                         </Badge>
                       </div>
                       {livePnl !== null && (
@@ -421,7 +421,7 @@ export default function SimulatorPage() {
                     ) : (
                       <ArrowDownRight className="h-3 w-3 mr-0.5" />
                     )}
-                    {trade.side.toUpperCase()}
+                    {trade.side === "long" ? "BULLISH" : "BEARISH"}
                   </Badge>
                 </span>
                 <span className="text-right tabular-nums font-medium">
