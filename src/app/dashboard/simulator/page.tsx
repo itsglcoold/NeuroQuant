@@ -397,101 +397,123 @@ export default function SimulatorPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="rounded-xl border border-border/60 overflow-hidden">
-            {/* Table Header */}
-            <div className="grid grid-cols-8 gap-2 px-4 py-2 bg-muted/50 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border/40">
-              <span>Symbol</span>
-              <span>Side</span>
-              <span className="text-right">Entry</span>
-              <span className="text-right">Close</span>
-              <span className="text-right">P/L</span>
-              <span>AI Direction</span>
-              <span className="text-right">Date</span>
-              <span></span>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {closedTrades.slice(0, 50).map((trade) => {
+              const isWin = (trade.result_pnl ?? 0) > 0;
+              return (
+                <Card key={trade.id} className={`border ${isWin ? "border-green-500/20" : "border-red-500/20"}`}>
+                  <CardContent className="py-3 px-4 space-y-2">
+                    {/* Header: symbol + side + P/L */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Link href={`/dashboard/market/${encodeURIComponent(trade.symbol)}`} className="font-bold text-sm hover:underline">
+                          {trade.symbol}
+                        </Link>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] ${
+                            trade.side === "long"
+                              ? "text-green-500 border-green-500/30"
+                              : "text-red-500 border-red-500/30"
+                          }`}
+                        >
+                          {trade.side === "long" ? (
+                            <ArrowUpRight className="h-3 w-3 mr-0.5" />
+                          ) : (
+                            <ArrowDownRight className="h-3 w-3 mr-0.5" />
+                          )}
+                          {trade.side === "long" ? "BULLISH" : "BEARISH"}
+                        </Badge>
+                      </div>
+                      <span
+                        className={`text-sm font-bold tabular-nums ${
+                          isWin ? "text-green-500" : "text-red-500"
+                        }`}
+                      >
+                        {trade.result_pnl !== undefined ? (
+                          <>
+                            {formatPnl(trade.result_pnl)}{" "}
+                            <span className="opacity-70">({formatDollarPnl(trade.result_pnl)})</span>
+                          </>
+                        ) : "—"}
+                      </span>
+                    </div>
 
-            {/* Table Rows */}
-            {closedTrades.slice(0, 50).map((trade) => (
-              <div
-                key={trade.id}
-                className="grid grid-cols-8 gap-2 px-4 py-2.5 text-xs border-b border-border/20 hover:bg-muted/30 transition-colors items-center"
-              >
-                <Link href={`/dashboard/market/${encodeURIComponent(trade.symbol)}`} className="font-bold hover:underline">
-                  {trade.symbol}
-                </Link>
-                <span>
-                  <Badge
-                    variant="outline"
-                    className={`text-[10px] ${
-                      trade.side === "long"
-                        ? "text-green-500 border-green-500/30"
-                        : "text-red-500 border-red-500/30"
-                    }`}
-                  >
-                    {trade.side === "long" ? (
-                      <ArrowUpRight className="h-3 w-3 mr-0.5" />
-                    ) : (
-                      <ArrowDownRight className="h-3 w-3 mr-0.5" />
-                    )}
-                    {trade.side === "long" ? "BULLISH" : "BEARISH"}
-                  </Badge>
-                </span>
-                <span className="text-right tabular-nums font-medium">
-                  {getPriceDisplay(trade.entry_price)}
-                </span>
-                <span className="text-right tabular-nums font-medium">
-                  {trade.close_price ? getPriceDisplay(trade.close_price) : "—"}
-                </span>
-                <span
-                  className={`text-right tabular-nums font-bold ${
-                    (trade.result_pnl ?? 0) >= 0 ? "text-green-500" : "text-red-500"
-                  }`}
-                >
-                  {trade.result_pnl !== undefined
-                    ? <>{formatPnl(trade.result_pnl)} <span className="opacity-70">({formatDollarPnl(trade.result_pnl)})</span></>
-                    : "—"}
-                </span>
-                <span>
-                  {trade.analysis_snapshot ? (
-                    <Badge
-                      variant="outline"
-                      className={`text-[10px] ${
-                        trade.analysis_snapshot.consensusDirection === "bullish"
-                          ? "text-green-500 border-green-500/30"
-                          : trade.analysis_snapshot.consensusDirection === "bearish"
-                          ? "text-red-500 border-red-500/30"
-                          : "text-amber-500 border-amber-500/30"
-                      }`}
-                    >
-                      {trade.analysis_snapshot.consensusDirection}
-                    </Badge>
-                  ) : (
-                    "—"
-                  )}
-                </span>
-                <span className="text-right text-muted-foreground">
-                  {trade.closed_at
-                    ? new Date(trade.closed_at).toLocaleDateString("en-US", {
-                        day: "numeric",
-                        month: "short",
-                      })
-                    : "—"}
-                </span>
-                <span className="text-right">
-                  <button
-                    onClick={async () => {
-                      if (confirm("Delete this trade from history?")) {
-                        await deleteTrade(trade.id);
-                      }
-                    }}
-                    className="text-muted-foreground/40 hover:text-red-500 transition-colors"
-                    title="Delete trade"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </span>
-              </div>
-            ))}
+                    {/* Price details grid */}
+                    <div className="grid grid-cols-4 gap-2 text-xs">
+                      <div>
+                        <span className="text-muted-foreground block">Entry</span>
+                        <span className="font-medium tabular-nums">
+                          {getPriceDisplay(trade.entry_price)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-red-500 block">SL</span>
+                        <span className="font-medium tabular-nums">
+                          {getPriceDisplay(trade.sl_price)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-green-500 block">TP</span>
+                        <span className="font-medium tabular-nums">
+                          {getPriceDisplay(trade.tp_price)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className={`block ${isWin ? "text-green-500" : "text-red-500"}`}>Close</span>
+                        <span className="font-medium tabular-nums">
+                          {trade.close_price ? getPriceDisplay(trade.close_price) : "—"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Footer: AI direction + date + delete */}
+                    <div className="flex items-center justify-between pt-1 border-t border-border/20">
+                      <div className="flex items-center gap-2">
+                        {trade.analysis_snapshot ? (
+                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                            <span>AI:</span>
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] ${
+                                trade.analysis_snapshot.consensusDirection === "bullish"
+                                  ? "text-green-500 border-green-500/30"
+                                  : trade.analysis_snapshot.consensusDirection === "bearish"
+                                  ? "text-red-500 border-red-500/30"
+                                  : "text-amber-500 border-amber-500/30"
+                              }`}
+                            >
+                              {trade.analysis_snapshot.consensusDirection}
+                            </Badge>
+                          </div>
+                        ) : null}
+                        <span className="text-[10px] text-muted-foreground">
+                          {trade.closed_at
+                            ? new Date(trade.closed_at).toLocaleDateString("en-US", {
+                                day: "numeric",
+                                month: "short",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : "—"}
+                        </span>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          if (confirm("Delete this trade from history?")) {
+                            await deleteTrade(trade.id);
+                          }
+                        }}
+                        className="text-muted-foreground/40 hover:text-red-500 transition-colors"
+                        title="Delete trade"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
