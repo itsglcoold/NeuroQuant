@@ -411,6 +411,15 @@ export function AISuggestions({ tier }: AISuggestionsProps) {
           {/* Rows with suggestions */}
           {canAccess && !loading && !error && rows.length > 0 && (
             <>
+              {/* Quick scan disclaimer */}
+              <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2">
+                <Sparkles className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-amber-500" />
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  <span className="font-semibold text-amber-600 dark:text-amber-400">Quick scan based on price action only.</span>{" "}
+                  This overview does not use technical indicators. Tap any tile to run a full analysis with RSI, MACD, and more before trading.
+                </p>
+              </div>
+
               {rows.map((row) => (
                 <RowSection key={row.key} row={row} />
               ))}
@@ -443,8 +452,8 @@ export function AISuggestions({ tier }: AISuggestionsProps) {
 
           {/* Disclaimer */}
           <p className="mt-3 text-center text-[10px] text-muted-foreground/60">
-            AI Market Research — For educational purposes only. Not financial advice.
-            Past patterns do not guarantee future results.
+            Quick directional scan based on price action — not a substitute for full technical analysis.
+            For educational purposes only. Not financial advice. Past patterns do not guarantee future results.
           </p>
         </>
       )}
