@@ -411,6 +411,16 @@ export function AISuggestions({ tier }: AISuggestionsProps) {
           {/* Rows with suggestions */}
           {canAccess && !loading && !error && rows.length > 0 && (
             <>
+              {/* Scanning banner — shown when refreshing with existing data */}
+              {refreshing && (
+                <div className="mb-4 flex items-center justify-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 py-2.5 px-4">
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin text-blue-500" />
+                  <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                    Updating — scanning 15 markets for fresh signals…
+                  </span>
+                </div>
+              )}
+
               {/* Quick scan disclaimer */}
               <div className="mb-5 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
                 <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-amber-500/20">
@@ -427,6 +437,7 @@ export function AISuggestions({ tier }: AISuggestionsProps) {
                 </div>
               </div>
 
+              <div className={cn(refreshing && "opacity-50 pointer-events-none transition-opacity")}>
               {rows.map((row) => (
                 <RowSection key={row.key} row={row} />
               ))}
@@ -444,6 +455,7 @@ export function AISuggestions({ tier }: AISuggestionsProps) {
                   </button>
                 </div>
               )}
+              </div>
             </>
           )}
 
