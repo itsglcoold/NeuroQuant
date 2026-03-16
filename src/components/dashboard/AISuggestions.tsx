@@ -334,7 +334,8 @@ export function AISuggestions({ tier }: AISuggestionsProps) {
               {lastUpdated.toLocaleTimeString()}
             </span>
           )}
-          {canAccess && !loading && (
+          {/* Show Rescan button only when actively scanning OR when data is stale/old (>5 min) */}
+          {canAccess && !loading && (refreshing || isStale || !lastUpdated || (lastUpdated && Date.now() - lastUpdated.getTime() > 5 * 60 * 1000)) && (
             <button
               title="Rescan markets with AI"
               className={cn(

@@ -107,33 +107,65 @@ export function QuickSimWidget({
   const isShortTimeframe = SHORT_TIMEFRAMES.includes(timeframe);
 
   // Support/resistance helper values for free-tier guidance
+  // Only suggest levels on the correct side of the entry price
   const { support, resistance } = consensus.mergedKeyLevels;
+  const validSlSupport = support.filter((s) => s < currentPrice);
+  const validSlResistance = resistance.filter((r) => r > currentPrice);
+  const validTpResistance = resistance.filter((r) => r > currentPrice);
+  const validTpSupport = support.filter((s) => s < currentPrice);
+
   const suggestedSl =
     side === "long"
-      ? support.length > 0
-        ? Math.min(...support)
+      ? validSlSupport.length > 0
+        ? Math.max(...validSlSupport)
         : null
-      : resistance.length > 0
-        ? Math.max(...resistance)
+      : validSlResistance.length > 0
+        ? Math.min(...validSlResistance)
         : null;
   const suggestedTp =
     side === "long"
-      ? resistance.length > 0
-        ? Math.max(...resistance)
+      ? validTpResistance.length > 0
+        ? Math.max(...validTpResistance)
         : null
-      : support.length > 0
-        ? Math.min(...support)
+      : validTpSupport.length > 0
+        ? Math.min(...validTpSupport)
         : null;
 
   // Auto-fill AI levels (Pro+)
+  // Filter levels to only those on the correct side of the entry price.
+  // For LONG: SL must be below entry, TP must be above entry.
+  // For SHORT: SL must be above entry, TP must be below entry.
+  // If no valid AI level exists, add a small buffer (0.3%) from entry.
   const canAutoFill = tier === "pro" || tier === "premium";
   const handleAutoFill = () => {
+    const buffer = currentPrice * 0.003; // 0.3% fallback buffer
+
     if (side === "long") {
-      if (support.length > 0) setSl(Math.min(...support).toFixed(decimals));
-      if (resistance.length > 0) setTp(Math.max(...resistance).toFixed(decimals));
+      const validSl = support.filter((s) => s < currentPrice);
+      const validTp = resistance.filter((r) => r > currentPrice);
+      setSl(
+        validSl.length > 0
+          ? Math.max(...validSl).toFixed(decimals)
+          : (currentPrice - buffer).toFixed(decimals)
+      );
+      setTp(
+        validTp.length > 0
+          ? Math.max(...validTp).toFixed(decimals)
+          : (currentPrice + buffer).toFixed(decimals)
+      );
     } else {
-      if (resistance.length > 0) setSl(Math.max(...resistance).toFixed(decimals));
-      if (support.length > 0) setTp(Math.min(...support).toFixed(decimals));
+      const validSl = resistance.filter((r) => r > currentPrice);
+      const validTp = support.filter((s) => s < currentPrice);
+      setSl(
+        validSl.length > 0
+          ? Math.min(...validSl).toFixed(decimals)
+          : (currentPrice + buffer).toFixed(decimals)
+      );
+      setTp(
+        validTp.length > 0
+          ? Math.min(...validTp).toFixed(decimals)
+          : (currentPrice - buffer).toFixed(decimals)
+      );
     }
   };
 

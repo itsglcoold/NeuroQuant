@@ -3,48 +3,46 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { MarketPrice } from "@/types/market";
 
-// Map app symbols → EODHD WebSocket symbol format (no exchange suffix)
-const WS_SYMBOL_MAP: Record<string, { ws: string; endpoint: "forex" | "us" }> = {
+// Map app symbols → EODHD WebSocket symbol format
+// NOTE: EODHD WebSocket only supports forex, crypto, and US equities.
+// Indices (DXY, SPX, IXIC) are NOT available via WebSocket — they use REST only.
+const WS_SYMBOL_MAP: Record<string, string> = {
   // Forex — Majors
-  "EUR/USD": { ws: "EURUSD", endpoint: "forex" },
-  "GBP/USD": { ws: "GBPUSD", endpoint: "forex" },
-  "USD/JPY": { ws: "USDJPY", endpoint: "forex" },
-  "USD/CHF": { ws: "USDCHF", endpoint: "forex" },
-  "AUD/USD": { ws: "AUDUSD", endpoint: "forex" },
-  "NZD/USD": { ws: "NZDUSD", endpoint: "forex" },
-  "USD/CAD": { ws: "USDCAD", endpoint: "forex" },
+  "EUR/USD": "EURUSD",
+  "GBP/USD": "GBPUSD",
+  "USD/JPY": "USDJPY",
+  "USD/CHF": "USDCHF",
+  "AUD/USD": "AUDUSD",
+  "NZD/USD": "NZDUSD",
+  "USD/CAD": "USDCAD",
   // Forex — JPY Crosses
-  "EUR/JPY": { ws: "EURJPY", endpoint: "forex" },
-  "GBP/JPY": { ws: "GBPJPY", endpoint: "forex" },
-  "AUD/JPY": { ws: "AUDJPY", endpoint: "forex" },
-  "NZD/JPY": { ws: "NZDJPY", endpoint: "forex" },
-  "CAD/JPY": { ws: "CADJPY", endpoint: "forex" },
+  "EUR/JPY": "EURJPY",
+  "GBP/JPY": "GBPJPY",
+  "AUD/JPY": "AUDJPY",
+  "NZD/JPY": "NZDJPY",
+  "CAD/JPY": "CADJPY",
   // Forex — GBP Crosses
-  "EUR/GBP": { ws: "EURGBP", endpoint: "forex" },
-  "GBP/AUD": { ws: "GBPAUD", endpoint: "forex" },
-  "GBP/NZD": { ws: "GBPNZD", endpoint: "forex" },
-  "GBP/CAD": { ws: "GBPCAD", endpoint: "forex" },
-  "GBP/CHF": { ws: "GBPCHF", endpoint: "forex" },
+  "EUR/GBP": "EURGBP",
+  "GBP/AUD": "GBPAUD",
+  "GBP/NZD": "GBPNZD",
+  "GBP/CAD": "GBPCAD",
+  "GBP/CHF": "GBPCHF",
   // Forex — AUD/NZD Crosses
-  "AUD/CAD": { ws: "AUDCAD", endpoint: "forex" },
-  "AUD/CHF": { ws: "AUDCHF", endpoint: "forex" },
-  "AUD/NZD": { ws: "AUDNZD", endpoint: "forex" },
-  "EUR/AUD": { ws: "EURAUD", endpoint: "forex" },
-  "NZD/CAD": { ws: "NZDCAD", endpoint: "forex" },
-  // Metals
-  "XAU/USD": { ws: "XAUUSD", endpoint: "forex" },
-  "XAG/USD": { ws: "XAGUSD", endpoint: "forex" },
-  // Energy
-  "CL": { ws: "CLUSD", endpoint: "forex" },
-  // Indices — try on /ws/us
-  "DXY": { ws: "DXY", endpoint: "us" },
-  "SPX": { ws: "GSPC", endpoint: "us" },
-  "IXIC": { ws: "IXIC", endpoint: "us" },
+  "AUD/CAD": "AUDCAD",
+  "AUD/CHF": "AUDCHF",
+  "AUD/NZD": "AUDNZD",
+  "EUR/AUD": "EURAUD",
+  "NZD/CAD": "NZDCAD",
+  // Metals (available on forex endpoint)
+  "XAU/USD": "XAUUSD",
+  "XAG/USD": "XAGUSD",
+  // Energy (available on forex endpoint)
+  "CL": "CLUSD",
 };
 
 // Reverse map: WS symbol → app symbol
 const WS_REVERSE_MAP: Record<string, string> = {};
-for (const [appSym, { ws }] of Object.entries(WS_SYMBOL_MAP)) {
+for (const [appSym, ws] of Object.entries(WS_SYMBOL_MAP)) {
   WS_REVERSE_MAP[ws] = appSym;
 }
 
@@ -65,10 +63,10 @@ interface WebSocketState {
 }
 
 // Cache the WS config so we only fetch it once
-let wsConfigCache: { forex: string; us: string } | null = null;
-let wsConfigPromise: Promise<{ forex: string; us: string } | null> | null = null;
+let wsConfigCache: { forex: string } | null = null;
+let wsConfigPromise: Promise<{ forex: string } | null> | null = null;
 
-async function getWsConfig(): Promise<{ forex: string; us: string } | null> {
+async function getWsConfig(): Promise<{ forex: string } | null> {
   if (wsConfigCache) return wsConfigCache;
   if (wsConfigPromise) return wsConfigPromise;
 
@@ -100,16 +98,17 @@ export function useEodhdWebSocket(symbols: string[]) {
     error: null,
   });
 
-  const wsForexRef = useRef<WebSocket | null>(null);
-  const wsUsRef = useRef<WebSocket | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pricesRef = useRef<Record<string, MarketPrice>>({});
   const batchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
   const reconnectCountRef = useRef(0);
 
-  // Stable symbol key to prevent re-renders
-  const symbolKey = symbols.join(",");
+  // Only subscribe to symbols that have WebSocket support (forex/metals/energy)
+  // Indices (DXY, SPX, IXIC) are NOT available via EODHD WebSocket
+  const wsSymbols = symbols.filter((s) => s in WS_SYMBOL_MAP);
+  const symbolKey = wsSymbols.join(",");
 
   const handleMessage = useCallback((event: MessageEvent) => {
     try {
@@ -159,26 +158,20 @@ export function useEodhdWebSocket(symbols: string[]) {
     mountedRef.current = true;
     reconnectCountRef.current = 0;
 
-    if (symbols.length === 0 || !isMarketOpen()) return;
+    if (wsSymbols.length === 0 || !isMarketOpen()) return;
 
-    const forexSymbols = symbols.filter((s) => WS_SYMBOL_MAP[s]?.endpoint === "forex");
-    const usSymbols = symbols.filter((s) => WS_SYMBOL_MAP[s]?.endpoint === "us");
-
-    async function connect(endpoint: "forex" | "us", wsSymbols: string[]): Promise<WebSocket | null> {
-      if (wsSymbols.length === 0 || !mountedRef.current) return null;
+    async function connect(): Promise<WebSocket | null> {
+      if (!mountedRef.current) return null;
 
       const config = await getWsConfig();
-      if (!config || !mountedRef.current) return null;
+      if (!config?.forex || !mountedRef.current) return null;
 
-      const wsUrl = config[endpoint];
-      if (!wsUrl) return null;
-
-      const ws = new WebSocket(wsUrl);
+      const ws = new WebSocket(config.forex);
 
       ws.onopen = () => {
         reconnectCountRef.current = 0;
         const wsNames = wsSymbols
-          .map((s) => WS_SYMBOL_MAP[s]?.ws)
+          .map((s) => WS_SYMBOL_MAP[s])
           .filter(Boolean)
           .join(",");
 
@@ -207,9 +200,8 @@ export function useEodhdWebSocket(symbols: string[]) {
           const delay = Math.min(5000 * Math.pow(2, reconnectCountRef.current), 60000);
           reconnectCountRef.current++;
           reconnectTimerRef.current = setTimeout(() => {
-            connect(endpoint, wsSymbols).then((newWs) => {
-              if (endpoint === "forex") wsForexRef.current = newWs;
-              else wsUsRef.current = newWs;
+            connect().then((newWs) => {
+              wsRef.current = newWs;
             });
           }, delay);
         }
@@ -218,24 +210,17 @@ export function useEodhdWebSocket(symbols: string[]) {
       return ws;
     }
 
-    // Connect to both endpoints
-    connect("forex", forexSymbols).then((ws) => {
-      wsForexRef.current = ws;
-    });
-    connect("us", usSymbols).then((ws) => {
-      wsUsRef.current = ws;
+    // Single connection to forex endpoint only
+    connect().then((ws) => {
+      wsRef.current = ws;
     });
 
     return () => {
       mountedRef.current = false;
 
-      if (wsForexRef.current) {
-        wsForexRef.current.close();
-        wsForexRef.current = null;
-      }
-      if (wsUsRef.current) {
-        wsUsRef.current.close();
-        wsUsRef.current = null;
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
       }
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);

@@ -59,6 +59,12 @@ export default function DashboardPage() {
   const { tier } = useUsageTracking();
   const marketStatus = useMarketStatus();
 
+  // Only show "Refresh Prices" button when it's useful:
+  // - There's a connection error
+  // - WebSocket is disconnected AND data is older than 2 minutes
+  const dataAge = lastUpdated ? (Date.now() - lastUpdated.getTime()) / 1000 : Infinity;
+  const showRefreshButton = !!error || (!wsConnected && dataAge > 120) || (!lastUpdated && !loading);
+
   return (
     <div className="space-y-8">
       {/* Page header */}
@@ -72,18 +78,20 @@ export default function DashboardPage() {
             detailed insights.
           </p>
         </div>
-        <button
-          onClick={() => refetch()}
-          disabled={loading}
-          title="Refresh all market prices"
-          className={cn(
-            "flex items-center gap-2 rounded-lg border border-border bg-secondary px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-            loading && "pointer-events-none opacity-50"
-          )}
-        >
-          <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
-          Refresh Prices
-        </button>
+        {showRefreshButton && (
+          <button
+            onClick={() => refetch()}
+            disabled={loading}
+            title="Refresh all market prices"
+            className={cn(
+              "flex items-center gap-2 rounded-lg border border-border bg-secondary px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+              loading && "pointer-events-none opacity-50"
+            )}
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+            Refresh Prices
+          </button>
+        )}
       </div>
 
       {/* Status bar */}

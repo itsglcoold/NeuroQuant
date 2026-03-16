@@ -36,7 +36,8 @@ export function useMarketData(refreshInterval = 60000) {
   const ws = useEodhdWebSocket(ALL_SYMBOLS);
 
   // Merge WebSocket prices into state whenever they update
-  // Preserve change/changePercent from REST if WebSocket sends 0
+  // WS only provides reliable: price, high, low, timestamp
+  // change/changePercent ALWAYS come from REST (EODHD WS dd/dc are unreliable, often 0)
   useEffect(() => {
     if (Object.keys(ws.prices).length > 0) {
       setPrices((prev) => {
@@ -44,11 +45,21 @@ export function useMarketData(refreshInterval = 60000) {
         for (const [sym, wsPrice] of Object.entries(ws.prices)) {
           const existing = prev[sym];
           merged[sym] = {
-            ...existing,
-            ...wsPrice,
-            // Keep REST change values if WS sends 0/undefined
-            change: wsPrice.change || existing?.change || 0,
-            changePercent: wsPrice.changePercent || existing?.changePercent || 0,
+            symbol: sym,
+            price: wsPrice.price || existing?.price || 0,
+            // NEVER use WS change values — REST is the source of truth for daily change
+            change: existing?.change || 0,
+            changePercent: existing?.changePercent || 0,
+            // WS can update high/low if it tracks intraday extremes
+            high: wsPrice.high && existing?.high
+              ? Math.max(wsPrice.high, existing.high)
+              : wsPrice.high || existing?.high || 0,
+            low: wsPrice.low && existing?.low
+              ? Math.min(wsPrice.low, existing.low)
+              : wsPrice.low || existing?.low || 0,
+            open: existing?.open || wsPrice.open || 0,
+            previousClose: existing?.previousClose || wsPrice.previousClose || 0,
+            timestamp: wsPrice.timestamp || existing?.timestamp || 0,
           };
         }
         return merged;
@@ -105,7 +116,19 @@ export function useMarketData(refreshInterval = 60000) {
       }
     }, actualInterval);
 
-    return () => clearInterval(interval);
+    // Auto-refresh when user returns to the tab (e.g. after switching apps)
+    // This ensures prices + change values are always fresh without manual buttons
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && isAnyMarketOpen()) {
+        fetchPrices();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [fetchPrices, refreshInterval, ws.connected]);
 
   return {

@@ -12,8 +12,8 @@ export async function GET() {
     return NextResponse.json({ error: "API key not configured" }, { status: 500 });
   }
 
+  // Only forex endpoint is used — indices are NOT available via WebSocket (confirmed by EODHD support)
   return NextResponse.json({
     forex: `wss://ws.eodhistoricaldata.com/ws/forex?api_token=${token}`,
-    us: `wss://ws.eodhistoricaldata.com/ws/us?api_token=${token}`,
   });
 }
