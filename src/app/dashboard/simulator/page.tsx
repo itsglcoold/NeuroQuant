@@ -156,8 +156,10 @@ export default function SimulatorPage() {
       <div>
         <h1 className="text-2xl font-bold">Trading Simulator</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Paper trading based on AI analyses — {tradesRemaining}/
-          {dailyLimit === Infinity ? "\u221E" : dailyLimit} trades today
+          Paper trading based on AI analyses —{" "}
+          {dailyLimit === Infinity
+            ? "Unlimited trades"
+            : `${tradesRemaining}/${dailyLimit} trades today`}
         </p>
       </div>
 
