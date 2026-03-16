@@ -30,6 +30,12 @@ function formatPnl(pnl: number): string {
   return `${sign}${pnl.toFixed(2)}%`;
 }
 
+function formatDollarPnl(pnlPercent: number): string {
+  const dollarPnl = (pnlPercent / 100) * INITIAL_VIRTUAL_BALANCE;
+  const sign = dollarPnl >= 0 ? "+" : "-";
+  return `${sign}$${Math.abs(dollarPnl).toFixed(2)}`;
+}
+
 function getPriceDisplay(price: number): string {
   return price > 100 ? price.toFixed(2) : price.toFixed(4);
 }
@@ -134,7 +140,7 @@ export default function SimulatorPage() {
           }`}
         >
           <span>
-            {notif.symbol} trade closed: {formatPnl(notif.pnl)}
+            {notif.symbol} trade closed: {formatPnl(notif.pnl)} ({formatDollarPnl(notif.pnl)})
           </span>
           <button
             onClick={() =>
@@ -227,6 +233,11 @@ export default function SimulatorPage() {
             >
               {stats.totalTrades > 0 ? formatPnl(stats.totalPnl) : "—"}
             </p>
+            {stats.totalTrades > 0 && (
+              <p className={`text-xs font-medium ${stats.totalPnl >= 0 ? "text-green-500" : "text-red-500"}`}>
+                {formatDollarPnl(stats.totalPnl)}
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -284,7 +295,8 @@ export default function SimulatorPage() {
                             livePnl >= 0 ? "text-green-500" : "text-red-500"
                           }`}
                         >
-                          {formatPnl(livePnl)}
+                          {formatPnl(livePnl)}{" "}
+                          <span className="opacity-70">({formatDollarPnl(livePnl)})</span>
                         </span>
                       )}
                     </div>
@@ -435,7 +447,9 @@ export default function SimulatorPage() {
                     (trade.result_pnl ?? 0) >= 0 ? "text-green-500" : "text-red-500"
                   }`}
                 >
-                  {trade.result_pnl !== undefined ? formatPnl(trade.result_pnl) : "—"}
+                  {trade.result_pnl !== undefined
+                    ? <>{formatPnl(trade.result_pnl)} <span className="opacity-70">({formatDollarPnl(trade.result_pnl)})</span></>
+                    : "—"}
                 </span>
                 <span>
                   {trade.analysis_snapshot ? (
