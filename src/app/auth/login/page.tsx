@@ -36,7 +36,11 @@ export default function LoginPage() {
     });
 
     if (error) {
-      setError(error.message);
+      if (error.message.toLowerCase().includes("rate limit")) {
+        setError("Too many sign-in attempts. Please wait a few minutes and try again, or use 'Continue with Google' instead.");
+      } else {
+        setError(error.message);
+      }
       setLoading(false);
       return;
     }
