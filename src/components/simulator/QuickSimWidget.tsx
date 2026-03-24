@@ -505,11 +505,9 @@ export function QuickSimWidget({
             ? "border-amber-500/40 bg-amber-500/8"
             : "border-green-500/30 bg-green-500/5"
         }`}>
-          <span className="text-[11px] font-semibold text-muted-foreground">
-            R:R ratio <span className="font-normal text-muted-foreground/60">(TP:SL)</span>
-          </span>
+          <span className="text-[11px] font-semibold text-muted-foreground">Risk:Reward</span>
           <span className={`text-sm font-bold tabular-nums ${rrTooLow ? "text-amber-500" : "text-green-500"}`}>
-            {rrRatio.toFixed(2)} : 1
+            1 : {rrRatio.toFixed(2)}
           </span>
         </div>
       )}
@@ -517,7 +515,7 @@ export function QuickSimWidget({
         <div className="flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/30 p-2.5">
           <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
           <p className="text-[11px] text-amber-600 dark:text-amber-400">
-            <span className="font-semibold">R:R below 2:1</span> — your TP is less than 2× your SL distance. Move TP further or SL closer to entry.
+            <span className="font-semibold">R:R below 1:2</span> — your TP is less than 2× your SL distance. Move TP further or SL closer to entry.
           </p>
         </div>
       )}
