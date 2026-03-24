@@ -81,6 +81,15 @@ export function useSimulator(tier: UserTier) {
         };
       }
 
+      // Validate prices are positive
+      if (params.entryPrice <= 0 || params.slPrice <= 0 || params.tpPrice <= 0) {
+        return { success: false, error: "All prices must be positive" };
+      }
+      // Validate SL and TP are not equal
+      if (Math.abs(params.slPrice - params.tpPrice) < 0.00001) {
+        return { success: false, error: "Stop-Loss and Take-Profit cannot be the same price" };
+      }
+
       // Validate SL/TP
       if (params.side === "long") {
         if (params.slPrice >= params.entryPrice) {
@@ -223,7 +232,7 @@ export function useSimulator(tier: UserTier) {
   const stats: SimulatorStats = (() => {
     const closedTrades = trades.filter((t) => t.status === "closed");
     const winCount = closedTrades.filter((t) => (t.result_pnl ?? 0) > 0).length;
-    const lossCount = closedTrades.filter((t) => (t.result_pnl ?? 0) <= 0).length;
+    const lossCount = closedTrades.filter((t) => (t.result_pnl ?? 0) < 0).length;
     const totalPnl = closedTrades.reduce((sum, t) => sum + (t.result_pnl ?? 0), 0);
     const activeTrades = trades.filter((t) => t.status === "open").length;
 

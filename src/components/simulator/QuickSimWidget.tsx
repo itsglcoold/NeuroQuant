@@ -105,11 +105,6 @@ export function QuickSimWidget({
       : null;
   const rrTooLow = rrRatio !== null && rrRatio < 1.5;
 
-  // SL too tight (< 0.3% from entry)
-  const slDistancePct =
-    slValid ? Math.abs(currentPrice - slNum) / currentPrice : null;
-  const slTooTight = slDistancePct !== null && slDistancePct < 0.003;
-
   // Low confidence warning: absolute consensus score < 40 (weak directional signal)
   const absScore = Math.abs(consensus.consensusScore);
   const lowConfidence = absScore < 40;
@@ -121,6 +116,16 @@ export function QuickSimWidget({
 
   // Timeframe awareness
   const timeframe = analysisTimeframe || consensus.timeframe || "1day";
+
+  // SL too tight — threshold depends on timeframe
+  // Scalp (1m/5m): 0.3% | Intraday (15m/1h): 0.5% | Swing/Daily (4h/1d): 1.0%
+  const slDistancePct =
+    slValid ? Math.abs(currentPrice - slNum) / currentPrice : null;
+  const slTightThreshold =
+    ["1min", "5min"].includes(timeframe) ? 0.003 :
+    ["15min", "1h"].includes(timeframe) ? 0.005 :
+    0.010;
+  const slTooTight = slDistancePct !== null && slDistancePct < slTightThreshold;
   const timeframeLabel = TIMEFRAME_LABELS[timeframe] || timeframe;
   const isShortTimeframe = SHORT_TIMEFRAMES.includes(timeframe);
 
@@ -511,7 +516,7 @@ export function QuickSimWidget({
         <div className="flex items-start gap-2 rounded-lg bg-orange-500/10 border border-orange-500/30 p-2.5">
           <AlertTriangle className="h-3.5 w-3.5 text-orange-500 mt-0.5 shrink-0" />
           <p className="text-[11px] text-orange-600 dark:text-orange-400">
-            <span className="font-semibold">SL very tight</span> — less than 0.3% from entry. Normal price fluctuations may trigger it early.
+            <span className="font-semibold">SL very tight</span> — less than {(slTightThreshold * 100).toFixed(1)}% from entry for this timeframe. Normal price fluctuations may trigger it early.
           </p>
         </div>
       )}
