@@ -103,7 +103,7 @@ export function QuickSimWidget({
         ? (tpNum - currentPrice) / (currentPrice - slNum)
         : (currentPrice - tpNum) / (slNum - currentPrice)
       : null;
-  const rrTooLow = rrRatio !== null && rrRatio < 1.5;
+  const rrTooLow = rrRatio !== null && rrRatio < 2.0;
 
   // Low confidence warning: absolute consensus score < 40 (weak directional signal)
   const absScore = Math.abs(consensus.consensusScore);
@@ -168,9 +168,11 @@ export function QuickSimWidget({
       const validSl = support.filter((s) => s < currentPrice);
       const validTp = resistance.filter((r) => r > currentPrice);
 
-      // SL: place BELOW the lowest support in the zone (not at it) — avoids wicks hitting SL
-      const slZoneBottom = validSl.length > 0 ? Math.min(...validSl) : currentPrice - fallbackBuffer;
-      setSl((slZoneBottom - structureBuffer).toFixed(decimals));
+      // SL: just below the AVERAGE of all support levels — logical zone center, avoids being too tight
+      const avgSupport = validSl.length > 0
+        ? validSl.reduce((sum, s) => sum + s, 0) / validSl.length
+        : currentPrice - fallbackBuffer;
+      setSl((avgSupport - structureBuffer).toFixed(decimals));
 
       // TP: target the farthest resistance for best R:R potential
       setTp(
@@ -182,9 +184,11 @@ export function QuickSimWidget({
       const validSl = resistance.filter((r) => r > currentPrice);
       const validTp = support.filter((s) => s < currentPrice);
 
-      // SL: place ABOVE the highest resistance in the zone (not at it) — avoids wicks hitting SL
-      const slZoneTop = validSl.length > 0 ? Math.max(...validSl) : currentPrice + fallbackBuffer;
-      setSl((slZoneTop + structureBuffer).toFixed(decimals));
+      // SL: just above the AVERAGE of all resistance levels — logical zone center, avoids being too tight
+      const avgResistance = validSl.length > 0
+        ? validSl.reduce((sum, r) => sum + r, 0) / validSl.length
+        : currentPrice + fallbackBuffer;
+      setSl((avgResistance + structureBuffer).toFixed(decimals));
 
       // TP: target the lowest support for best R:R potential
       setTp(
@@ -498,9 +502,9 @@ export function QuickSimWidget({
             ? "border-amber-500/40 bg-amber-500/8"
             : "border-green-500/30 bg-green-500/5"
         }`}>
-          <span className="text-[11px] font-semibold text-muted-foreground">Risk:Reward ratio</span>
+          <span className="text-[11px] font-semibold text-muted-foreground">Reward:Risk ratio</span>
           <span className={`text-sm font-bold tabular-nums ${rrTooLow ? "text-amber-500" : "text-green-500"}`}>
-            1 : {rrRatio.toFixed(2)}
+            {rrRatio.toFixed(2)} : 1
           </span>
         </div>
       )}
@@ -508,7 +512,7 @@ export function QuickSimWidget({
         <div className="flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/30 p-2.5">
           <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
           <p className="text-[11px] text-amber-600 dark:text-amber-400">
-            <span className="font-semibold">R:R below 1.5:1</span> — your potential profit doesn&apos;t justify the risk. Move your TP further or SL closer to entry.
+            <span className="font-semibold">Reward:Risk below 2:1</span> — you risk more than you stand to gain. Move your TP further away or your SL closer to entry.
           </p>
         </div>
       )}
