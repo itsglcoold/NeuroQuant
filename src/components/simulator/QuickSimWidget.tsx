@@ -168,13 +168,15 @@ export function QuickSimWidget({
       const validSl = support.filter((s) => s < currentPrice);
       const validTp = resistance.filter((r) => r > currentPrice);
 
-      // SL: just below the AVERAGE of all support levels — logical zone center, avoids being too tight
-      const avgSupport = validSl.length > 0
-        ? validSl.reduce((sum, s) => sum + s, 0) / validSl.length
+      // SL: average of the 3 most recent (closest to price) support levels
+      // "Most recent" = closest to current price, as those are the most recently tested levels
+      const recentSl = [...validSl].sort((a, b) => b - a).slice(0, 3);
+      const avgSupport = recentSl.length > 0
+        ? recentSl.reduce((sum, s) => sum + s, 0) / recentSl.length
         : currentPrice - fallbackBuffer;
       setSl((avgSupport - structureBuffer).toFixed(decimals));
 
-      // TP: target the farthest resistance for best R:R potential
+      // TP: farthest resistance for maximum R:R potential
       setTp(
         validTp.length > 0
           ? Math.max(...validTp).toFixed(decimals)
@@ -184,13 +186,14 @@ export function QuickSimWidget({
       const validSl = resistance.filter((r) => r > currentPrice);
       const validTp = support.filter((s) => s < currentPrice);
 
-      // SL: just above the AVERAGE of all resistance levels — logical zone center, avoids being too tight
-      const avgResistance = validSl.length > 0
-        ? validSl.reduce((sum, r) => sum + r, 0) / validSl.length
+      // SL: average of the 3 most recent (closest to price) resistance levels
+      const recentSl = [...validSl].sort((a, b) => a - b).slice(0, 3);
+      const avgResistance = recentSl.length > 0
+        ? recentSl.reduce((sum, r) => sum + r, 0) / recentSl.length
         : currentPrice + fallbackBuffer;
       setSl((avgResistance + structureBuffer).toFixed(decimals));
 
-      // TP: target the lowest support for best R:R potential
+      // TP: lowest support for maximum R:R potential
       setTp(
         validTp.length > 0
           ? Math.min(...validTp).toFixed(decimals)
@@ -502,7 +505,9 @@ export function QuickSimWidget({
             ? "border-amber-500/40 bg-amber-500/8"
             : "border-green-500/30 bg-green-500/5"
         }`}>
-          <span className="text-[11px] font-semibold text-muted-foreground">Reward:Risk ratio</span>
+          <span className="text-[11px] font-semibold text-muted-foreground">
+            R:R ratio <span className="font-normal text-muted-foreground/60">(TP:SL)</span>
+          </span>
           <span className={`text-sm font-bold tabular-nums ${rrTooLow ? "text-amber-500" : "text-green-500"}`}>
             {rrRatio.toFixed(2)} : 1
           </span>
@@ -512,7 +517,7 @@ export function QuickSimWidget({
         <div className="flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/30 p-2.5">
           <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
           <p className="text-[11px] text-amber-600 dark:text-amber-400">
-            <span className="font-semibold">Reward:Risk below 2:1</span> — you risk more than you stand to gain. Move your TP further away or your SL closer to entry.
+            <span className="font-semibold">R:R below 2:1</span> — your TP is less than 2× your SL distance. Move TP further or SL closer to entry.
           </p>
         </div>
       )}
