@@ -96,6 +96,24 @@ export function QuickSimWidget({
     (side === "long" ? tpNum > currentPrice : tpNum < currentPrice);
   const formValid = slValid && tpValid && canOpenTrade;
 
+  // R:R ratio
+  const rrRatio =
+    slValid && tpValid
+      ? side === "long"
+        ? (tpNum - currentPrice) / (currentPrice - slNum)
+        : (currentPrice - tpNum) / (slNum - currentPrice)
+      : null;
+  const rrTooLow = rrRatio !== null && rrRatio < 1.5;
+
+  // SL too tight (< 0.3% from entry)
+  const slDistancePct =
+    slValid ? Math.abs(currentPrice - slNum) / currentPrice : null;
+  const slTooTight = slDistancePct !== null && slDistancePct < 0.003;
+
+  // Low confidence warning: absolute consensus score < 40 (weak directional signal)
+  const absScore = Math.abs(consensus.consensusScore);
+  const lowConfidence = absScore < 40;
+
   // Detect if user is trading against the AI consensus
   const isAgainstConsensus =
     (consensus.consensusDirection === "bullish" && side === "short") ||
@@ -464,6 +482,44 @@ export function QuickSimWidget({
           )}
         </div>
       </div>
+
+      {/* R:R Ratio + warnings */}
+      {rrRatio !== null && (
+        <div className={`flex items-center justify-between rounded-lg border px-3 py-2 ${
+          rrTooLow
+            ? "border-amber-500/40 bg-amber-500/8"
+            : "border-green-500/30 bg-green-500/5"
+        }`}>
+          <span className="text-[11px] font-semibold text-muted-foreground">Risk:Reward ratio</span>
+          <span className={`text-sm font-bold tabular-nums ${rrTooLow ? "text-amber-500" : "text-green-500"}`}>
+            1 : {rrRatio.toFixed(2)}
+          </span>
+        </div>
+      )}
+      {rrTooLow && (
+        <div className="flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/30 p-2.5">
+          <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
+          <p className="text-[11px] text-amber-600 dark:text-amber-400">
+            <span className="font-semibold">R:R below 1.5:1</span> — your potential profit doesn&apos;t justify the risk. Move your TP further or SL closer to entry.
+          </p>
+        </div>
+      )}
+      {slTooTight && (
+        <div className="flex items-start gap-2 rounded-lg bg-orange-500/10 border border-orange-500/30 p-2.5">
+          <AlertTriangle className="h-3.5 w-3.5 text-orange-500 mt-0.5 shrink-0" />
+          <p className="text-[11px] text-orange-600 dark:text-orange-400">
+            <span className="font-semibold">SL very tight</span> — less than 0.3% from entry. Normal price fluctuations may trigger it early.
+          </p>
+        </div>
+      )}
+      {lowConfidence && (
+        <div className="flex items-start gap-2 rounded-lg bg-zinc-500/10 border border-zinc-500/30 p-2.5">
+          <AlertTriangle className="h-3.5 w-3.5 text-zinc-400 mt-0.5 shrink-0" />
+          <p className="text-[11px] text-zinc-400">
+            <span className="font-semibold">Low AI confidence ({absScore}%)</span> — the analysts don&apos;t strongly agree on direction. Consider waiting for a clearer signal.
+          </p>
+        </div>
+      )}
 
       {/* Auto-fill AI Button */}
       {canAutoFill ? (
