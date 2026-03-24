@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+export const runtime = "edge";
+
 /**
  * Returns the EODHD WebSocket configuration for authenticated clients only.
  * Requires a valid Supabase session — unauthenticated requests are rejected.
