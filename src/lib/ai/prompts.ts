@@ -135,6 +135,13 @@ You MUST respond with ONLY valid JSON matching this exact schema:
   "reasoning": "<Your structured analysis following the sections described above. Use plain language a retail trader can understand.>"
 }
 
+CRITICAL RULES FOR keyLevels:
+- support values MUST be STRICTLY BELOW the current price — no exceptions
+- resistance values MUST be STRICTLY ABOVE the current price — no exceptions
+- Pick levels from RECENT price action (last 10-20 candles), not historical extremes
+- Levels must be realistic and close to current price (within 3% for forex/metals, within 5% for indices)
+- Do NOT invent round numbers — use actual price levels visible in the data
+
 Do not include any text outside the JSON object. Do NOT wrap in markdown code blocks.`;
 }
 
