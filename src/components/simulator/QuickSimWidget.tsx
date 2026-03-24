@@ -164,41 +164,44 @@ export function QuickSimWidget({
     const fallbackBuffer = currentPrice * 0.003; // 0.3% fallback when no levels available
     const structureBuffer = currentPrice * 0.001; // 0.1% buffer beyond the structure zone
 
+    const MIN_RR = 2.0; // Minimum reward:risk required
+
     if (side === "long") {
       const validSl = support.filter((s) => s < currentPrice);
       const validTp = resistance.filter((r) => r > currentPrice);
 
-      // SL: average of the 3 most recent (closest to price) support levels
-      // "Most recent" = closest to current price, as those are the most recently tested levels
-      const recentSl = [...validSl].sort((a, b) => b - a).slice(0, 3);
-      const avgSupport = recentSl.length > 0
-        ? recentSl.reduce((sum, s) => sum + s, 0) / recentSl.length
-        : currentPrice - fallbackBuffer;
-      setSl((avgSupport - structureBuffer).toFixed(decimals));
+      // SL: just below the NEAREST (most recently tested) support level
+      const nearestSupport = validSl.length > 0 ? Math.max(...validSl) : currentPrice - fallbackBuffer;
+      const slPrice = nearestSupport - structureBuffer;
+      setSl(slPrice.toFixed(decimals));
 
-      // TP: farthest resistance for maximum R:R potential
-      setTp(
-        validTp.length > 0
-          ? Math.max(...validTp).toFixed(decimals)
-          : (currentPrice + fallbackBuffer).toFixed(decimals)
-      );
+      // TP: use the farthest resistance that achieves ≥ 2:1 R:R
+      // If no resistance is far enough, calculate TP from the minimum 2:1 requirement
+      const slDistance = currentPrice - slPrice;
+      const minTp = currentPrice + MIN_RR * slDistance;
+      const qualifyingTp = validTp.filter((r) => r >= minTp);
+      const tpPrice = qualifyingTp.length > 0
+        ? Math.max(...qualifyingTp)
+        : minTp; // guarantee minimum 2:1 R:R even if no resistance level is far enough
+      setTp(tpPrice.toFixed(decimals));
     } else {
       const validSl = resistance.filter((r) => r > currentPrice);
       const validTp = support.filter((s) => s < currentPrice);
 
-      // SL: average of the 3 most recent (closest to price) resistance levels
-      const recentSl = [...validSl].sort((a, b) => a - b).slice(0, 3);
-      const avgResistance = recentSl.length > 0
-        ? recentSl.reduce((sum, r) => sum + r, 0) / recentSl.length
-        : currentPrice + fallbackBuffer;
-      setSl((avgResistance + structureBuffer).toFixed(decimals));
+      // SL: just above the NEAREST (most recently tested) resistance level
+      const nearestResistance = validSl.length > 0 ? Math.min(...validSl) : currentPrice + fallbackBuffer;
+      const slPrice = nearestResistance + structureBuffer;
+      setSl(slPrice.toFixed(decimals));
 
-      // TP: lowest support for maximum R:R potential
-      setTp(
-        validTp.length > 0
-          ? Math.min(...validTp).toFixed(decimals)
-          : (currentPrice - fallbackBuffer).toFixed(decimals)
-      );
+      // TP: use the lowest support that achieves ≥ 2:1 R:R
+      // If no support is far enough, calculate TP from the minimum 2:1 requirement
+      const slDistance = slPrice - currentPrice;
+      const minTp = currentPrice - MIN_RR * slDistance;
+      const qualifyingTp = validTp.filter((s) => s <= minTp);
+      const tpPrice = qualifyingTp.length > 0
+        ? Math.min(...qualifyingTp)
+        : minTp; // guarantee minimum 2:1 R:R even if no support level is far enough
+      setTp(tpPrice.toFixed(decimals));
     }
   };
 
