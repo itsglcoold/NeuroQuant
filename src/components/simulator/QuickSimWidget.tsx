@@ -156,33 +156,36 @@ export function QuickSimWidget({
   // If no valid AI level exists, add a small buffer (0.3%) from entry.
   const canAutoFill = tier === "pro" || tier === "premium";
   const handleAutoFill = () => {
-    const buffer = currentPrice * 0.003; // 0.3% fallback buffer
+    const fallbackBuffer = currentPrice * 0.003; // 0.3% fallback when no levels available
+    const structureBuffer = currentPrice * 0.001; // 0.1% buffer beyond the structure zone
 
     if (side === "long") {
       const validSl = support.filter((s) => s < currentPrice);
       const validTp = resistance.filter((r) => r > currentPrice);
-      setSl(
-        validSl.length > 0
-          ? Math.max(...validSl).toFixed(decimals)
-          : (currentPrice - buffer).toFixed(decimals)
-      );
+
+      // SL: place BELOW the lowest support in the zone (not at it) — avoids wicks hitting SL
+      const slZoneBottom = validSl.length > 0 ? Math.min(...validSl) : currentPrice - fallbackBuffer;
+      setSl((slZoneBottom - structureBuffer).toFixed(decimals));
+
+      // TP: target the farthest resistance for best R:R potential
       setTp(
         validTp.length > 0
           ? Math.max(...validTp).toFixed(decimals)
-          : (currentPrice + buffer).toFixed(decimals)
+          : (currentPrice + fallbackBuffer).toFixed(decimals)
       );
     } else {
       const validSl = resistance.filter((r) => r > currentPrice);
       const validTp = support.filter((s) => s < currentPrice);
-      setSl(
-        validSl.length > 0
-          ? Math.min(...validSl).toFixed(decimals)
-          : (currentPrice + buffer).toFixed(decimals)
-      );
+
+      // SL: place ABOVE the highest resistance in the zone (not at it) — avoids wicks hitting SL
+      const slZoneTop = validSl.length > 0 ? Math.max(...validSl) : currentPrice + fallbackBuffer;
+      setSl((slZoneTop + structureBuffer).toFixed(decimals));
+
+      // TP: target the lowest support for best R:R potential
       setTp(
         validTp.length > 0
           ? Math.min(...validTp).toFixed(decimals)
-          : (currentPrice - buffer).toFixed(decimals)
+          : (currentPrice - fallbackBuffer).toFixed(decimals)
       );
     }
   };

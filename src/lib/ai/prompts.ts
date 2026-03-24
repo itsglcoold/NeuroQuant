@@ -140,7 +140,10 @@ CRITICAL RULES FOR keyLevels:
 - resistance values MUST be STRICTLY ABOVE the current price — no exceptions
 - Pick levels from RECENT price action (last 10-20 candles), not historical extremes
 - Levels must be realistic and close to current price (within 3% for forex/metals, within 5% for indices)
-- Do NOT invent round numbers — use actual price levels visible in the data
+- Do NOT invent round numbers — use actual swing highs/lows and structure levels visible in the data
+- For support: identify the actual swing lows and structure zones where price has previously bounced — these are the levels a Stop Loss should sit BELOW for long trades
+- For resistance: identify the actual swing highs and structure zones where price has previously rejected — these are the levels a Stop Loss should sit ABOVE for short trades
+- Provide a RANGE of levels (nearest to furthest) so traders can choose their structure-based SL placement
 
 Do not include any text outside the JSON object. Do NOT wrap in markdown code blocks.`;
 }
