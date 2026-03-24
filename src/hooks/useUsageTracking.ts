@@ -87,11 +87,19 @@ export function useUsageTracking() {
           .eq("id", user.id)
           .single();
 
-        if (profile?.subscription_tier) {
-          const dbTier = profile.subscription_tier as UserTier;
-          setTier(dbTier);
-          localStorage.setItem(TIER_KEY, dbTier);
+        if (!profile) {
+          // First login — create profile with free tier
+          await supabase.from("profiles").insert({
+            id: user.id,
+            subscription_tier: "free",
+          });
         }
+
+        // Always use DB value; never trust localStorage when logged in.
+        // Falls back to "free" if no profile row exists yet.
+        const dbTier = (profile?.subscription_tier as UserTier) || "free";
+        setTier(dbTier);
+        localStorage.setItem(TIER_KEY, dbTier);
       } catch {
         // Best-effort — fall back to localStorage value
       }
