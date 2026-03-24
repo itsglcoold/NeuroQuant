@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Upload, X, Image as ImageIcon, TrendingUp, TrendingDown, Minus, Lock, ClipboardPaste } from "lucide-react";
+import { Upload, X, Image as ImageIcon, TrendingUp, TrendingDown, Minus, Lock } from "lucide-react";
 import { ChartAnalysisResult } from "@/types/analysis";
 import { useUsageTracking } from "@/hooks/useUsageTracking";
 import { UpgradeModal } from "@/components/dashboard/UpgradeModal";
@@ -49,36 +49,6 @@ export default function ChartUploadPage() {
   const { canAccessFeature, getRequiredTier } = useUsageTracking();
   const [showUpgrade, setShowUpgrade] = useState(false);
   const hasAccess = canAccessFeature("chart-upload");
-
-  const pasteZoneRef = useRef<HTMLDivElement>(null);
-
-  // Handle paste events (from both global Ctrl+V and iOS paste callout)
-  function handlePasteEvent(e: React.ClipboardEvent | ClipboardEvent) {
-    const items = (e as ClipboardEvent).clipboardData?.items;
-    if (!items) return;
-    for (const item of Array.from(items)) {
-      if (item.type.startsWith("image/")) {
-        e.preventDefault();
-        const blob = item.getAsFile();
-        if (blob) {
-          const pastedFile = new File([blob], `pasted-chart-${Date.now()}.png`, { type: blob.type });
-          handleFileSelect(pastedFile);
-        }
-        // Clean up any text/html injected into the contentEditable
-        if (pasteZoneRef.current) pasteZoneRef.current.textContent = "";
-        return;
-      }
-    }
-  }
-
-  // Global paste listener for desktop (Ctrl+V / Cmd+V)
-  useEffect(() => {
-    function onPaste(e: ClipboardEvent) {
-      handlePasteEvent(e);
-    }
-    document.addEventListener("paste", onPaste);
-    return () => document.removeEventListener("paste", onPaste);
-  }, []);
 
   if (!hasAccess) {
     return (
@@ -194,34 +164,6 @@ export default function ChartUploadPage() {
         <CardContent className="pt-6">
           {!preview ? (
             <div className="space-y-3">
-              {/* Paste zone — tap to focus on iOS, then iOS shows "Paste" callout */}
-              <div
-                ref={pasteZoneRef}
-                contentEditable
-                suppressContentEditableWarning
-                onPaste={(e) => handlePasteEvent(e)}
-                onFocus={() => {
-                  if (pasteZoneRef.current) pasteZoneRef.current.textContent = "";
-                }}
-                onInput={() => {
-                  if (pasteZoneRef.current) pasteZoneRef.current.textContent = "";
-                }}
-                className="w-full flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-blue-500/30 bg-blue-500/5 px-4 py-8 text-center cursor-pointer transition-colors hover:bg-blue-500/10 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 caret-transparent select-none"
-                role="button"
-                tabIndex={0}
-                aria-label="Tap to paste chart from clipboard"
-              >
-                <ClipboardPaste className="h-10 w-10 text-blue-500 pointer-events-none mb-1" />
-                <span className="text-lg font-medium text-foreground pointer-events-none">Tap to paste copied chart</span>
-                <span className="text-sm text-muted-foreground pointer-events-none">Long-press a chart → Copy Image → tap here</span>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-border" />
-                <span className="text-xs text-muted-foreground/60 uppercase tracking-wider">or</span>
-                <div className="h-px flex-1 bg-border" />
-              </div>
-
               {/* Upload zone — screenshot or file browse */}
               <div
                 onDrop={handleDrop}
