@@ -34,6 +34,7 @@ import {
   Clock,
   Activity,
   X,
+  Trash2,
 } from "lucide-react";
 import type { ModelOutput } from "@/types/analysis";
 import { QuickSimWidget } from "@/components/simulator/QuickSimWidget";
@@ -721,6 +722,18 @@ export default function MarketDetailPage() {
                     >
                       <X className="h-3 w-3 mr-1" />
                       Close
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                      onClick={async () => {
+                        if (confirm("Delete this trade?")) {
+                          await simulator.deleteTrade(trade.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>

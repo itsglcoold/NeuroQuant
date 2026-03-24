@@ -35,19 +35,17 @@ const SYMBOL_MAP: Record<string, string> = {
   // Metals
   "XAU/USD": "XAUUSD.FOREX",
   "XAG/USD": "XAGUSD.FOREX",
-  // Energy
-  "CL": "CLUSD.FOREX",
+  // Energy — use futures contract (CL.US) for accurate real-time pricing
+  // CLUSD.FOREX on the forex endpoint gives unreliable/stale prices
+  "CL": "CL.US",
   // Indices
   "DXY": "DXY.INDX",
   "SPX": "GSPC.INDX",
   "IXIC": "IXIC.INDX",
 };
 
-// Some symbols need a different ticker for EOD (end-of-day) vs real-time
-// e.g. Crude Oil: CLUSD.FOREX works for real-time, but CL.US works for EOD
-const EOD_SYMBOL_MAP: Record<string, string> = {
-  "CL": "CL.US",
-};
+// Symbols that need a different ticker for EOD (historical/daily) data
+const EOD_SYMBOL_MAP: Record<string, string> = {};
 
 function toEodhdSymbol(symbol: string): string {
   return SYMBOL_MAP[symbol] || symbol;

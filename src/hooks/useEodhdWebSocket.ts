@@ -37,8 +37,8 @@ const WS_SYMBOL_MAP: Record<string, string> = {
   // Metals (available on forex endpoint)
   "XAU/USD": "XAUUSD",
   "XAG/USD": "XAGUSD",
-  // Energy (available on forex endpoint)
-  "CL": "CLUSD",
+  // NOTE: CL (Crude Oil) intentionally excluded — EODHD forex WS gives stale prices for it.
+  // CL uses REST polling instead for consistent, accurate pricing.
 };
 
 // Reverse map: WS symbol → app symbol

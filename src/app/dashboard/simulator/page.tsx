@@ -23,6 +23,7 @@ import {
   Trash2,
   ArrowUpRight,
   ArrowDownRight,
+  RotateCcw,
 } from "lucide-react";
 
 function formatPnl(pnl: number): string {
@@ -60,6 +61,7 @@ export default function SimulatorPage() {
     dailyLimit,
     closeTrade,
     deleteTrade,
+    resetSimulator,
     refetch,
   } = useSimulator(tier);
 
@@ -129,7 +131,8 @@ export default function SimulatorPage() {
       ))}
 
       {/* Header */}
-      <div>
+      <div className="flex items-start justify-between gap-4">
+        <div>
         <h1 className="text-2xl font-bold">Trading Simulator</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Paper trading based on AI analyses —{" "}
@@ -137,6 +140,20 @@ export default function SimulatorPage() {
             ? "Unlimited trades"
             : `${tradesRemaining}/${dailyLimit} trades today`}
         </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="shrink-0 text-xs text-red-500 border-red-500/30 hover:bg-red-500/10 hover:text-red-600"
+          onClick={async () => {
+            if (confirm("Reset simulator? This will delete ALL trades and restore your $10,000 balance.")) {
+              await resetSimulator();
+            }
+          }}
+        >
+          <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+          Reset
+        </Button>
       </div>
 
       {/* Stats Header */}

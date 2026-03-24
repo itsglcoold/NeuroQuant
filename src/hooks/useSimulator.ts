@@ -177,6 +177,27 @@ export function useSimulator(tier: UserTier) {
     [supabase, trades]
   );
 
+  // Reset simulator — delete all trades and start fresh with $10,000
+  const resetSimulator = useCallback(async (): Promise<boolean> => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+
+      const { error: deleteError } = await supabase
+        .from("paper_trades")
+        .delete()
+        .eq("user_id", user.id);
+
+      if (deleteError) throw deleteError;
+
+      setTrades([]);
+      return true;
+    } catch (err) {
+      console.error("Failed to reset simulator:", err);
+      return false;
+    }
+  }, [supabase]);
+
   // Delete a trade (open or closed)
   const deleteTrade = useCallback(
     async (tradeId: string): Promise<boolean> => {
@@ -234,6 +255,7 @@ export function useSimulator(tier: UserTier) {
     openTrade,
     closeTrade,
     deleteTrade,
+    resetSimulator,
     refetch: fetchTrades,
   };
 }
