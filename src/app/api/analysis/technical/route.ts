@@ -48,10 +48,13 @@ export async function POST(request: NextRequest) {
         const barCount = ["1min", "5min"].includes(interval) ? 60 : ["15min", "1h"].includes(interval) ? 40 : 30;
 
         // Fetch market data — use allSettled so one failure doesn't crash everything
+        // Map short intervals to "1h" for indicators — 1min/5min/15min indicators are too noisy
+        const indicatorInterval = ["1min", "5min", "15min"].includes(interval) ? "1h" : "1day";
+
         const [priceResult, timeSeriesResult, indicatorsResult] = await Promise.allSettled([
           getPrice(symbol),
           getTimeSeries(symbol, interval, barCount),
-          getTechnicalIndicators(symbol, "1day"),
+          getTechnicalIndicators(symbol, indicatorInterval),
         ]);
 
         if (priceResult.status === "rejected") {
@@ -147,7 +150,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Step 3: Calculate consensus
-        const consensus = calculateConsensus(modelOutputs, interval);
+        const consensus = calculateConsensus(modelOutputs, interval, price.price);
 
         send("consensus", {
           symbol,

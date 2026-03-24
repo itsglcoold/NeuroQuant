@@ -48,7 +48,7 @@ function getProbabilityScore(outputs: ModelOutput[]): number {
   return Math.round(weightedConfidence * directionFactor);
 }
 
-export function calculateConsensus(outputs: ModelOutput[], timeframe: string = "1day"): ConsensusResult {
+export function calculateConsensus(outputs: ModelOutput[], timeframe: string = "1day", currentPrice?: number): ConsensusResult {
   if (outputs.length === 0) {
     return emptyConsensus();
   }
@@ -95,8 +95,8 @@ export function calculateConsensus(outputs: ModelOutput[], timeframe: string = "
   const sentimentLabel = getSentimentLabel(Math.round(weightedSentiment));
   const probabilityScore = getProbabilityScore(outputs);
 
-  // Merge key levels from all models
-  const mergedKeyLevels = mergeKeyLevels(outputs);
+  // Merge key levels from all models — filter by current price if available
+  const mergedKeyLevels = mergeKeyLevels(outputs, currentPrice);
 
   // Generate summary
   const summary = generateSummary(
@@ -128,16 +128,22 @@ export function calculateConsensus(outputs: ModelOutput[], timeframe: string = "
 }
 
 function mergeKeyLevels(
-  outputs: ModelOutput[]
+  outputs: ModelOutput[],
+  currentPrice?: number
 ): { support: number[]; resistance: number[] } {
   const allSupport = outputs.flatMap((o) => o.keyLevels.support);
   const allResistance = outputs.flatMap((o) => o.keyLevels.resistance);
 
-  // Remove duplicates and sort
-  const support = [...new Set(allSupport)].sort((a, b) => b - a).slice(0, 3);
-  const resistance = [...new Set(allResistance)]
-    .sort((a, b) => a - b)
-    .slice(0, 3);
+  // Filter by current price if available — support must be below, resistance above
+  const filteredSupport = currentPrice
+    ? allSupport.filter((s) => typeof s === "number" && s < currentPrice)
+    : allSupport.filter((s) => typeof s === "number");
+  const filteredResistance = currentPrice
+    ? allResistance.filter((r) => typeof r === "number" && r > currentPrice)
+    : allResistance.filter((r) => typeof r === "number");
+
+  const support = [...new Set(filteredSupport)].sort((a, b) => b - a).slice(0, 3);
+  const resistance = [...new Set(filteredResistance)].sort((a, b) => a - b).slice(0, 3);
 
   return { support, resistance };
 }

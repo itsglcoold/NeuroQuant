@@ -49,9 +49,9 @@ export async function analyzeTechnical(marketData: {
     const validDirections = ["bullish", "bearish", "neutral"];
     return {
       model: "Analyst Beta",
-      sentiment: typeof parsed.sentiment === "number" ? parsed.sentiment : 0,
+      sentiment: typeof parsed.sentiment === "number" ? Math.min(100, Math.max(-100, parsed.sentiment)) : 0,
       direction: validDirections.includes(parsed.direction) ? parsed.direction : "neutral",
-      confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0,
+      confidence: typeof parsed.confidence === "number" ? Math.min(100, Math.max(0, parsed.confidence)) : 0,
       keyLevels: {
         support: Array.isArray(parsed.keyLevels?.support) ? parsed.keyLevels.support : [],
         resistance: Array.isArray(parsed.keyLevels?.resistance) ? parsed.keyLevels.resistance : [],
