@@ -32,6 +32,8 @@ import {
   Sparkles,
   Shield,
   Clock,
+  Activity,
+  X,
 } from "lucide-react";
 import type { ModelOutput } from "@/types/analysis";
 import { QuickSimWidget } from "@/components/simulator/QuickSimWidget";
@@ -165,6 +167,7 @@ export default function MarketDetailPage() {
   const [consensus, setConsensus] = useState<ConsensusResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analysisStatus, setAnalysisStatus] = useState<string>("");
   const [streamedAnalysts, setStreamedAnalysts] = useState<ModelOutput[]>([]);
   const [analystFailures, setAnalystFailures] = useState(0);
@@ -210,6 +213,7 @@ export default function MarketDetailPage() {
 
     setAnalyzing(true);
     setAnalysisStatus("Starting analysis…");
+    setAnalysisError(null);
     setStreamedAnalysts([]);
     setConsensus(null);
     setAnalystFailures(0);
@@ -275,7 +279,7 @@ export default function MarketDetailPage() {
               if (data.price) setPrice(data.price);
               if (data.indicators) setIndicators(data.indicators);
             } else if (event === "error") {
-              console.error("Analysis error:", data.message);
+              setAnalysisError(data.message || "Analysis failed. Please try again.");
             }
           } catch {
             // Ignore malformed SSE lines
@@ -283,7 +287,7 @@ export default function MarketDetailPage() {
         }
       }
     } catch (error) {
-      console.error("Analysis failed:", error);
+      setAnalysisError(error instanceof Error ? error.message : "Analysis failed. Please try again.");
     }
     setAnalyzing(false);
     setAnalysisStatus("");
@@ -448,6 +452,14 @@ export default function MarketDetailPage() {
         requiredTier="pro"
         reason="limit-reached"
       />
+
+      {/* Analysis error banner */}
+      {analysisError && !analyzing && (
+        <div className="flex items-start gap-3 rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-600 dark:text-red-400">
+          <span className="mt-0.5 shrink-0">⚠</span>
+          <span>{analysisError}</span>
+        </div>
+      )}
 
       {/* Analysis results: Analysts (left) + Consensus (right) */}
       {(() => {
@@ -635,6 +647,85 @@ export default function MarketDetailPage() {
                 </div>
               </div>
             )}
+          </div>
+        );
+      })()}
+
+      {/* Active trades for this symbol */}
+      {(() => {
+        const symbolTrades = simulator.openTrades.filter((t) => t.symbol === symbol);
+        if (symbolTrades.length === 0) return null;
+        const currentPrice = price?.price ?? null;
+
+        function calcPnl(trade: typeof symbolTrades[0], cp: number) {
+          return trade.side === "long"
+            ? ((cp - trade.entry_price) / trade.entry_price) * 100
+            : ((trade.entry_price - cp) / trade.entry_price) * 100;
+        }
+        function fmt(p: number) {
+          return p > 100 ? p.toFixed(2) : p.toFixed(4);
+        }
+
+        return (
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Activity className="h-4 w-4 text-green-500" />
+              Active Trades — {symbol}
+            </h3>
+            {symbolTrades.map((trade) => {
+              const pnl = currentPrice ? calcPnl(trade, currentPrice) : null;
+              const isWinning = pnl !== null && pnl >= 0;
+              return (
+                <div
+                  key={trade.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/80 px-4 py-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <Badge
+                      className={
+                        trade.side === "long"
+                          ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20"
+                          : "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
+                      }
+                    >
+                      {trade.side === "long" ? (
+                        <TrendingUp className="h-3 w-3 mr-1" />
+                      ) : (
+                        <TrendingDown className="h-3 w-3 mr-1" />
+                      )}
+                      {trade.side === "long" ? "BULLISH" : "BEARISH"}
+                    </Badge>
+                    <div className="flex gap-4 text-xs tabular-nums">
+                      <span className="text-muted-foreground">Entry <span className="text-foreground font-medium">{fmt(trade.entry_price)}</span></span>
+                      <span className="text-red-500">SL <span className="font-medium">{fmt(trade.sl_price)}</span></span>
+                      <span className="text-green-500">TP <span className="font-medium">{fmt(trade.tp_price)}</span></span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {pnl !== null && (
+                      <span className={`text-sm font-bold tabular-nums ${isWinning ? "text-green-500" : "text-red-500"}`}>
+                        {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}%
+                      </span>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      disabled={!currentPrice}
+                      onClick={async () => {
+                        if (currentPrice) {
+                          await simulator.closeTrade(trade.id, currentPrice);
+                          simulator.refetch();
+                        }
+                      }}
+                    >
+                      <X className="h-3 w-3 mr-1" />
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         );
       })()}

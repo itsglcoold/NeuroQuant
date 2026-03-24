@@ -1,22 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPrices } from "@/lib/market/eodhd";
+import { isMarketOpen } from "@/lib/market/hours";
 
 export const runtime = "edge";
-
-// ---------------------------------------------------------------------------
-// Market hours check (Sun 22:00 – Fri 22:00 GMT)
-// ---------------------------------------------------------------------------
-
-function isMarketOpen(): boolean {
-  const now = new Date();
-  const d = now.getUTCDay();
-  const h = now.getUTCHours();
-  if (d === 6) return false; // Saturday
-  if (d === 0 && h < 22) return false; // Sunday before 22:00
-  if (d === 5 && h >= 22) return false; // Friday after 22:00
-  return true;
-}
 
 // ---------------------------------------------------------------------------
 // GET /api/trades/check — called by external cron every minute

@@ -63,7 +63,6 @@ export default function SimulatorPage() {
     refetch,
   } = useSimulator(tier);
 
-  const [livePrices, setLivePrices] = useState<Record<string, number>>({});
   const [closedNotifications, setClosedNotifications] = useState<
     { symbol: string; pnl: number }[]
   >([]);
@@ -90,29 +89,6 @@ export default function SimulatorPage() {
     },
   });
 
-  // Fetch live prices for open trades periodically
-  // (reuses the watcher's price fetch cycle implicitly)
-  // We also fetch on mount for display
-  useState(() => {
-    async function fetchPrices() {
-      const symbols = [...new Set(openTrades.map((t) => t.symbol))];
-      for (const sym of symbols) {
-        try {
-          const res = await fetch(
-            `/api/market-data?symbol=${encodeURIComponent(sym)}&type=quote`
-          );
-          if (!res.ok) continue;
-          const json = await res.json();
-          if (json.data?.price) {
-            setLivePrices((prev) => ({ ...prev, [sym]: json.data.price }));
-          }
-        } catch {
-          // skip
-        }
-      }
-    }
-    if (openTrades.length > 0) fetchPrices();
-  });
 
   if (loading) {
     return (
@@ -265,7 +241,7 @@ export default function SimulatorPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {openTrades.map((trade) => {
-              const livePrice = livePrices[trade.symbol];
+              const livePrice = wsPrices[trade.symbol]?.price || null;
               const livePnl = livePrice
                 ? calcLivePnl(trade, livePrice)
                 : null;

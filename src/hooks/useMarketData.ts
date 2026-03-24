@@ -4,23 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { MarketPrice } from "@/types/market";
 import { MARKETS } from "@/lib/market/symbols";
 import { useEodhdWebSocket } from "./useEodhdWebSocket";
-
-// Check if any major market session is currently open (GMT-based)
-// Forex trades Sun 22:00 GMT – Fri 22:00 GMT
-function isAnyMarketOpen(): boolean {
-  const now = new Date();
-  const utcDay = now.getUTCDay(); // 0=Sun, 6=Sat
-  const utcHour = now.getUTCHours();
-
-  // Saturday: always closed
-  if (utcDay === 6) return false;
-  // Sunday: closed until 22:00 GMT (Sydney open)
-  if (utcDay === 0 && utcHour < 22) return false;
-  // Friday: closed after 22:00 GMT
-  if (utcDay === 5 && utcHour >= 22) return false;
-
-  return true;
-}
+import { isMarketOpen } from "@/lib/market/hours";
 
 const ALL_SYMBOLS = MARKETS.map((m) => m.symbol);
 
@@ -111,7 +95,7 @@ export function useMarketData(refreshInterval = 60000) {
     const actualInterval = ws.connected ? Math.max(refreshInterval, 300000) : refreshInterval;
 
     const interval = setInterval(() => {
-      if (isAnyMarketOpen()) {
+      if (isMarketOpen()) {
         fetchPrices();
       }
     }, actualInterval);
@@ -119,7 +103,7 @@ export function useMarketData(refreshInterval = 60000) {
     // Auto-refresh when user returns to the tab (e.g. after switching apps)
     // This ensures prices + change values are always fresh without manual buttons
     const handleVisibility = () => {
-      if (document.visibilityState === "visible" && isAnyMarketOpen()) {
+      if (document.visibilityState === "visible" && isMarketOpen()) {
         fetchPrices();
       }
     };

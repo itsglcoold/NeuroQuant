@@ -213,7 +213,7 @@ export function useSimulator(tier: UserTier) {
       accuracy: closedTrades.length > 0 ? Math.round((winCount / closedTrades.length) * 100) : 0,
       totalPnl: Math.round(totalPnl * 100) / 100,
       activeTrades,
-      virtualBalance: Math.round((INITIAL_VIRTUAL_BALANCE * (1 + totalPnl / 100)) * 100) / 100,
+      virtualBalance: Math.max(0, Math.round((INITIAL_VIRTUAL_BALANCE * (1 + totalPnl / 100)) * 100) / 100),
     };
   })();
 

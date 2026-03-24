@@ -46,13 +46,17 @@ export async function analyzeTechnical(marketData: {
 
   try {
     const parsed = JSON.parse(content);
+    const validDirections = ["bullish", "bearish", "neutral"];
     return {
       model: "Analyst Alpha",
-      sentiment: parsed.sentiment,
-      direction: parsed.direction,
-      confidence: parsed.confidence,
-      keyLevels: parsed.keyLevels,
-      reasoning: parsed.reasoning,
+      sentiment: typeof parsed.sentiment === "number" ? parsed.sentiment : 0,
+      direction: validDirections.includes(parsed.direction) ? parsed.direction : "neutral",
+      confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0,
+      keyLevels: {
+        support: Array.isArray(parsed.keyLevels?.support) ? parsed.keyLevels.support : [],
+        resistance: Array.isArray(parsed.keyLevels?.resistance) ? parsed.keyLevels.resistance : [],
+      },
+      reasoning: typeof parsed.reasoning === "string" ? parsed.reasoning : "No reasoning provided.",
       timestamp: new Date().toISOString(),
     };
   } catch {

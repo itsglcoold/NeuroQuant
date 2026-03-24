@@ -116,10 +116,10 @@ export function DisclaimerGate({ children }: { children: React.ReactNode }) {
     setAccepted(true);
   };
 
-  // During SSR or initial hydration, render children but hidden behind the gate
-  // This prevents a flash of content
+  // During SSR or initial hydration, render a blank placeholder so the gate
+  // cannot be bypassed by a flash of content before the localStorage check completes.
   if (accepted === null) {
-    return <>{children}</>;
+    return <div className="min-h-screen bg-zinc-950" />;
   }
 
   if (accepted) {

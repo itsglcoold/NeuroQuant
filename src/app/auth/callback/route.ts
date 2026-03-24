@@ -1,22 +1,42 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 
 export const runtime = 'edge';
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  // "next" param allows redirecting to a specific page after auth
   const next = searchParams.get("next") ?? "/dashboard";
 
   if (code) {
-    const supabase = await createClient();
+    // Build the redirect response first so we can attach cookies to it.
+    // This is the correct Supabase SSR pattern: cookies must be written
+    // onto the response object, not via next/headers, so the browser
+    // receives the session cookie in the same request that sets it.
+    const response = NextResponse.redirect(`${origin}${next}`);
+
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              response.cookies.set(name, value, options);
+            });
+          },
+        },
+      }
+    );
+
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+      return response;
     }
   }
 
-  // Return the user to an error page with instructions
   return NextResponse.redirect(`${origin}/auth/login?error=Could+not+authenticate`);
 }

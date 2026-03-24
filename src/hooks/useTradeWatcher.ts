@@ -3,16 +3,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import type { PaperTrade } from "@/types/simulator";
 import type { MarketPrice } from "@/types/market";
-
-// Check if forex markets are open (Sun 22:00 – Fri 22:00 GMT)
-function isMarketOpen(): boolean {
-  const now = new Date();
-  const d = now.getUTCDay(), h = now.getUTCHours();
-  if (d === 6) return false;
-  if (d === 0 && h < 22) return false;
-  if (d === 5 && h >= 22) return false;
-  return true;
-}
+import { isMarketOpen } from "@/lib/market/hours";
 
 interface TradeWatcherProps {
   openTrades: PaperTrade[];
