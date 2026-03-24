@@ -236,7 +236,7 @@ async function runScreening(timeoutMs: number = 90_000): Promise<SuggestionsResp
           { role: "user", content: userMessage },
         ],
         temperature: 0.2,
-        max_tokens: 3000,
+        max_tokens: 1500,
       }),
       perModelTimeout
     ),
@@ -248,7 +248,7 @@ async function runScreening(timeoutMs: number = 90_000): Promise<SuggestionsResp
           { role: "user", content: userMessage },
         ],
         temperature: 0.2,
-        max_tokens: 3000,
+        max_tokens: 1500,
       }),
       perModelTimeout
     ),

@@ -92,7 +92,7 @@ export async function analyzeChart(imageBase64: string): Promise<ChartAnalysisRe
       },
     ],
     temperature: 0.3,
-    max_tokens: 3000,
+    max_tokens: 1500,
   });
 
   let content = response.choices[0]?.message?.content || "";
