@@ -267,7 +267,7 @@ export function QuickSimWidget({
             {timeframeLabel}
           </Badge>
           <Badge variant="outline" className="text-[10px]">
-            {tradesRemaining}/{dailyLimit === Infinity ? "\u221E" : dailyLimit} trades
+            {dailyLimit === Infinity ? "Unlimited" : `${tradesRemaining}/${dailyLimit}`} trades
           </Badge>
         </div>
       </div>
