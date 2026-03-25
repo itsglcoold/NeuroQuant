@@ -6,6 +6,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
+  BarChart2,
   TrendingUp,
   Upload,
   MessageSquare,
@@ -117,6 +118,11 @@ const navItems: NavItem[] = [
     label: "Simulator",
     href: "/dashboard/simulator",
     icon: LineChart,
+  },
+  {
+    label: "Analytics",
+    href: "/dashboard/analytics",
+    icon: BarChart2,
   },
   {
     label: "Settings",
