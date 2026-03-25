@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,10 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   RotateCcw,
+  BookOpen,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 function formatPnl(pnl: number): string {
@@ -68,6 +72,56 @@ export default function SimulatorPage() {
   const [closedNotifications, setClosedNotifications] = useState<
     { symbol: string; pnl: number }[]
   >([]);
+
+  // Trade journal: tradeId → { review, loading, open }
+  const [journalState, setJournalState] = useState<
+    Record<string, { review: string | null; loading: boolean; open: boolean }>
+  >({});
+
+  const fetchReview = useCallback(async (trade: (typeof closedTrades)[number]) => {
+    const current = journalState[trade.id];
+    // Toggle closed if already open
+    if (current?.open) {
+      setJournalState((prev) => ({ ...prev, [trade.id]: { ...prev[trade.id], open: false } }));
+      return;
+    }
+    // Show cached
+    if (current?.review) {
+      setJournalState((prev) => ({ ...prev, [trade.id]: { ...prev[trade.id], open: true } }));
+      return;
+    }
+    // Fetch from API
+    setJournalState((prev) => ({ ...prev, [trade.id]: { review: null, loading: true, open: true } }));
+    try {
+      const res = await fetch("/api/journal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tradeId: trade.id,
+          symbol: trade.symbol,
+          side: trade.side,
+          entryPrice: trade.entry_price,
+          closePrice: trade.close_price,
+          pnlPercent: trade.result_pnl,
+          slPrice: trade.sl_price,
+          tpPrice: trade.tp_price,
+          createdAt: trade.created_at,
+          closedAt: trade.closed_at,
+        }),
+      });
+      const data = await res.json();
+      setJournalState((prev) => ({
+        ...prev,
+        [trade.id]: { review: data.review ?? "Review unavailable.", loading: false, open: true },
+      }));
+    } catch {
+      setJournalState((prev) => ({
+        ...prev,
+        [trade.id]: { review: "Could not load review.", loading: false, open: true },
+      }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [journalState]);
 
   // WebSocket prices for trade watcher (avoids REST polling)
   const { prices: wsPrices } = useMarketData();
@@ -461,6 +515,33 @@ export default function SimulatorPage() {
                         </span>
                       </div>
                     </div>
+
+                    {/* AI Journal Review */}
+                    <button
+                      onClick={() => fetchReview(trade)}
+                      className="w-full flex items-center justify-between rounded-md bg-muted/40 hover:bg-muted/70 px-2.5 py-1.5 transition-colors"
+                    >
+                      <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                        <BookOpen className="h-3.5 w-3.5" />
+                        AI Review
+                      </span>
+                      {journalState[trade.id]?.loading ? (
+                        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                      ) : journalState[trade.id]?.open ? (
+                        <ChevronUp className="h-3 w-3 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                      )}
+                    </button>
+                    {journalState[trade.id]?.open && journalState[trade.id]?.review && (
+                      <div className={`rounded-md px-3 py-2.5 text-[11px] leading-relaxed ${
+                        isWin
+                          ? "bg-green-500/5 border border-green-500/20 text-green-700 dark:text-green-300"
+                          : "bg-red-500/5 border border-red-500/20 text-red-700 dark:text-red-300"
+                      }`}>
+                        {journalState[trade.id].review}
+                      </div>
+                    )}
 
                     {/* Footer: AI direction + date + delete */}
                     <div className="flex items-center justify-between pt-1 border-t border-border/20">
