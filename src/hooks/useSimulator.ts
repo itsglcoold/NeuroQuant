@@ -54,10 +54,23 @@ export function useSimulator(tier: UserTier) {
     fetchTrades();
   }, [fetchTrades]);
 
-  // Count today's trades for limit check
+  // Realtime subscription: sync when cron closes trades externally
+  useEffect(() => {
+    const channel = supabase
+      .channel("paper_trades_changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "paper_trades" },
+        () => { fetchTrades(); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [supabase, fetchTrades]);
+
+  // Count today's OPEN trades only for limit check (closed trades free up the slot)
   const todayTradeCount = trades.filter((t) => {
     const tradeDate = new Date(t.created_at).toISOString().split("T")[0];
-    return tradeDate === getTodayKey();
+    return tradeDate === getTodayKey() && t.status === "open";
   }).length;
 
   const dailyLimit = SIMULATOR_LIMITS[tier] ?? 3;
