@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import type { ModelOutput } from "@/types/analysis";
 import { QuickSimWidget } from "@/components/simulator/QuickSimWidget";
+import { MultiTimeframePanel } from "@/components/market/MultiTimeframePanel";
 import { TourButton } from "@/components/onboarding/TourButton";
 import { SimulatorOnboarding } from "@/components/simulator/SimulatorOnboarding";
 import { useSimulator } from "@/hooks/useSimulator";
@@ -409,6 +410,9 @@ export default function MarketDetailPage() {
             ))}
           </div>
         </div>
+
+      {/* Multi-Timeframe Confluence */}
+      <MultiTimeframePanel symbol={symbol} />
 
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
         <TourButton />
