@@ -322,7 +322,12 @@ export default function SimulatorPage() {
                   <CardContent className="py-3 px-4 space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm">{trade.symbol}</span>
+                        <Link
+                          href={`/dashboard/market/${encodeURIComponent(trade.symbol)}`}
+                          className="font-bold text-sm hover:text-blue-500 hover:underline transition-colors"
+                        >
+                          {trade.symbol}
+                        </Link>
                         <Badge
                           className={
                             trade.side === "long"
