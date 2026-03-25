@@ -19,6 +19,7 @@ import {
   Home,
   Zap,
   LineChart,
+  Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -123,6 +124,12 @@ const navItems: NavItem[] = [
     label: "Analytics",
     href: "/dashboard/analytics",
     icon: BarChart2,
+  },
+  {
+    label: "Live Trading",
+    href: "/dashboard/live-trading",
+    icon: Activity,
+    badge: "PREMIUM",
   },
   {
     label: "Settings",

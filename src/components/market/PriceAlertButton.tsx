@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Bell, BellRing, Plus, Trash2, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Bell, BellRing, Plus, Trash2, X, ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useUsageTracking } from "@/hooks/useUsageTracking";
+import Link from "next/link";
 
 interface Alert {
   id: string;
@@ -27,6 +29,8 @@ function timeAgo(iso: string): string {
 }
 
 export function PriceAlertButton({ symbol, currentPrice, priceDecimals = 4 }: Props) {
+  const { canAccessFeature } = useUsageTracking();
+  const canUseAlerts = canAccessFeature("price-alerts");
   const [open, setOpen] = useState(false);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(false);
@@ -94,6 +98,19 @@ export function PriceAlertButton({ symbol, currentPrice, priceDecimals = 4 }: Pr
   async function deleteAlert(id: string) {
     await fetch(`/api/alerts?id=${id}`, { method: "DELETE" });
     setAlerts((prev) => prev.filter((a) => a.id !== id));
+  }
+
+  if (!canUseAlerts) {
+    return (
+      <Link
+        href="/pricing"
+        className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-border/80 hover:bg-muted/50 transition-colors"
+        title="Upgrade to Pro to set price alerts"
+      >
+        <Lock className="h-3.5 w-3.5" />
+        Alert
+      </Link>
+    );
   }
 
   return (

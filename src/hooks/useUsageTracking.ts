@@ -23,6 +23,10 @@ export const FEATURE_ACCESS: Record<string, UserTier> = {
   "api-access": "premium",
   "simulator": "free",
   "simulator-autofill": "pro",
+  "price-alerts": "pro",
+  "watchlist": "free",
+  "consensus-history": "free",
+  "analytics": "free",
 };
 
 interface UsageData {

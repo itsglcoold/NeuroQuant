@@ -36,7 +36,12 @@ export async function GET(request: NextRequest) {
     if (!error) {
       return response;
     }
+    // Provide a clear error for common cases (expired link, PKCE mismatch)
+    const msg = error.message.toLowerCase().includes("expired")
+      ? "Your sign-in link has expired. Please request a new one."
+      : "Sign-in failed. Please try again or use Google login.";
+    return NextResponse.redirect(`${origin}/auth/login?error=${encodeURIComponent(msg)}`);
   }
 
-  return NextResponse.redirect(`${origin}/auth/login?error=Could+not+authenticate`);
+  return NextResponse.redirect(`${origin}/auth/login?error=${encodeURIComponent("Invalid sign-in link. Please request a new one.")}`);
 }
