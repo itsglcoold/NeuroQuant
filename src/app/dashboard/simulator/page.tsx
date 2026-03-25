@@ -28,6 +28,9 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
+  Search,
+  Zap,
+  PlayCircle,
 } from "lucide-react";
 
 function formatPnl(pnl: number): string {
@@ -291,6 +294,81 @@ export default function SimulatorPage() {
         </Card>
       </div>
 
+      {/* Empty state — no trades at all */}
+      {openTrades.length === 0 && closedTrades.length === 0 && (
+        <Card className="border border-dashed border-blue-500/20 bg-blue-500/5">
+          <CardContent className="py-8 px-6 space-y-6">
+            <div className="text-center space-y-1">
+              <p className="font-semibold text-base">How to open your first trade</p>
+              <p className="text-sm text-muted-foreground">
+                The simulator uses virtual money ($10,000). Follow these 3 steps:
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                {
+                  icon: Search,
+                  step: "1",
+                  title: "Pick a market",
+                  desc: "Go to any market below — e.g. Gold or EUR/USD.",
+                  color: "text-blue-500",
+                  bg: "bg-blue-500/10",
+                },
+                {
+                  icon: Zap,
+                  step: "2",
+                  title: "Run AI Analysis",
+                  desc: 'Click "Run Analysis" on the market page. The AI gives you a Bullish or Bearish signal.',
+                  color: "text-amber-500",
+                  bg: "bg-amber-500/10",
+                },
+                {
+                  icon: PlayCircle,
+                  step: "3",
+                  title: "Open a trade",
+                  desc: "In the simulator widget, choose direction, auto-fill SL/TP, and click Open Trade.",
+                  color: "text-green-500",
+                  bg: "bg-green-500/10",
+                },
+              ].map(({ icon: Icon, step, title, desc, color, bg }) => (
+                <div key={step} className="flex gap-3">
+                  <div className={`shrink-0 flex h-8 w-8 items-center justify-center rounded-full ${bg}`}>
+                    <Icon className={`h-4 w-4 ${color}`} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Step {step}</p>
+                    <p className="text-sm font-semibold">{title}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="border-t border-border/40 pt-4">
+              <p className="text-xs text-muted-foreground mb-3 text-center">Start with a popular market:</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {[
+                  { label: "Gold", symbol: "XAU/USD" },
+                  { label: "EUR/USD", symbol: "EUR/USD" },
+                  { label: "GBP/USD", symbol: "GBP/USD" },
+                  { label: "Crude Oil", symbol: "CL" },
+                  { label: "S&P 500", symbol: "SPX" },
+                ].map(({ label, symbol }) => (
+                  <Link
+                    key={symbol}
+                    href={`/dashboard/market/${encodeURIComponent(symbol)}`}
+                    className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted hover:border-blue-500/30 hover:text-blue-500 transition-colors"
+                  >
+                    {label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Active Trades */}
       <div>
         <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
@@ -299,13 +377,9 @@ export default function SimulatorPage() {
         </h2>
         {openTrades.length === 0 ? (
           <Card className="border border-dashed border-border">
-            <CardContent className="py-8 text-center">
+            <CardContent className="py-6 text-center">
               <p className="text-sm text-muted-foreground">
-                No active trades. Go to a{" "}
-                <Link href="/dashboard" className="text-blue-500 hover:underline font-medium">
-                  market page
-                </Link>{" "}
-                to run an analysis and open a trade.
+                No active trades. Pick a market above and run an AI analysis to get started.
               </p>
             </CardContent>
           </Card>
