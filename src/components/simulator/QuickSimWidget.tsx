@@ -467,6 +467,7 @@ export function QuickSimWidget({
             </span>
           </label>
           <Input
+            data-tour="sl-tp"
             type="number"
             step="any"
             placeholder={side === "long" ? `< ${formatPrice(currentPrice)}` : `> ${formatPrice(currentPrice)}`}
@@ -642,6 +643,7 @@ export function QuickSimWidget({
 
       {/* Open Trade Button */}
       <Button
+        data-tour="open-trade"
         onClick={handleSubmit}
         disabled={!formValid || submitting}
         className={`w-full font-bold ${

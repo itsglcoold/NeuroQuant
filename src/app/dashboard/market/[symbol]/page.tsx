@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import type { ModelOutput } from "@/types/analysis";
 import { QuickSimWidget } from "@/components/simulator/QuickSimWidget";
+import { TourButton } from "@/components/onboarding/TourButton";
 import { SimulatorOnboarding } from "@/components/simulator/SimulatorOnboarding";
 import { useSimulator } from "@/hooks/useSimulator";
 
@@ -410,7 +411,9 @@ export default function MarketDetailPage() {
         </div>
 
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <TourButton />
         <Button
+          data-tour="run-analysis"
           onClick={() => runAnalysis()}
           disabled={analyzing}
           className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg shadow-blue-500/20 h-11 text-sm font-semibold"
@@ -550,7 +553,7 @@ export default function MarketDetailPage() {
 
             {/* AI Consensus — right 1/3 */}
             {consensus && (
-              <div className="lg:col-span-1">
+              <div className="lg:col-span-1" data-tour="consensus">
                 <div className="rounded-xl border border-border/60 bg-card/80 backdrop-blur-md p-3 space-y-3 shadow-sm lg:sticky lg:top-4">
                   {/* Header */}
                   <div className="flex items-center justify-between">
@@ -748,6 +751,7 @@ export default function MarketDetailPage() {
       {/* Quick Simulator Widget */}
       {consensus && price && (
         <>
+          <div data-tour="simulator">
           <QuickSimWidget
             symbol={symbol}
             currentPrice={price.price}
@@ -770,6 +774,7 @@ export default function MarketDetailPage() {
               }
             }}
           />
+          </div>
           <SimulatorOnboarding />
         </>
       )}
