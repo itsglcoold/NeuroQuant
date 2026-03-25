@@ -90,6 +90,7 @@ export function QuickSimWidget({
   const [switching, setSwitching] = useState(false);
   const [switchedConfirmation, setSwitchedConfirmation] = useState("");
   const [isManualOverride, setIsManualOverride] = useState(false);
+  const [slWasCapped, setSlWasCapped] = useState(false);
 
   const slNum = parseFloat(sl);
   const tpNum = parseFloat(tp);
@@ -213,24 +214,28 @@ export function QuickSimWidget({
   const canAutoFill = tier === "pro" || tier === "premium";
   const handleAutoFill = () => {
     setIsManualOverride(false);
+    setSlWasCapped(false);
     const fallbackBuffer = currentPrice * 0.003;
     const structureBuffer = currentPrice * 0.001;
 
     // Dynamic R:R: trending → 1:3, ranging/unknown → 1:2
     const MIN_RR = regime?.regime === "trending" ? 3.0 : 2.0;
 
-    // ATR-based minimum SL distance (1.5× ATR) to avoid being stopped out by noise
-    const atrSlBuffer = atr > 0 ? atr * 1.5 : 0;
+    // ATR-based SL bounds: floor = 1.5×ATR, ceiling = 3×ATR
+    const atrFloor = atr > 0 ? atr * 1.5 : 0;
+    const atrCeiling = atr > 0 ? atr * 3.0 : 0;
 
     if (side === "long") {
       const validSl = support.filter((s) => s < currentPrice);
       const validTp = resistance.filter((r) => r > currentPrice);
 
-      // SL: max(structure level, 1.5×ATR below entry) — whichever is further away
       const nearestSupport = validSl.length > 0 ? Math.max(...validSl) : currentPrice - fallbackBuffer;
       const structureSl = nearestSupport - structureBuffer;
-      const atrSl = currentPrice - atrSlBuffer;
-      const slPrice = Math.min(structureSl, atrSl); // further from entry = more breathing room
+      // Floor: SL at least 1.5×ATR below entry; ceiling: SL at most 3×ATR below entry
+      const minSl = atrCeiling > 0 ? currentPrice - atrCeiling : structureSl; // ceiling = min price for SL
+      const slUncapped = Math.min(structureSl, currentPrice - atrFloor); // further from entry
+      const slPrice = atrCeiling > 0 ? Math.max(slUncapped, minSl) : slUncapped;
+      if (atrCeiling > 0 && slUncapped < minSl) setSlWasCapped(true);
       setSl(slPrice.toFixed(decimals));
 
       // TP: use resistance that achieves ≥ MIN_RR, else calculate from MIN_RR
@@ -243,11 +248,13 @@ export function QuickSimWidget({
       const validSl = resistance.filter((r) => r > currentPrice);
       const validTp = support.filter((s) => s < currentPrice);
 
-      // SL: max(structure level, 1.5×ATR above entry)
       const nearestResistance = validSl.length > 0 ? Math.min(...validSl) : currentPrice + fallbackBuffer;
       const structureSl = nearestResistance + structureBuffer;
-      const atrSl = currentPrice + atrSlBuffer;
-      const slPrice = Math.max(structureSl, atrSl);
+      // Floor: SL at least 1.5×ATR above entry; ceiling: SL at most 3×ATR above entry
+      const maxSl = atrCeiling > 0 ? currentPrice + atrCeiling : structureSl;
+      const slUncapped = Math.max(structureSl, currentPrice + atrFloor); // further from entry
+      const slPrice = atrCeiling > 0 ? Math.min(slUncapped, maxSl) : slUncapped;
+      if (atrCeiling > 0 && slUncapped > maxSl) setSlWasCapped(true);
       setSl(slPrice.toFixed(decimals));
 
       // TP: use support that achieves ≥ MIN_RR, else calculate from MIN_RR
@@ -446,7 +453,7 @@ export function QuickSimWidget({
       {/* Side Toggle */}
       <div className="grid grid-cols-2 gap-2">
         <button
-          onClick={() => { setSide("long"); setIsManualOverride(false); }}
+          onClick={() => { setSide("long"); setIsManualOverride(false); setSlWasCapped(false); }}
           className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 transition-all ${
             side === "long"
               ? "border-green-500 bg-green-500/10 text-green-600 dark:text-green-400 shadow-sm"
@@ -460,7 +467,7 @@ export function QuickSimWidget({
           <span className="text-[9px] opacity-70 font-medium">Bet on rise</span>
         </button>
         <button
-          onClick={() => { setSide("short"); setIsManualOverride(false); }}
+          onClick={() => { setSide("short"); setIsManualOverride(false); setSlWasCapped(false); }}
           className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 transition-all ${
             side === "short"
               ? "border-red-500 bg-red-500/10 text-red-600 dark:text-red-400 shadow-sm"
@@ -515,7 +522,7 @@ export function QuickSimWidget({
             step="any"
             placeholder={side === "long" ? `< ${formatPrice(currentPrice)}` : `> ${formatPrice(currentPrice)}`}
             value={sl}
-            onChange={(e) => { setSl(e.target.value); setIsManualOverride(true); }}
+            onChange={(e) => { setSl(e.target.value); setIsManualOverride(true); setSlWasCapped(false); }}
             className={`text-sm tabular-nums ${
               sl && !slValid ? "border-red-500 focus-visible:ring-red-500" : ""
             }`}
@@ -648,6 +655,14 @@ export function QuickSimWidget({
           <AlertTriangle className="h-3.5 w-3.5 text-orange-500 mt-0.5 shrink-0" />
           <p className="text-[11px] text-orange-600 dark:text-orange-400">
             <span className="font-semibold">SL very tight</span> — less than {(slTightThreshold * 100).toFixed(1)}% from entry for this timeframe. Normal price fluctuations may trigger it early.
+          </p>
+        </div>
+      )}
+      {slWasCapped && !isManualOverride && (
+        <div className="flex items-start gap-2 rounded-lg bg-blue-500/10 border border-blue-500/30 p-2.5">
+          <AlertTriangle className="h-3.5 w-3.5 text-blue-500 mt-0.5 shrink-0" />
+          <p className="text-[11px] text-blue-600 dark:text-blue-400">
+            <span className="font-semibold">SL adjusted to 3×ATR</span> — the AI support/resistance level was too far from entry. SL was capped to keep risk manageable.
           </p>
         </div>
       )}
