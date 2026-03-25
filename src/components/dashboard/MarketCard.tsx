@@ -1,5 +1,7 @@
+"use client";
+
 import Link from "next/link";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { TrendingUp, TrendingDown, Star } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -22,6 +24,8 @@ interface MarketCardProps {
   change?: number;
   changePercent?: number;
   tradingStyle?: { key: string; label: string; badgeColor: string; timeframeFocus: string };
+  isPinned?: boolean;
+  onTogglePin?: (symbol: string) => void;
 }
 
 export function MarketCard({
@@ -34,6 +38,8 @@ export function MarketCard({
   change,
   changePercent,
   tradingStyle,
+  isPinned,
+  onTogglePin,
 }: MarketCardProps) {
   const isPositive = change !== undefined && change >= 0;
   const hasData = price !== undefined && price > 0;
@@ -42,8 +48,17 @@ export function MarketCard({
 
   return (
     <Link href={`/dashboard/market/${encodeURIComponent(symbol)}${styleParam}`} prefetch={false}>
-      <Card className={cn("group border border-border bg-card transition-all hover:bg-accent", colors ? `border-l-4 ${colors.border}` : "")}>
+      <Card className={cn("group relative border border-border bg-card transition-all hover:bg-accent", colors ? `border-l-4 ${colors.border}` : "", isPinned ? "ring-1 ring-amber-400/30" : "")}>
         <CardContent className="p-4">
+          {onTogglePin && (
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTogglePin(symbol); }}
+              className="absolute top-2 right-2 z-10 p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+              title={isPinned ? "Remove from watchlist" : "Add to watchlist"}
+            >
+              <Star className={cn("h-3.5 w-3.5", isPinned ? "fill-amber-400 text-amber-400" : "text-muted-foreground")} />
+            </button>
+          )}
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
               <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg transition-colors group-hover:bg-secondary", colors ? `${colors.bg}` : "bg-muted")}>

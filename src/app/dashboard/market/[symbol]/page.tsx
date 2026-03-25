@@ -39,6 +39,8 @@ import {
 import type { ModelOutput } from "@/types/analysis";
 import { QuickSimWidget } from "@/components/simulator/QuickSimWidget";
 import { MultiTimeframePanel } from "@/components/market/MultiTimeframePanel";
+import { ConsensusHistory } from "@/components/market/ConsensusHistory";
+import { PriceAlertButton } from "@/components/market/PriceAlertButton";
 import { TourButton } from "@/components/onboarding/TourButton";
 import { SimulatorOnboarding } from "@/components/simulator/SimulatorOnboarding";
 import { useSimulator } from "@/hooks/useSimulator";
@@ -380,6 +382,13 @@ export default function MarketDetailPage() {
           <Button onClick={fetchMarketData} variant="ghost" size="icon" className="h-8 w-8">
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
+          {price && (
+            <PriceAlertButton
+              symbol={symbol}
+              currentPrice={price.price}
+              priceDecimals={decimals}
+            />
+          )}
         </div>
       </div>
 
@@ -751,6 +760,9 @@ export default function MarketDetailPage() {
           </div>
         );
       })()}
+
+      {/* Consensus History */}
+      <ConsensusHistory symbol={symbol} />
 
       {/* Quick Simulator Widget */}
       {consensus && price && (

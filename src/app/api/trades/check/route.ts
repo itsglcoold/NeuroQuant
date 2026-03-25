@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPrices } from "@/lib/market/eodhd";
 import { isMarketOpen } from "@/lib/market/hours";
+import { Resend } from "resend";
 
 export const runtime = "edge";
 
@@ -127,11 +128,93 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // -----------------------------------------------------------------------
+    // 5. Check price alerts
+    // -----------------------------------------------------------------------
+    const { data: activeAlerts } = await supabase
+      .from("price_alerts")
+      .select("id, user_id, symbol, target_price, direction")
+      .eq("is_active", true);
+
+    const triggeredAlerts: string[] = [];
+
+    if (activeAlerts && activeAlerts.length > 0) {
+      // Fetch any extra symbols needed for alerts (some may already be in priceMap)
+      const alertSymbols = [...new Set((activeAlerts as { symbol: string }[]).map((a) => a.symbol))];
+      const missingSymbols = alertSymbols.filter((s) => !priceMap.has(s));
+      if (missingSymbols.length > 0) {
+        const extraPrices = await getPrices(missingSymbols);
+        for (const p of extraPrices) priceMap.set(p.symbol, p.price);
+      }
+
+      const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+      const now = new Date().toISOString();
+
+      for (const alert of activeAlerts as { id: string; user_id: string; symbol: string; target_price: number; direction: string }[]) {
+        const currentPrice = priceMap.get(alert.symbol);
+        if (!currentPrice) continue;
+
+        const triggered =
+          (alert.direction === "above" && currentPrice >= alert.target_price) ||
+          (alert.direction === "below" && currentPrice <= alert.target_price);
+
+        if (!triggered) continue;
+
+        // Mark alert as triggered
+        await supabase
+          .from("price_alerts")
+          .update({ is_active: false, triggered_at: now })
+          .eq("id", alert.id);
+
+        triggeredAlerts.push(`${alert.symbol} ${alert.direction} ${alert.target_price}`);
+
+        // Send email notification
+        if (resend) {
+          try {
+            // Get user email
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("email")
+              .eq("id", alert.user_id)
+              .single();
+
+            if (profile?.email) {
+              await resend.emails.send({
+                from: "NeuroQuant <alerts@neuroquant.app>",
+                to: profile.email as string,
+                subject: `🔔 Price Alert: ${alert.symbol} hit ${alert.target_price}`,
+                html: `
+                  <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+                    <h2 style="color:#1d4ed8">Price Alert Triggered</h2>
+                    <p>Your alert for <strong>${alert.symbol}</strong> has been triggered.</p>
+                    <table style="width:100%;border-collapse:collapse;margin:16px 0">
+                      <tr><td style="padding:8px;color:#666">Market</td><td style="padding:8px;font-weight:bold">${alert.symbol}</td></tr>
+                      <tr style="background:#f9f9f9"><td style="padding:8px;color:#666">Target</td><td style="padding:8px;font-weight:bold">${alert.direction === "above" ? "≥" : "≤"} ${alert.target_price}</td></tr>
+                      <tr><td style="padding:8px;color:#666">Current price</td><td style="padding:8px;font-weight:bold">${currentPrice.toFixed(4)}</td></tr>
+                    </table>
+                    <a href="https://neuroquant.app/dashboard/market/${encodeURIComponent(alert.symbol)}"
+                       style="display:inline-block;background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600">
+                      View on NeuroQuant →
+                    </a>
+                    <p style="color:#999;font-size:12px;margin-top:24px">This is a one-time alert. Set a new alert to be notified again.</p>
+                  </div>
+                `,
+              });
+            }
+          } catch {
+            // Email failure is non-critical
+          }
+        }
+      }
+    }
+
     return NextResponse.json({
       status: "ok",
       checked: openTrades.length,
       closed: closedTrades.length,
       closedTrades,
+      alertsTriggered: triggeredAlerts.length,
+      triggeredAlerts,
     });
   } catch (error) {
     console.error("Trade check error:", error);

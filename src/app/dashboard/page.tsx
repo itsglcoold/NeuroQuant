@@ -5,10 +5,11 @@ import { MarketCard } from "@/components/dashboard/MarketCard";
 import { MarketCategory } from "@/types/market";
 import { useMarketData } from "@/hooks/useMarketData";
 import { SessionTimes } from "@/components/dashboard/SessionTimes";
-import { Activity, RefreshCw } from "lucide-react";
+import { Activity, RefreshCw, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUsageTracking } from "@/hooks/useUsageTracking";
 import { AISuggestions } from "@/components/dashboard/AISuggestions";
+import { useWatchlist } from "@/hooks/useWatchlist";
 import { useMemo, useState, useEffect } from "react";
 
 /** Check if any major forex/commodity market is currently open */
@@ -58,6 +59,7 @@ export default function DashboardPage() {
   const { prices, loading, error, latency, lastUpdated, refetch, wsConnected } = useMarketData(60000);
   const { tier } = useUsageTracking();
   const marketStatus = useMarketStatus();
+  const { watchlist, isPinned, toggle: togglePin } = useWatchlist();
 
   // Only show "Refresh Prices" button when it's useful:
   // - There's a connection error
@@ -151,6 +153,47 @@ export default function DashboardPage() {
       {/* AI Market Suggestions */}
       <AISuggestions tier={tier} />
 
+      {/* Watchlist */}
+      {watchlist.length > 0 && (
+        <section>
+          <div className="mb-4 flex items-center gap-2">
+            <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+            <h2 className="text-lg font-semibold text-foreground">Watchlist</h2>
+            <span className="text-sm text-muted-foreground">{watchlist.length} pinned</span>
+          </div>
+          <div className={cn(
+            "grid gap-4",
+            watchlist.length === 1 ? "grid-cols-1" :
+            watchlist.length === 2 ? "grid-cols-1 sm:grid-cols-2" :
+            watchlist.length === 3 ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" :
+            "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          )}>
+            {watchlist.map((symbol) => {
+              const market = MARKETS.find((m) => m.symbol === symbol);
+              if (!market) return null;
+              const priceData = prices[symbol];
+              const style = getSymbolTradingStyle(symbol);
+              return (
+                <MarketCard
+                  key={symbol}
+                  symbol={symbol}
+                  name={market.name}
+                  icon={market.icon}
+                  emoji={market.emoji}
+                  category={market.category}
+                  price={priceData?.price}
+                  change={priceData?.change}
+                  changePercent={priceData?.changePercent}
+                  tradingStyle={style ?? undefined}
+                  isPinned={true}
+                  onTogglePin={togglePin}
+                />
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {/* Market cards by category */}
       {(
         Object.entries(MARKET_CATEGORIES) as [
@@ -197,6 +240,8 @@ export default function DashboardPage() {
                     category={market.category}
                     price={priceData?.price}
                     change={priceData?.change}
+                    isPinned={isPinned(market.symbol)}
+                    onTogglePin={togglePin}
                     changePercent={priceData?.changePercent}
                     tradingStyle={getSymbolTradingStyle(market.symbol)}
                   />
