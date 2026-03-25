@@ -166,6 +166,7 @@ export default function MarketDetailPage() {
   const [price, setPrice] = useState<MarketPrice | null>(null);
   const [indicators, setIndicators] = useState<TechnicalIndicators | null>(null);
   const [consensus, setConsensus] = useState<ConsensusResult | null>(null);
+  const [timeSeries, setTimeSeries] = useState<Array<{ datetime: string; open: number; high: number; low: number; close: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -259,6 +260,7 @@ export default function MarketDetailPage() {
             } else if (event === "market_data") {
               if (data.price) setPrice(data.price);
               if (data.indicators) setIndicators(data.indicators);
+              if (data.timeSeries) setTimeSeries(data.timeSeries);
             } else if (event === "analyst") {
               setStreamedAnalysts((prev) => {
                 const next = [...prev];
@@ -758,6 +760,8 @@ export default function MarketDetailPage() {
             decimals={decimals}
             prefix={prefix}
             analysisTimeframe={consensus.timeframe}
+            timeSeries={timeSeries}
+            virtualBalance={simulator.stats.virtualBalance}
             onSwitchTimeframe={(newApi) => {
               const iv = INTERVALS.find((i) => i.api === newApi);
               if (iv) {

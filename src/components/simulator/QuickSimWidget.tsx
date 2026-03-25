@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Info,
   Zap,
@@ -13,7 +13,10 @@ import {
   Clock,
   RefreshCw,
   CheckCircle2,
+  ShieldAlert,
 } from "lucide-react";
+import { calculateATR } from "@/lib/atr-calculator";
+import { calculateRiskScore } from "@/lib/risk-score";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,6 +56,8 @@ interface QuickSimWidgetProps {
   decimals: number;
   prefix: string;
   analysisTimeframe?: string;
+  timeSeries?: Array<{ datetime: string; open: number; high: number; low: number; close: number }>;
+  virtualBalance?: number;
   onSwitchTimeframe?: (newInterval: string) => void;
 }
 
@@ -68,6 +73,8 @@ export function QuickSimWidget({
   decimals,
   prefix,
   analysisTimeframe,
+  timeSeries,
+  virtualBalance = 10000,
   onSwitchTimeframe,
 }: QuickSimWidgetProps) {
   const aiSide: "long" | "short" =
@@ -81,6 +88,7 @@ export function QuickSimWidget({
   const [errorMsg, setErrorMsg] = useState("");
   const [switching, setSwitching] = useState(false);
   const [switchedConfirmation, setSwitchedConfirmation] = useState("");
+  const [isManualOverride, setIsManualOverride] = useState(false);
 
   const slNum = parseFloat(sl);
   const tpNum = parseFloat(tp);
@@ -105,6 +113,29 @@ export function QuickSimWidget({
       : null;
   const rrTooLow = rrRatio !== null && rrRatio < 2.0;
 
+  // ATR — calculated once from timeSeries prop (server already fetched this data)
+  const atr = useMemo(
+    () => (timeSeries && timeSeries.length >= 15 ? calculateATR(timeSeries) : 0),
+    [timeSeries]
+  );
+
+  // SL distance in ATR units — how much breathing room the SL has relative to market volatility
+  const slDistanceInATR =
+    slValid && atr > 0 ? Math.abs(currentPrice - slNum) / atr : null;
+
+  // Risk Score (1–10)
+  const riskScore =
+    rrRatio !== null
+      ? calculateRiskScore({
+          rrRatio,
+          agreementLevel: consensus.agreementLevel,
+          slDistanceInATR,
+        })
+      : null;
+
+  // Risk in dollars — 1% of virtual balance
+  const riskDollars = (virtualBalance * 0.01).toFixed(2);
+
   // Low confidence warning: absolute consensus score < 40 (weak directional signal)
   const absScore = Math.abs(consensus.consensusScore);
   const lowConfidence = absScore < 40;
@@ -125,7 +156,12 @@ export function QuickSimWidget({
     ["1min", "5min"].includes(timeframe) ? 0.003 :
     ["15min", "1h"].includes(timeframe) ? 0.005 :
     0.010;
-  const slTooTight = slDistancePct !== null && slDistancePct < slTightThreshold;
+  // Use ATR-based check when available (more accurate than fixed %) — SL < 0.5× ATR is too tight
+  const slTooTight = slValid
+    ? atr > 0
+      ? Math.abs(currentPrice - slNum) < 0.5 * atr
+      : slDistancePct !== null && slDistancePct < slTightThreshold
+    : false;
   const timeframeLabel = TIMEFRAME_LABELS[timeframe] || timeframe;
   const isShortTimeframe = SHORT_TIMEFRAMES.includes(timeframe);
 
@@ -161,6 +197,7 @@ export function QuickSimWidget({
   // If no valid AI level exists, add a small buffer (0.3%) from entry.
   const canAutoFill = tier === "pro" || tier === "premium";
   const handleAutoFill = () => {
+    setIsManualOverride(false);
     const fallbackBuffer = currentPrice * 0.003; // 0.3% fallback when no levels available
     const structureBuffer = currentPrice * 0.001; // 0.1% buffer beyond the structure zone
 
@@ -366,7 +403,7 @@ export function QuickSimWidget({
       {/* Side Toggle */}
       <div className="grid grid-cols-2 gap-2">
         <button
-          onClick={() => setSide("long")}
+          onClick={() => { setSide("long"); setIsManualOverride(false); }}
           className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 transition-all ${
             side === "long"
               ? "border-green-500 bg-green-500/10 text-green-600 dark:text-green-400 shadow-sm"
@@ -380,7 +417,7 @@ export function QuickSimWidget({
           <span className="text-[9px] opacity-70 font-medium">Bet on rise</span>
         </button>
         <button
-          onClick={() => setSide("short")}
+          onClick={() => { setSide("short"); setIsManualOverride(false); }}
           className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 transition-all ${
             side === "short"
               ? "border-red-500 bg-red-500/10 text-red-600 dark:text-red-400 shadow-sm"
@@ -434,7 +471,7 @@ export function QuickSimWidget({
             step="any"
             placeholder={side === "long" ? `< ${formatPrice(currentPrice)}` : `> ${formatPrice(currentPrice)}`}
             value={sl}
-            onChange={(e) => setSl(e.target.value)}
+            onChange={(e) => { setSl(e.target.value); setIsManualOverride(true); }}
             className={`text-sm tabular-nums ${
               sl && !slValid ? "border-red-500 focus-visible:ring-red-500" : ""
             }`}
@@ -474,7 +511,7 @@ export function QuickSimWidget({
             step="any"
             placeholder={side === "long" ? `> ${formatPrice(currentPrice)}` : `< ${formatPrice(currentPrice)}`}
             value={tp}
-            onChange={(e) => setTp(e.target.value)}
+            onChange={(e) => { setTp(e.target.value); setIsManualOverride(true); }}
             className={`text-sm tabular-nums ${
               tp && !tpValid ? "border-red-500 focus-visible:ring-red-500" : ""
             }`}
@@ -514,6 +551,46 @@ export function QuickSimWidget({
           </span>
         </div>
       )}
+      {/* Risk Score */}
+      {riskScore !== null && (
+        <div className={`rounded-lg border p-3 ${
+          riskScore.color === "green" ? "border-green-500/30 bg-green-500/5" :
+          riskScore.color === "blue"  ? "border-blue-500/30 bg-blue-500/5" :
+          riskScore.color === "amber" ? "border-amber-500/30 bg-amber-500/5" :
+          "border-red-500/30 bg-red-500/5"
+        }`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className={`text-xl font-bold tabular-nums ${
+                riskScore.color === "green" ? "text-green-500" :
+                riskScore.color === "blue"  ? "text-blue-500" :
+                riskScore.color === "amber" ? "text-amber-500" :
+                "text-red-500"
+              }`}>
+                {riskScore.score}/10
+              </span>
+              <div>
+                <p className={`text-[11px] font-bold ${
+                  riskScore.color === "green" ? "text-green-600 dark:text-green-400" :
+                  riskScore.color === "blue"  ? "text-blue-600 dark:text-blue-400" :
+                  riskScore.color === "amber" ? "text-amber-600 dark:text-amber-400" :
+                  "text-red-600 dark:text-red-400"
+                }`}>
+                  {riskScore.grade}
+                </p>
+                <p className="text-[10px] text-muted-foreground">{riskScore.explanation}</p>
+              </div>
+            </div>
+            {slValid && (
+              <p className="text-[10px] text-muted-foreground text-right shrink-0">
+                1% risk<br />
+                <span className="font-semibold tabular-nums">${riskDollars}</span>
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       {rrTooLow && (
         <div className="flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/30 p-2.5">
           <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
@@ -535,6 +612,14 @@ export function QuickSimWidget({
           <AlertTriangle className="h-3.5 w-3.5 text-zinc-400 mt-0.5 shrink-0" />
           <p className="text-[11px] text-zinc-400">
             <span className="font-semibold">Low AI confidence ({absScore}%)</span> — the analysts don&apos;t strongly agree on direction. Consider waiting for a clearer signal.
+          </p>
+        </div>
+      )}
+      {isManualOverride && (
+        <div className="flex items-start gap-2 rounded-lg bg-orange-500/10 border border-orange-500/30 p-2.5">
+          <ShieldAlert className="h-3.5 w-3.5 text-orange-500 mt-0.5 shrink-0" />
+          <p className="text-[11px] text-orange-600 dark:text-orange-400">
+            <span className="font-semibold">Manual override.</span> You&apos;ve changed the AI-suggested levels. This trade is your own responsibility.
           </p>
         </div>
       )}

@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
           tradingStyle: tradingStyle as "scalping" | "daytrading" | "swing" | undefined,
         };
 
-        send("market_data", { price, indicators });
+        send("market_data", { price, indicators, timeSeries: marketData.timeSeries });
 
         // Step 2: Run AI analysts — stream each result as it arrives
         const modelOutputs: ModelOutput[] = [];
