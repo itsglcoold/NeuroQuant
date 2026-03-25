@@ -15,7 +15,7 @@ import {
   CheckCircle2,
   ShieldAlert,
 } from "lucide-react";
-import { calculateATR, getATRAnalysis } from "@/lib/atr-calculator";
+import { calculateATR, getATRAnalysis, priceToPips } from "@/lib/atr-calculator";
 import { calculateRiskScore } from "@/lib/risk-score";
 import { detectMarketRegime } from "@/lib/market-regime";
 import { Badge } from "@/components/ui/badge";
@@ -355,6 +355,12 @@ export function QuickSimWidget({
               {regime.label} · 1:{regime.recommendedRR > 0 ? regime.recommendedRR : "?"}
             </Badge>
           )}
+          {/* ATR badge */}
+          {atrAnalysis && atrAnalysis.pips > 0 && (
+            <Badge variant="outline" className="text-[10px] gap-1 font-mono" title="Average True Range — typical daily move in pips">
+              ATR {Math.round(atrAnalysis.pips)}p
+            </Badge>
+          )}
           {/* Timeframe tag */}
           <Badge variant="secondary" className="text-[10px] gap-1">
             <Clock className="h-2.5 w-2.5" />
@@ -532,6 +538,18 @@ export function QuickSimWidget({
               {side === "long" ? "Must be below entry price" : "Must be above entry price"}
             </p>
           )}
+          {/* SL width in pips */}
+          {slValid && atr > 0 && (() => {
+            const slPips = Math.round(priceToPips(symbol, Math.abs(currentPrice - slNum)));
+            const atrPips = Math.round(atrAnalysis!.pips);
+            const ratio = slPips / atrPips;
+            const color = ratio > 3 ? "text-red-500" : ratio > 2 ? "text-amber-500" : "text-green-500";
+            return (
+              <p className={`text-[10px] mt-0.5 font-mono ${color}`}>
+                SL: {slPips}p &nbsp;·&nbsp; ATR: {atrPips}p &nbsp;·&nbsp; {ratio.toFixed(1)}×ATR
+              </p>
+            );
+          })()}
           {/* Free-tier helper: show suggested SL value */}
           {!canAutoFill && suggestedSl !== null && !sl && (
             <p className="text-[10px] text-red-500/80 mt-1 flex items-center gap-1">
