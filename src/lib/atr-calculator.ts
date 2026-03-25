@@ -86,23 +86,40 @@ const ATR_DEFAULTS: Record<string, number> = {
  * ratio > 1.5 → spike/choppy, avoid trading.
  */
 export function getATRAnalysis(bars: OHLCBar[], symbol: string): ATRAnalysis {
+  const fallbackValue = ATR_DEFAULTS[symbol] ?? 0.0050;
+
   if (!bars || bars.length < 35) {
-    const value = ATR_DEFAULTS[symbol] ?? 0.0050;
     return {
-      value,
+      value: fallbackValue,
       ratio: 1.0,
       isVolatile: false,
-      pips: priceToPips(symbol, value),
+      pips: priceToPips(symbol, fallbackValue),
     };
   }
 
-  const atr14 = calculateATR(bars, 14);
+  // Filter out outlier bars — candles with H-L > 5% of their close price are corrupt/gap bars
+  // that skew ATR wildly (e.g. weekend gaps, bad EODHD data points)
+  const cleanBars = bars.filter((b) => b.close > 0 && (b.high - b.low) / b.close < 0.05);
+  const workingBars = cleanBars.length >= 35 ? cleanBars : bars;
+
+  const atr14 = calculateATR(workingBars, 14);
+
+  // Sanity check: ATR > 3% of current price means the data is corrupt — fall back to defaults
+  const lastClose = workingBars[workingBars.length - 1]?.close ?? 0;
+  if (lastClose > 0 && atr14 > lastClose * 0.03) {
+    return {
+      value: fallbackValue,
+      ratio: 1.0,
+      isVolatile: false,
+      pips: priceToPips(symbol, fallbackValue),
+    };
+  }
 
   // Rolling average of ATR(14) over last 20 data-points
   const history: number[] = [];
-  const window = Math.min(bars.length, 34); // at least 14+1 bars needed per slice
-  for (let end = bars.length - window; end <= bars.length; end++) {
-    const slice = bars.slice(Math.max(0, end - 34), end);
+  const window = Math.min(workingBars.length, 34); // at least 14+1 bars needed per slice
+  for (let end = workingBars.length - window; end <= workingBars.length; end++) {
+    const slice = workingBars.slice(Math.max(0, end - 34), end);
     if (slice.length >= 15) history.push(calculateATR(slice, 14));
   }
   const avg20 =
