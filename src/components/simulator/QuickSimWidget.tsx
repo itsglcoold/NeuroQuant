@@ -15,8 +15,9 @@ import {
   CheckCircle2,
   ShieldAlert,
 } from "lucide-react";
-import { calculateATR } from "@/lib/atr-calculator";
+import { calculateATR, getATRAnalysis } from "@/lib/atr-calculator";
 import { calculateRiskScore } from "@/lib/risk-score";
+import { detectMarketRegime } from "@/lib/market-regime";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -111,13 +112,27 @@ export function QuickSimWidget({
         ? (tpNum - currentPrice) / (currentPrice - slNum)
         : (currentPrice - tpNum) / (slNum - currentPrice)
       : null;
-  const rrTooLow = rrRatio !== null && rrRatio < 2.0;
-
-  // ATR — calculated once from timeSeries prop (server already fetched this data)
-  const atr = useMemo(
-    () => (timeSeries && timeSeries.length >= 15 ? calculateATR(timeSeries) : 0),
-    [timeSeries]
+  // ATR + volatility analysis
+  const atrAnalysis = useMemo(
+    () =>
+      timeSeries && timeSeries.length >= 15
+        ? getATRAnalysis(timeSeries, symbol)
+        : null,
+    [timeSeries, symbol]
   );
+  const atr = atrAnalysis?.value ?? 0;
+
+  // Market regime (ADX-based)
+  const regime = useMemo(
+    () =>
+      timeSeries && timeSeries.length >= 30
+        ? detectMarketRegime(timeSeries, symbol)
+        : null,
+    [timeSeries, symbol]
+  );
+
+  const rrMinForRegime = regime?.regime === "trending" ? 3.0 : 2.0;
+  const rrTooLow = rrRatio !== null && rrRatio < rrMinForRegime;
 
   // SL distance in ATR units — how much breathing room the SL has relative to market volatility
   const slDistanceInATR =
@@ -198,46 +213,48 @@ export function QuickSimWidget({
   const canAutoFill = tier === "pro" || tier === "premium";
   const handleAutoFill = () => {
     setIsManualOverride(false);
-    const fallbackBuffer = currentPrice * 0.003; // 0.3% fallback when no levels available
-    const structureBuffer = currentPrice * 0.001; // 0.1% buffer beyond the structure zone
+    const fallbackBuffer = currentPrice * 0.003;
+    const structureBuffer = currentPrice * 0.001;
 
-    const MIN_RR = 2.0; // Minimum reward:risk required
+    // Dynamic R:R: trending → 1:3, ranging/unknown → 1:2
+    const MIN_RR = regime?.regime === "trending" ? 3.0 : 2.0;
+
+    // ATR-based minimum SL distance (1.5× ATR) to avoid being stopped out by noise
+    const atrSlBuffer = atr > 0 ? atr * 1.5 : 0;
 
     if (side === "long") {
       const validSl = support.filter((s) => s < currentPrice);
       const validTp = resistance.filter((r) => r > currentPrice);
 
-      // SL: just below the NEAREST (most recently tested) support level
+      // SL: max(structure level, 1.5×ATR below entry) — whichever is further away
       const nearestSupport = validSl.length > 0 ? Math.max(...validSl) : currentPrice - fallbackBuffer;
-      const slPrice = nearestSupport - structureBuffer;
+      const structureSl = nearestSupport - structureBuffer;
+      const atrSl = currentPrice - atrSlBuffer;
+      const slPrice = Math.min(structureSl, atrSl); // further from entry = more breathing room
       setSl(slPrice.toFixed(decimals));
 
-      // TP: use the farthest resistance that achieves ≥ 2:1 R:R
-      // If no resistance is far enough, calculate TP from the minimum 2:1 requirement
+      // TP: use resistance that achieves ≥ MIN_RR, else calculate from MIN_RR
       const slDistance = currentPrice - slPrice;
       const minTp = currentPrice + MIN_RR * slDistance;
       const qualifyingTp = validTp.filter((r) => r >= minTp);
-      const tpPrice = qualifyingTp.length > 0
-        ? Math.max(...qualifyingTp)
-        : minTp; // guarantee minimum 2:1 R:R even if no resistance level is far enough
+      const tpPrice = qualifyingTp.length > 0 ? Math.max(...qualifyingTp) : minTp;
       setTp(tpPrice.toFixed(decimals));
     } else {
       const validSl = resistance.filter((r) => r > currentPrice);
       const validTp = support.filter((s) => s < currentPrice);
 
-      // SL: just above the NEAREST (most recently tested) resistance level
+      // SL: max(structure level, 1.5×ATR above entry)
       const nearestResistance = validSl.length > 0 ? Math.min(...validSl) : currentPrice + fallbackBuffer;
-      const slPrice = nearestResistance + structureBuffer;
+      const structureSl = nearestResistance + structureBuffer;
+      const atrSl = currentPrice + atrSlBuffer;
+      const slPrice = Math.max(structureSl, atrSl);
       setSl(slPrice.toFixed(decimals));
 
-      // TP: use the lowest support that achieves ≥ 2:1 R:R
-      // If no support is far enough, calculate TP from the minimum 2:1 requirement
+      // TP: use support that achieves ≥ MIN_RR, else calculate from MIN_RR
       const slDistance = slPrice - currentPrice;
       const minTp = currentPrice - MIN_RR * slDistance;
       const qualifyingTp = validTp.filter((s) => s <= minTp);
-      const tpPrice = qualifyingTp.length > 0
-        ? Math.min(...qualifyingTp)
-        : minTp; // guarantee minimum 2:1 R:R even if no support level is far enough
+      const tpPrice = qualifyingTp.length > 0 ? Math.min(...qualifyingTp) : minTp;
       setTp(tpPrice.toFixed(decimals));
     }
   };
@@ -315,7 +332,22 @@ export function QuickSimWidget({
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Market Regime badge */}
+          {regime && (
+            <Badge
+              className={`text-[10px] gap-1 border ${
+                regime.color === "green"
+                  ? "bg-green-500/10 border-green-500/30 text-green-600 dark:text-green-400"
+                  : regime.color === "red"
+                  ? "bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400"
+                  : "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400"
+              }`}
+              title={regime.tip}
+            >
+              {regime.label} · 1:{regime.recommendedRR > 0 ? regime.recommendedRR : "?"}
+            </Badge>
+          )}
           {/* Timeframe tag */}
           <Badge variant="secondary" className="text-[10px] gap-1">
             <Clock className="h-2.5 w-2.5" />
@@ -326,6 +358,17 @@ export function QuickSimWidget({
           </Badge>
         </div>
       </div>
+
+      {/* Volatility spike warning */}
+      {atrAnalysis?.isVolatile && (
+        <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-3 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+          <p className="text-[11px] text-red-600 dark:text-red-400">
+            <span className="font-bold">Volatility spike detected</span> — ATR is {atrAnalysis.ratio.toFixed(1)}× above average.
+            Market conditions are unstable. Consider waiting for calmer conditions before entering.
+          </p>
+        </div>
+      )}
 
       {/* Timeframe Awareness Warning — short timeframes */}
       {isShortTimeframe && (
@@ -596,7 +639,7 @@ export function QuickSimWidget({
         <div className="flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/30 p-2.5">
           <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
           <p className="text-[11px] text-amber-600 dark:text-amber-400">
-            <span className="font-semibold">R:R below 1:2</span> — your TP is less than 2× your SL distance. Move TP further or SL closer to entry.
+            <span className="font-semibold">R:R below 1:{rrMinForRegime}</span> — {regime?.regime === "trending" ? "trending market, target 1:3 to let winners run." : "your TP is less than 2× your SL distance."} Move TP further or SL closer to entry.
           </p>
         </div>
       )}

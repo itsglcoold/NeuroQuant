@@ -27,6 +27,7 @@ import {
   ArrowDownRight,
 } from "lucide-react";
 import type { PaperTrade } from "@/types/simulator";
+import { calcProfitFactor, calcExpectancy, calcMaxDrawdown } from "@/lib/risk-metrics";
 
 function calcAchievedRR(trade: PaperTrade): number | null {
   if (trade.close_price == null || trade.result_pnl == null) return null;
@@ -139,6 +140,12 @@ export default function AnalyticsPage() {
         return !isAligned && (t.result_pnl ?? 0) > 0;
       }).length;
 
+    // Professional risk metrics
+    const tradeMetrics = closedTrades.map((t) => ({ pnlPercent: t.result_pnl ?? 0 }));
+    const profitFactor = calcProfitFactor(tradeMetrics);
+    const expectancy = calcExpectancy(tradeMetrics);
+    const maxDrawdown = calcMaxDrawdown(tradeMetrics);
+
     return {
       total,
       wins,
@@ -151,6 +158,9 @@ export default function AnalyticsPage() {
       streakType,
       pnlCurve,
       bySymbol,
+      profitFactor,
+      expectancy,
+      maxDrawdown,
       longs: {
         total: longs.length,
         wins: longWins,
@@ -292,6 +302,63 @@ export default function AnalyticsPage() {
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
               {stats.bestTrade.symbol}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Professional metrics row */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        {/* Expectancy */}
+        <Card className="border border-border/60">
+          <CardContent className="py-3 px-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Brain className="h-4 w-4 text-blue-500" />
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Expectancy
+              </span>
+            </div>
+            <p className={`text-2xl font-bold tabular-nums ${stats.expectancy.value >= 0 ? "text-green-500" : "text-red-500"}`}>
+              {stats.expectancy.value >= 0 ? "+" : ""}{stats.expectancy.value.toFixed(2)}%
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              avg per trade · breakeven at {stats.expectancy.breakevenWinRate}% wins
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Profit Factor */}
+        <Card className="border border-border/60">
+          <CardContent className="py-3 px-4">
+            <div className="flex items-center gap-2 mb-1">
+              <BarChart2 className="h-4 w-4 text-purple-500" />
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Profit Factor
+              </span>
+            </div>
+            <p className={`text-2xl font-bold tabular-nums ${stats.profitFactor >= 1.5 ? "text-green-500" : stats.profitFactor >= 1 ? "text-amber-500" : "text-red-500"}`}>
+              {stats.profitFactor >= 99 ? "∞" : stats.profitFactor.toFixed(2)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {stats.profitFactor >= 1.5 ? "Strong edge" : stats.profitFactor >= 1.3 ? "Good edge" : stats.profitFactor >= 1 ? "Breakeven zone" : "No edge yet"}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Max Drawdown */}
+        <Card className="border border-border/60">
+          <CardContent className="py-3 px-4">
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingDown className="h-4 w-4 text-red-500" />
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Max Drawdown
+              </span>
+            </div>
+            <p className={`text-2xl font-bold tabular-nums ${stats.maxDrawdown <= 10 ? "text-green-500" : stats.maxDrawdown <= 20 ? "text-amber-500" : "text-red-500"}`}>
+              -{stats.maxDrawdown.toFixed(2)}%
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {stats.maxDrawdown <= 10 ? "Excellent risk control" : stats.maxDrawdown <= 20 ? "Acceptable (&lt;20%)" : "High — review position sizing"}
             </p>
           </CardContent>
         </Card>
