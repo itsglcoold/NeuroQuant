@@ -358,7 +358,7 @@ export function QuickSimWidget({
           {/* ATR badge */}
           {atrAnalysis && atrAnalysis.pips > 0 && (
             <Badge variant="outline" className="text-[10px] gap-1 font-mono" title="Average True Range — typical daily move in pips">
-              ATR {Math.round(atrAnalysis.pips)}p
+              ATR {Math.round(atrAnalysis.pips)}{atrAnalysis.pipLabel}
             </Badge>
           )}
           {/* Timeframe tag */}
@@ -538,15 +538,16 @@ export function QuickSimWidget({
               {side === "long" ? "Must be below entry price" : "Must be above entry price"}
             </p>
           )}
-          {/* SL width in pips */}
+          {/* SL width in pips/pts */}
           {slValid && atr > 0 && (() => {
+            const unit = atrAnalysis!.pipLabel;
             const slPips = Math.round(priceToPips(symbol, Math.abs(currentPrice - slNum)));
             const atrPips = Math.round(atrAnalysis!.pips);
             const ratio = slPips / atrPips;
             const color = ratio > 3 ? "text-red-500" : ratio > 2 ? "text-amber-500" : "text-green-500";
             return (
               <p className={`text-[10px] mt-0.5 font-mono ${color}`}>
-                SL: {slPips}p &nbsp;·&nbsp; ATR: {atrPips}p &nbsp;·&nbsp; {ratio.toFixed(1)}×ATR
+                SL: {slPips}{unit} &nbsp;·&nbsp; ATR: {atrPips}{unit} &nbsp;·&nbsp; {ratio.toFixed(1)}×ATR
               </p>
             );
           })()}

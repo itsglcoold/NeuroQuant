@@ -11,12 +11,14 @@ export interface ATRAnalysis {
   /** ATR(14) / ATR(20-bar rolling avg) — >1.5 = volatility spike */
   ratio: number;
   isVolatile: boolean;
-  /** ATR expressed in pips for display */
+  /** ATR expressed in display units (pips for forex, points for indices/metals/energy) */
   pips: number;
+  /** Unit label: "p" for forex pips, "pts" for indices/metals/energy */
+  pipLabel: string;
 }
 
 // ---------------------------------------------------------------------------
-// Pip utilities
+// Pip / point utilities
 // ---------------------------------------------------------------------------
 
 const JPY_PAIRS = [
@@ -24,8 +26,18 @@ const JPY_PAIRS = [
   "NZD/JPY", "CAD/JPY", "CHF/JPY",
 ];
 
+// Indices, metals, energy — use raw price units (1 point = $1 or 1 unit)
+// "pips" don't apply; display as "pts" instead
+const POINTS_ASSETS = ["IXIC", "SPX", "DXY", "XAU/USD", "XAG/USD", "CL"];
+
 export function getPipSize(symbol: string): number {
-  return JPY_PAIRS.includes(symbol) ? 0.01 : 0.0001;
+  if (POINTS_ASSETS.includes(symbol)) return 1.0;  // 1 point = 1 price unit
+  if (JPY_PAIRS.includes(symbol)) return 0.01;
+  return 0.0001; // Standard forex
+}
+
+export function getPipLabel(symbol: string): string {
+  return POINTS_ASSETS.includes(symbol) ? "pts" : "p";
 }
 
 export function priceToPips(symbol: string, priceDiff: number): number {
@@ -78,6 +90,8 @@ const ATR_DEFAULTS: Record<string, number> = {
   "USD/CAD": 0.0050, "EUR/JPY": 0.60,  "GBP/JPY": 0.70,
   "AUD/JPY": 0.45,   "XAU/USD": 15.0,  "XAG/USD": 0.30,
   "CL":      0.80,   "DXY":     0.20,
+  // Indices — ATR in price points (1 point = $1)
+  "IXIC":    25.0,   "SPX":     20.0,
 };
 
 /**
@@ -88,12 +102,15 @@ const ATR_DEFAULTS: Record<string, number> = {
 export function getATRAnalysis(bars: OHLCBar[], symbol: string): ATRAnalysis {
   const fallbackValue = ATR_DEFAULTS[symbol] ?? 0.0050;
 
+  const label = getPipLabel(symbol);
+
   if (!bars || bars.length < 35) {
     return {
       value: fallbackValue,
       ratio: 1.0,
       isVolatile: false,
       pips: priceToPips(symbol, fallbackValue),
+      pipLabel: label,
     };
   }
 
@@ -112,6 +129,7 @@ export function getATRAnalysis(bars: OHLCBar[], symbol: string): ATRAnalysis {
       ratio: 1.0,
       isVolatile: false,
       pips: priceToPips(symbol, fallbackValue),
+      pipLabel: label,
     };
   }
 
@@ -135,5 +153,6 @@ export function getATRAnalysis(bars: OHLCBar[], symbol: string): ATRAnalysis {
     ratio,
     isVolatile: ratio > 1.5,
     pips: priceToPips(symbol, atr14),
+    pipLabel: label,
   };
 }
