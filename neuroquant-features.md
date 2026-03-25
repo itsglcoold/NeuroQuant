@@ -405,23 +405,63 @@ Research-backed improvements to simulator quality, based on institutional tradin
 
 ---
 
-## 20. Pages (updated)
+## 20. MT5 Live Trading (Premium, March 2026)
+
+Connect a real MetaTrader 5 account to NeuroQuant. View live trades and close them with one click — directly from the app.
+
+### Architecture
+- **No passwords stored** — webhook-only approach
+- User generates a unique webhook URL + secret in the app
+- User installs the NeuroQuant EA (Expert Advisor) in MT5
+- EA pushes trade events to the webhook; NeuroQuant stores them in Supabase
+- User clicks "Close" → command queued → EA polls every 10s and executes in MT5
+
+### Pages & API
+| Route | Purpose |
+|---|---|
+| `/dashboard/live-trading` | Main page: risk disclaimer → setup → live trades |
+| `POST /api/mt5` | Generate webhook credentials |
+| `POST /api/mt5/webhook/[token]` | EA pushes trade events (heartbeat, open, update, close, account_info) |
+| `GET /api/mt5/webhook/[token]` | EA polls for pending commands |
+| `POST /api/mt5/command` | Queue close_trade command |
+
+### DB Tables (migration 006)
+- `mt5_connections` — one row per user: token, secret, account_info, last_heartbeat
+- `mt5_trades` — live trades from EA (open + closed)
+- `mt5_commands` — command queue: pending → sent → confirmed
+
+### Security
+- HMAC-SHA256 signature verification on all EA webhook POSTs
+- Commands only accepted for verified connections
+- RLS on all tables — users see only their own data
+- Risk disclaimer modal (localStorage) before accessing the page
+
+### EA (TODO)
+- Full MQL5 Expert Advisor code still needs to be written
+- EA responsibilities: send trade events, poll commands, execute close in MT5, send heartbeat every 60s
+- Configuration inputs: WebhookURL, WebhookSecret, PollSeconds
+
+---
+
+## 21. Pages (complete)
 
 | Page | Access | Description |
 |---|---|---|
 | `/dashboard/analytics` | All tiers | Performance dashboard with equity curve, risk metrics |
 | `/dashboard/watchlist` | All tiers | Personal watchlist with live prices |
 | `/dashboard/chat` | All tiers | AI chat with persistent history |
+| `/dashboard/live-trading` | Premium | MT5 live trading — view & close real trades |
 
 ---
 
-## 21. Pending / Roadmap
+## 22. Pending / Roadmap
 
 | Feature | Priority | Notes |
 |---|---|---|
 | Stripe payments integration | 🔴 Critical | Users can't upgrade — checkout/portal/webhooks needed |
 | RESEND_API_KEY in Cloudflare Pages | 🔴 Critical | Price alerts email delivery won't work without it |
-| Time-of-day session filter | 🟡 Medium | Warn if trading outside London/NY sessions |
+| MT5 EA (MQL5 Expert Advisor) | 🟡 High | Full EA code to write — webhook push + command polling + close execution |
+| Time-of-day session filter | 🟡 Medium | Warn if trading outside London/NY sessions in QuickSimWidget |
 | Push notifications | 🟡 Medium | Browser push for price alerts |
 | Backtesting | 🟢 Low | Replay historical data through strategies |
 | Historical reports (Premium) | 🟢 Low | Planned feature in tier table |
