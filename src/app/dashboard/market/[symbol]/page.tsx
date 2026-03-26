@@ -45,6 +45,7 @@ import { TourButton } from "@/components/onboarding/TourButton";
 import { SimulatorOnboarding } from "@/components/simulator/SimulatorOnboarding";
 import { useSimulator } from "@/hooks/useSimulator";
 import { useMarketData } from "@/hooks/useMarketData";
+import { TradeTile } from "@/components/simulator/TradeTile";
 
 export const runtime = 'edge';
 
@@ -677,98 +678,30 @@ export default function MarketDetailPage() {
       {(() => {
         const activeTrades = simulator.openTrades.filter((t) => t.symbol === symbol);
         if (activeTrades.length === 0) return null;
-        const currentPrice = (price ? (wsPrices[symbol]?.price ?? price.price) : null);
+        const currentPrice = price ? (wsPrices[symbol]?.price ?? price.price) : null;
         if (!currentPrice) return null;
-
-        function toggleExpanded(id: string) {
-          setExpandedTradeIds((prev) => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id); else next.add(id);
-            return next;
-          });
-        }
-
         return (
           <div className="space-y-2">
             <h3 className="text-sm font-semibold flex items-center gap-2">
               <Activity className="h-4 w-4 text-green-500" />
               Active Trades — {symbol}
             </h3>
-            {activeTrades.map((trade) => {
-              const pnlPct = trade.side === "long"
-                ? ((currentPrice - trade.entry_price) / trade.entry_price) * 100
-                : ((trade.entry_price - currentPrice) / trade.entry_price) * 100;
-              const pnlDollar = (simulator.stats.virtualBalance * pnlPct) / 100;
-              const isProfit = pnlPct >= 0;
-              const isExpanded = expandedTradeIds.has(trade.id);
-              const distToSl = trade.side === "long"
-                ? ((currentPrice - trade.sl_price) / trade.sl_price) * 100
-                : ((trade.sl_price - currentPrice) / trade.sl_price) * 100;
-              const distToTp = trade.side === "long"
-                ? ((trade.tp_price - currentPrice) / currentPrice) * 100
-                : ((currentPrice - trade.tp_price) / currentPrice) * 100;
-              return (
-                <div key={trade.id} className={`rounded-xl border overflow-hidden transition-colors ${isProfit ? "border-green-500/30" : "border-red-500/30"}`}>
-                  {/* Collapsed header — always visible */}
-                  <button
-                    className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors hover:bg-muted/30 ${isProfit ? "bg-green-500/5" : "bg-red-500/5"}`}
-                    onClick={() => toggleExpanded(trade.id)}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      {trade.side === "long"
-                        ? <TrendingUp className="h-4 w-4 text-green-500 shrink-0" />
-                        : <TrendingDown className="h-4 w-4 text-red-500 shrink-0" />}
-                      <span className="text-sm font-semibold">{trade.side === "long" ? "BUY" : "SELL"}</span>
-                      <span className="text-xs text-muted-foreground tabular-nums">@ {prefix}{formatPrice(trade.entry_price, decimals)}</span>
-                      <Badge variant="outline" className={`text-[10px] tabular-nums ${isProfit ? "border-green-500/40 text-green-600 dark:text-green-400" : "border-red-500/40 text-red-600 dark:text-red-400"}`}>
-                        {isProfit ? "+" : ""}{pnlPct.toFixed(2)}% ({isProfit ? "+" : ""}${pnlDollar.toFixed(2)})
-                      </Badge>
-                    </div>
-                    {isExpanded
-                      ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
-                      : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />}
-                  </button>
-
-                  {/* Expanded details */}
-                  {isExpanded && (
-                    <div className={`px-4 pb-4 pt-3 border-t ${isProfit ? "border-green-500/20 bg-green-500/5" : "border-red-500/20 bg-red-500/5"}`}>
-                      <div className="grid grid-cols-3 gap-2 text-[11px] mb-3">
-                        <div className="rounded-lg bg-background/60 border border-border p-2">
-                          <p className="text-muted-foreground font-medium">Entry</p>
-                          <p className="font-bold tabular-nums mt-0.5">{prefix}{formatPrice(trade.entry_price, decimals)}</p>
-                        </div>
-                        <div className="rounded-lg bg-red-500/5 border border-red-500/20 p-2">
-                          <p className="text-red-500/70 font-medium">Stop-Loss</p>
-                          <p className="font-bold tabular-nums text-red-600 dark:text-red-400 mt-0.5">{prefix}{formatPrice(trade.sl_price, decimals)}</p>
-                          <p className="text-[9px] text-muted-foreground mt-0.5">{distToSl > 0 ? `${distToSl.toFixed(2)}% away` : "⚠ breached"}</p>
-                        </div>
-                        <div className="rounded-lg bg-green-500/5 border border-green-500/20 p-2">
-                          <p className="text-green-500/70 font-medium">Take-Profit</p>
-                          <p className="font-bold tabular-nums text-green-600 dark:text-green-400 mt-0.5">{prefix}{formatPrice(trade.tp_price, decimals)}</p>
-                          <p className="text-[9px] text-muted-foreground mt-0.5">{distToTp > 0 ? `${distToTp.toFixed(2)}% away` : "🎯 reached"}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={async () => { await simulator.closeTrade(trade.id, currentPrice); }}
-                          className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-[11px] font-medium text-muted-foreground hover:border-red-500/50 hover:text-red-500 transition-colors"
-                        >
-                          <X className="h-3 w-3" />
-                          Close trade
-                        </button>
-                        <button
-                          onClick={async () => { if (confirm("Delete this trade?")) await simulator.deleteTrade(trade.id); }}
-                          className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-[11px] font-medium text-red-500/70 hover:text-red-500 hover:border-red-500/50 transition-colors"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {activeTrades.map((trade) => (
+              <TradeTile
+                key={trade.id}
+                trade={trade}
+                currentPrice={currentPrice}
+                virtualBalance={simulator.stats.virtualBalance}
+                isExpanded={expandedTradeIds.has(trade.id)}
+                onToggle={() => setExpandedTradeIds((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(trade.id)) next.delete(trade.id); else next.add(trade.id);
+                  return next;
+                })}
+                onClose={async (id, price) => { await simulator.closeTrade(id, price); }}
+                onDelete={async (id) => { await simulator.deleteTrade(id); }}
+              />
+            ))}
           </div>
         );
       })()}

@@ -24,6 +24,12 @@ export interface AnalysisSnapshot {
     support: number[];
     resistance: number[];
   };
+  // Metadata saved at trade open time (optional — not present on older trades)
+  atrPips?: number;
+  atrLabel?: string;     // "p" | "pts"
+  regime?: string;       // "trending" | "ranging" | "choppy"
+  riskScore?: number;    // 1–10
+  rrRatio?: number;      // e.g. 2.0
 }
 
 export interface SimulatorStats {

@@ -288,11 +288,20 @@ export function QuickSimWidget({
     setErrorMsg("");
     setSuccessMsg("");
 
+    const rrRatio = slNum > 0
+      ? Math.abs(tpNum - currentPrice) / Math.abs(slNum - currentPrice)
+      : undefined;
+
     const snapshot: AnalysisSnapshot = {
       consensusDirection: consensus.consensusDirection,
       consensusScore: consensus.consensusScore,
       sentimentLabel: consensus.sentimentLabel,
       mergedKeyLevels: consensus.mergedKeyLevels,
+      atrPips: atrAnalysis ? Math.round(atrAnalysis.pips) : undefined,
+      atrLabel: atrAnalysis?.pipLabel,
+      regime: regime?.regime,
+      riskScore: riskScore?.score ?? undefined,
+      rrRatio: rrRatio ? Math.round(rrRatio * 10) / 10 : undefined,
     };
 
     const result = await onOpenTrade({

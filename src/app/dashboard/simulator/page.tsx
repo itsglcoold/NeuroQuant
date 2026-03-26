@@ -11,6 +11,7 @@ import { useTradeWatcher } from "@/hooks/useTradeWatcher";
 import { useMarketData } from "@/hooks/useMarketData";
 import { INITIAL_VIRTUAL_BALANCE } from "@/types/simulator";
 import type { PaperTrade } from "@/types/simulator";
+import { TradeTile } from "@/components/simulator/TradeTile";
 import {
   TrendingUp,
   TrendingDown,
@@ -75,6 +76,8 @@ export default function SimulatorPage() {
   const [closedNotifications, setClosedNotifications] = useState<
     { symbol: string; pnl: number }[]
   >([]);
+
+  const [expandedTradeIds, setExpandedTradeIds] = useState<Set<string>>(new Set());
 
   // Trade journal: tradeId → { review, loading, open }
   const [journalState, setJournalState] = useState<
@@ -384,128 +387,24 @@ export default function SimulatorPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {openTrades.map((trade) => {
-              const livePrice = wsPrices[trade.symbol]?.price || null;
-              const livePnl = livePrice
-                ? calcLivePnl(trade, livePrice)
-                : null;
-
-              return (
-                <Card key={trade.id} className="border border-border/60">
-                  <CardContent className="py-3 px-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Link
-                          href={`/dashboard/market/${encodeURIComponent(trade.symbol)}`}
-                          className="font-bold text-sm hover:text-blue-500 hover:underline transition-colors"
-                        >
-                          {trade.symbol}
-                        </Link>
-                        <Badge
-                          className={
-                            trade.side === "long"
-                              ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20"
-                              : "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
-                          }
-                        >
-                          {trade.side === "long" ? (
-                            <TrendingUp className="h-3 w-3 mr-1" />
-                          ) : (
-                            <TrendingDown className="h-3 w-3 mr-1" />
-                          )}
-                          {trade.side === "long" ? "BULLISH" : "BEARISH"}
-                        </Badge>
-                      </div>
-                      {livePnl !== null && (
-                        <span
-                          className={`text-sm font-bold tabular-nums ${
-                            livePnl >= 0 ? "text-green-500" : "text-red-500"
-                          }`}
-                        >
-                          {formatPnl(livePnl)}{" "}
-                          <span className="opacity-70">({formatDollarPnl(livePnl)})</span>
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 text-xs">
-                      <div>
-                        <span className="text-muted-foreground block">Entry</span>
-                        <span className="font-medium tabular-nums">
-                          {getPriceDisplay(trade.entry_price)}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-red-500 block">SL</span>
-                        <span className="font-medium tabular-nums">
-                          {getPriceDisplay(trade.sl_price)}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-green-500 block">TP</span>
-                        <span className="font-medium tabular-nums">
-                          {getPriceDisplay(trade.tp_price)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* AI Snapshot */}
-                    {trade.analysis_snapshot && (
-                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                        <span>AI:</span>
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] ${
-                            trade.analysis_snapshot.consensusDirection === "bullish"
-                              ? "text-green-500 border-green-500/30"
-                              : trade.analysis_snapshot.consensusDirection === "bearish"
-                              ? "text-red-500 border-red-500/30"
-                              : "text-amber-500 border-amber-500/30"
-                          }`}
-                        >
-                          {trade.analysis_snapshot.sentimentLabel}
-                        </Badge>
-                      </div>
-                    )}
-
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 text-xs h-7"
-                        onClick={async () => {
-                          if (livePrice) {
-                            await closeTrade(trade.id, livePrice);
-                            refetch();
-                          }
-                        }}
-                        disabled={!livePrice}
-                      >
-                        Close Trade
-                      </Button>
-                      <Link href={`/dashboard/market/${encodeURIComponent(trade.symbol)}`}>
-                        <Button variant="ghost" size="sm" className="text-xs h-7">
-                          <ExternalLink className="h-3 w-3" />
-                        </Button>
-                      </Link>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs h-7 text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                        onClick={async () => {
-                          if (confirm("Delete this trade?")) {
-                            await deleteTrade(trade.id);
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+          <div className="space-y-2">
+            {openTrades.map((trade) => (
+              <TradeTile
+                key={trade.id}
+                trade={trade}
+                currentPrice={wsPrices[trade.symbol]?.price ?? null}
+                virtualBalance={stats.virtualBalance}
+                isExpanded={expandedTradeIds.has(trade.id)}
+                onToggle={() => setExpandedTradeIds((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(trade.id)) next.delete(trade.id); else next.add(trade.id);
+                  return next;
+                })}
+                onClose={async (id, price) => { await closeTrade(id, price); refetch(); }}
+                onDelete={async (id) => { await deleteTrade(id); }}
+                showSymbolLink
+              />
+            ))}
           </div>
         )}
       </div>
