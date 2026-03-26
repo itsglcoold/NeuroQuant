@@ -167,11 +167,7 @@ export function TradeTile({
               }`}
             >
               {isProfit ? "+" : ""}{pnlPct.toFixed(2)}%
-              {pnlDollar !== null && (
-                <span className="ml-1 opacity-80">
-                  ({pnlDollar >= 0 ? "+" : "-"}${Math.abs(pnlDollar).toFixed(2)})
-                </span>
-              )}
+              {pnlDollar !== null && ` (${pnlDollar >= 0 ? "+" : "-"}$${Math.abs(pnlDollar).toFixed(2)})`}
             </Badge>
           )}
         </div>

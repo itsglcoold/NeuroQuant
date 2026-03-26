@@ -423,6 +423,9 @@ export default function SimulatorPage() {
                       {pnlPct !== null && (
                         <span className={`text-sm font-bold tabular-nums shrink-0 ${isProfit ? "text-green-500" : "text-red-500"}`}>
                           {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
+                          {pnlDollar !== null && (
+                            <span className="font-normal opacity-80"> ({pnlDollar >= 0 ? "+" : "-"}${Math.abs(pnlDollar).toFixed(2)})</span>
+                          )}
                         </span>
                       )}
                     </div>
@@ -459,13 +462,8 @@ export default function SimulatorPage() {
                       )}
                     </div>
 
-                    {/* Dollar P&L + buttons */}
+                    {/* Buttons */}
                     <div className="flex items-center gap-2">
-                      {pnlDollar !== null && (
-                        <span className={`text-xs font-medium tabular-nums ${isProfit ? "text-green-500" : "text-red-500"}`}>
-                          {pnlDollar >= 0 ? "+" : "-"}${Math.abs(pnlDollar).toFixed(2)}
-                        </span>
-                      )}
                       <div className="flex gap-1.5 ml-auto">
                         <Button
                           variant="outline"
