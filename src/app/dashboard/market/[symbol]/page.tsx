@@ -766,59 +766,64 @@ export default function MarketDetailPage() {
       {/* Consensus History */}
       <ConsensusHistory symbol={symbol} />
 
-      {/* Active Trade Card — shown when there's an open trade for this symbol */}
+      {/* Active Trade Cards — shown for all open trades for this symbol */}
       {(() => {
-        const activeTrade = simulator.openTrades.find((t) => t.symbol === symbol);
-        if (!activeTrade || !price) return null;
-        // Prefer WebSocket price (same source as simulator page) for consistent P&L
+        const activeTrades = simulator.openTrades.filter((t) => t.symbol === symbol);
+        if (activeTrades.length === 0 || !price) return null;
         const currentPrice = wsPrices[symbol]?.price ?? price.price;
-        const pnlPct = activeTrade.side === "long"
-          ? ((currentPrice - activeTrade.entry_price) / activeTrade.entry_price) * 100
-          : ((activeTrade.entry_price - currentPrice) / activeTrade.entry_price) * 100;
-        const pnlDollar = (simulator.stats.virtualBalance * pnlPct) / 100;
-        const isProfit = pnlPct >= 0;
-        const distToSl = activeTrade.side === "long"
-          ? ((currentPrice - activeTrade.sl_price) / activeTrade.sl_price) * 100
-          : ((activeTrade.sl_price - currentPrice) / activeTrade.sl_price) * 100;
-        const distToTp = activeTrade.side === "long"
-          ? ((activeTrade.tp_price - currentPrice) / currentPrice) * 100
-          : ((currentPrice - activeTrade.tp_price) / currentPrice) * 100;
         return (
-          <div className={`rounded-xl border p-4 ${isProfit ? "bg-green-500/5 border-green-500/30" : "bg-red-500/5 border-red-500/30"}`}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                {activeTrade.side === "long"
-                  ? <TrendingUp className="h-4 w-4 text-green-500" />
-                  : <TrendingDown className="h-4 w-4 text-red-500" />}
-                <span className="text-sm font-bold">Open Trade — {activeTrade.side === "long" ? "BUY" : "SELL"}</span>
-                <Badge variant="outline" className={`text-[10px] ${isProfit ? "border-green-500/40 text-green-600 dark:text-green-400" : "border-red-500/40 text-red-600 dark:text-red-400"}`}>
-                  {isProfit ? "+" : ""}{pnlPct.toFixed(2)}% ({isProfit ? "+" : ""}${pnlDollar.toFixed(2)})
-                </Badge>
-              </div>
-              <button
-                onClick={async () => { await simulator.closeTrade(activeTrade.id, wsPrices[symbol]?.price ?? price.price); }}
-                className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:border-red-500/50 hover:text-red-500 transition-colors"
-              >
-                <X className="h-3 w-3" />
-                Close trade
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-2 text-[11px]">
-              <div className="rounded-lg bg-background/60 border border-border p-2">
-                <p className="text-muted-foreground font-medium">Entry</p>
-                <p className="font-bold tabular-nums mt-0.5">{prefix}{formatPrice(activeTrade.entry_price, decimals)}</p>
-              </div>
-              <div className="rounded-lg bg-red-500/5 border border-red-500/20 p-2">
-                <p className="text-red-500/70 font-medium">Stop-Loss</p>
-                <p className="font-bold tabular-nums text-red-600 dark:text-red-400 mt-0.5">{prefix}{formatPrice(activeTrade.sl_price, decimals)}</p>
-                <p className="text-[9px] text-muted-foreground mt-0.5">{distToSl > 0 ? `${distToSl.toFixed(2)}% away` : "⚠ breached"}</p>
-              </div>
-              <div className="rounded-lg bg-green-500/5 border border-green-500/20 p-2">
-                <p className="text-green-500/70 font-medium">Take-Profit</p>
-                <p className="font-bold tabular-nums text-green-600 dark:text-green-400 mt-0.5">{prefix}{formatPrice(activeTrade.tp_price, decimals)}</p>
-                <p className="text-[9px] text-muted-foreground mt-0.5">{distToTp > 0 ? `${distToTp.toFixed(2)}% away` : "🎯 reached"}</p>
-              </div>
-            </div>
+          <div className="space-y-2">
+            {activeTrades.map((activeTrade) => {
+              const pnlPct = activeTrade.side === "long"
+                ? ((currentPrice - activeTrade.entry_price) / activeTrade.entry_price) * 100
+                : ((activeTrade.entry_price - currentPrice) / activeTrade.entry_price) * 100;
+              const pnlDollar = (simulator.stats.virtualBalance * pnlPct) / 100;
+              const isProfit = pnlPct >= 0;
+              const distToSl = activeTrade.side === "long"
+                ? ((currentPrice - activeTrade.sl_price) / activeTrade.sl_price) * 100
+                : ((activeTrade.sl_price - currentPrice) / activeTrade.sl_price) * 100;
+              const distToTp = activeTrade.side === "long"
+                ? ((activeTrade.tp_price - currentPrice) / currentPrice) * 100
+                : ((currentPrice - activeTrade.tp_price) / currentPrice) * 100;
+              return (
+                <div key={activeTrade.id} className={`rounded-xl border p-4 ${isProfit ? "bg-green-500/5 border-green-500/30" : "bg-red-500/5 border-red-500/30"}`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      {activeTrade.side === "long"
+                        ? <TrendingUp className="h-4 w-4 text-green-500" />
+                        : <TrendingDown className="h-4 w-4 text-red-500" />}
+                      <span className="text-sm font-bold">Open Trade — {activeTrade.side === "long" ? "BUY" : "SELL"}</span>
+                      <Badge variant="outline" className={`text-[10px] ${isProfit ? "border-green-500/40 text-green-600 dark:text-green-400" : "border-red-500/40 text-red-600 dark:text-red-400"}`}>
+                        {isProfit ? "+" : ""}{pnlPct.toFixed(2)}% ({isProfit ? "+" : ""}${pnlDollar.toFixed(2)})
+                      </Badge>
+                    </div>
+                    <button
+                      onClick={async () => { await simulator.closeTrade(activeTrade.id, wsPrices[symbol]?.price ?? price.price); }}
+                      className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:border-red-500/50 hover:text-red-500 transition-colors"
+                    >
+                      <X className="h-3 w-3" />
+                      Close trade
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-[11px]">
+                    <div className="rounded-lg bg-background/60 border border-border p-2">
+                      <p className="text-muted-foreground font-medium">Entry</p>
+                      <p className="font-bold tabular-nums mt-0.5">{prefix}{formatPrice(activeTrade.entry_price, decimals)}</p>
+                    </div>
+                    <div className="rounded-lg bg-red-500/5 border border-red-500/20 p-2">
+                      <p className="text-red-500/70 font-medium">Stop-Loss</p>
+                      <p className="font-bold tabular-nums text-red-600 dark:text-red-400 mt-0.5">{prefix}{formatPrice(activeTrade.sl_price, decimals)}</p>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">{distToSl > 0 ? `${distToSl.toFixed(2)}% away` : "⚠ breached"}</p>
+                    </div>
+                    <div className="rounded-lg bg-green-500/5 border border-green-500/20 p-2">
+                      <p className="text-green-500/70 font-medium">Take-Profit</p>
+                      <p className="font-bold tabular-nums text-green-600 dark:text-green-400 mt-0.5">{prefix}{formatPrice(activeTrade.tp_price, decimals)}</p>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">{distToTp > 0 ? `${distToTp.toFixed(2)}% away` : "🎯 reached"}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         );
       })()}
