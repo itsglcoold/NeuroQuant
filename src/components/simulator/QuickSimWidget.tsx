@@ -255,8 +255,10 @@ export function QuickSimWidget({
       setSl(slPrice.toFixed(decimals));
 
       // TP: use resistance that achieves ≥ MIN_RR, else calculate from MIN_RR
+      // Add half-pip buffer so rounding never drops us below the minimum R:R
+      const pip = Math.pow(10, -decimals);
       const slDistance = currentPrice - slPrice;
-      const minTp = currentPrice + MIN_RR * slDistance;
+      const minTp = currentPrice + MIN_RR * slDistance + 0.5 * pip;
       const qualifyingTp = validTp.filter((r) => r >= minTp);
       const tpPrice = qualifyingTp.length > 0 ? Math.max(...qualifyingTp) : minTp;
       setTp(tpPrice.toFixed(decimals));
@@ -274,8 +276,10 @@ export function QuickSimWidget({
       setSl(slPrice.toFixed(decimals));
 
       // TP: use support that achieves ≥ MIN_RR, else calculate from MIN_RR
+      // Subtract half-pip buffer so rounding never pushes us above the minimum R:R threshold
+      const pip = Math.pow(10, -decimals);
       const slDistance = slPrice - currentPrice;
-      const minTp = currentPrice - MIN_RR * slDistance;
+      const minTp = currentPrice - MIN_RR * slDistance - 0.5 * pip;
       const qualifyingTp = validTp.filter((s) => s <= minTp);
       const tpPrice = qualifyingTp.length > 0 ? Math.min(...qualifyingTp) : minTp;
       setTp(tpPrice.toFixed(decimals));
@@ -736,7 +740,7 @@ export function QuickSimWidget({
         </div>
       )}
 
-      {rrTooLow && (
+      {rrTooLow && (isManualOverride || isStyleModified) && (
         <div className="flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/30 p-2.5">
           <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
           <p className="text-[11px] text-amber-600 dark:text-amber-400 leading-relaxed">
@@ -771,7 +775,7 @@ export function QuickSimWidget({
           </p>
         </div>
       )}
-      {slTooTight && (
+      {slTooTight && (isManualOverride || isStyleModified) && (
         <div className="flex items-start gap-2 rounded-lg bg-orange-500/10 border border-orange-500/30 p-2.5">
           <AlertTriangle className="h-3.5 w-3.5 text-orange-500 mt-0.5 shrink-0" />
           <p className="text-[11px] text-orange-600 dark:text-orange-400">
