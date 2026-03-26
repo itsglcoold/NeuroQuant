@@ -91,7 +91,7 @@ export function QuickSimWidget({
   const [switchedConfirmation, setSwitchedConfirmation] = useState("");
   const [isManualOverride, setIsManualOverride] = useState(false);
   const [slWasCapped, setSlWasCapped] = useState(false);
-  const [selectedStyle, setSelectedStyle] = useState<"safe" | "balanced" | "aggressive" | null>(null);
+  const [selectedStyle, setSelectedStyle] = useState<"auto" | "safe" | "balanced" | "aggressive" | null>(null);
 
   const slNum = parseFloat(sl);
   const tpNum = parseFloat(tp);
@@ -228,6 +228,7 @@ export function QuickSimWidget({
   const handleAutoFill = () => {
     setIsManualOverride(false);
     setSlWasCapped(false);
+    setSelectedStyle("auto");
     const fallbackBuffer = currentPrice * 0.003;
     const structureBuffer = currentPrice * 0.001;
 
@@ -381,6 +382,12 @@ export function QuickSimWidget({
   };
 
   const formatPrice = (p: number) => `${prefix}${p.toFixed(decimals)}`;
+
+  // Lot size calculation (educational — 1% risk model)
+  // $10/pip per standard lot for most forex pairs; indices use $1/point
+  const pipValuePerLot = ["SPX", "IXIC", "DXY", "CL"].includes(symbol) ? 1 : 10;
+  const slPipsRaw = slValid ? priceToPips(symbol, Math.abs(currentPrice - slNum)) : 0;
+  const lotSize = slPipsRaw > 0 ? (virtualBalance * 0.01) / (slPipsRaw * pipValuePerLot) : 0;
 
   const sentimentLabel =
     consensus.consensusDirection === "bullish"
@@ -793,15 +800,53 @@ export function QuickSimWidget({
         </div>
       )}
 
+      {/* Lot Size + Risk display */}
+      {slValid && lotSize > 0 && (
+        <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 flex items-center justify-between gap-2">
+          <div>
+            <p className="text-[10px] text-muted-foreground font-medium">Lot Size</p>
+            <p className="text-sm font-bold tabular-nums">
+              {lotSize < 0.01
+                ? "<0.01"
+                : lotSize >= 10
+                ? lotSize.toFixed(1)
+                : lotSize.toFixed(2)}{" "}
+              <span className="text-xs font-normal text-muted-foreground">lots</span>
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] text-muted-foreground font-medium">1% risk</p>
+            <p className="text-sm font-bold tabular-nums">
+              ${(virtualBalance * 0.01).toFixed(0)}{" "}
+              <span className="text-xs font-normal text-muted-foreground">of ${virtualBalance.toLocaleString()}</span>
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Trade Style Selector */}
       {canAutoFill ? (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
             <Zap className="h-3 w-3" />
             AI fills SL &amp; TP — choose your style
-            {!atr && <span className="normal-case font-normal tracking-normal text-amber-500/80">(needs more data)</span>}
           </p>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-1.5">
+            {/* Auto button — structure-based fill */}
+            <button
+              type="button"
+              onClick={() => { handleAutoFill(); }}
+              className={`flex flex-col items-center gap-0.5 rounded-lg border px-1.5 py-2 text-center transition-all ${
+                selectedStyle === "auto"
+                  ? "border-purple-500 bg-purple-500/15 text-purple-600 dark:text-purple-400 shadow-sm"
+                  : "border-purple-500/30 bg-purple-500/5 text-purple-600 dark:text-purple-400 hover:bg-purple-500/10"
+              }`}
+            >
+              <span className="text-sm leading-none">🤖</span>
+              <span className="text-[10px] font-bold mt-0.5">Auto</span>
+              <span className="text-[8px] opacity-60">AI levels</span>
+            </button>
+
             {TRADE_STYLES.map((style) => {
               const isActive = selectedStyle === style.key;
               const slPips = atr > 0 ? Math.round(style.atrMult * (atrAnalysis?.pips ?? 0)) : null;
@@ -809,26 +854,24 @@ export function QuickSimWidget({
                 <button
                   key={style.key}
                   type="button"
-                  disabled={!atr}
+                  disabled={!atr && !support.length}
                   onClick={() => handleStyleSelect(style.key)}
-                  className={`flex flex-col items-center gap-1 rounded-lg border px-2 py-2.5 text-center transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                  className={`flex flex-col items-center gap-0.5 rounded-lg border px-1.5 py-2 text-center transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
                     isActive ? style.activeClass : `${style.colorClass} hover:opacity-80`
                   }`}
                 >
-                  <span className="text-base leading-none">{style.icon}</span>
-                  <span className="text-[11px] font-bold">{style.label}</span>
-                  <span className="text-[9px] opacity-70">
-                    SL {style.atrMult}×ATR
-                    {slPips ? ` · ${slPips}${atrAnalysis?.pipLabel ?? "p"}` : ""}
+                  <span className="text-sm leading-none">{style.icon}</span>
+                  <span className="text-[10px] font-bold mt-0.5">{style.label}</span>
+                  <span className="text-[8px] opacity-60">
+                    {slPips ? `${slPips}${atrAnalysis?.pipLabel ?? "p"} · 1:${style.rr}` : `1:${style.rr}`}
                   </span>
-                  <span className="text-[9px] opacity-70">R:R 1:{style.rr}</span>
                 </button>
               );
             })}
           </div>
-          {selectedStyle && (
+          {selectedStyle && selectedStyle !== null && (
             <p className="text-[10px] text-muted-foreground text-center">
-              SL/TP filled — adjust manually if needed
+              {selectedStyle === "auto" ? "AI structure levels applied" : `${selectedStyle.charAt(0).toUpperCase() + selectedStyle.slice(1)} style applied`} — adjust manually if needed
             </p>
           )}
         </div>
