@@ -164,8 +164,9 @@ export async function GET(
     return NextResponse.json({ commands: [] });
   }
 
-  if (secret && secret !== connection.webhook_secret) {
-    return NextResponse.json({ error: "Invalid secret" }, { status: 401 });
+  // Secret is mandatory on GET (EA must always send x-webhook-secret header)
+  if (!secret || secret !== connection.webhook_secret) {
+    return NextResponse.json({ error: "Invalid or missing secret" }, { status: 401 });
   }
 
   const { data: commands } = await supabase

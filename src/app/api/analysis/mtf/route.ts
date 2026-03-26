@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getTimeSeries, getTechnicalIndicators } from "@/lib/market/eodhd";
 import OpenAI from "openai";
+import { checkAnalysisRateLimit } from "@/lib/ratelimit";
 
 export const runtime = "edge";
 
@@ -126,6 +127,14 @@ Based on the trend, momentum, and indicators, respond with ONLY this JSON (no ex
 }
 
 export async function POST(request: NextRequest) {
+  const rateLimit = await checkAnalysisRateLimit();
+  if (!rateLimit.allowed) {
+    return Response.json(
+      { error: rateLimit.reason },
+      { status: rateLimit.reason === "Unauthorized" ? 401 : 429 }
+    );
+  }
+
   let body: { symbol?: string };
   try {
     body = await request.json();

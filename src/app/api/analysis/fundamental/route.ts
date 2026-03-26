@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeFundamental } from "@/lib/ai/claude";
 import { getPrice, getTechnicalIndicators } from "@/lib/market/eodhd";
+import { checkAnalysisRateLimit } from "@/lib/ratelimit";
 
 export const runtime = 'edge';
 
 export async function POST(request: NextRequest) {
+  const rateLimit = await checkAnalysisRateLimit();
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: rateLimit.reason },
+      { status: rateLimit.reason === "Unauthorized" ? 401 : 429 }
+    );
+  }
+
   try {
     let body: { symbol?: string };
     try {

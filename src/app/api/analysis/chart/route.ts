@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeChart } from "@/lib/ai/qwen";
 import { getSymbolTradingStyle, MARKETS } from "@/lib/market/symbols";
+import { checkAnalysisRateLimit } from "@/lib/ratelimit";
 
 export const runtime = 'edge';
 
@@ -66,6 +67,14 @@ function normalizeSymbol(raw: string): string {
 }
 
 export async function POST(request: NextRequest) {
+  const rateLimit = await checkAnalysisRateLimit();
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: rateLimit.reason },
+      { status: rateLimit.reason === "Unauthorized" ? 401 : 429 }
+    );
+  }
+
   try {
     const formData = await request.formData();
     const file = formData.get("chart") as File | null;

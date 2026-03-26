@@ -5,6 +5,7 @@ import { analyzeTechnical as qwenAnalyze } from "@/lib/ai/qwen";
 import { analyzeTechnical as claudeAnalyze } from "@/lib/ai/claude";
 import { calculateConsensus } from "@/lib/ai/consensus";
 import { withTimeout, withRetry } from "@/lib/ai/timeout";
+import { checkAnalysisRateLimit } from "@/lib/ratelimit";
 import type { ModelOutput } from "@/types/analysis";
 
 /** Per-analyst timeout: 25 seconds max per AI call */
@@ -13,7 +14,17 @@ const ANALYST_TIMEOUT_MS = 25_000;
 export const runtime = 'edge';
 
 export async function POST(request: NextRequest) {
-  let body: { symbol?: string; tier?: string; interval?: string; tradingStyle?: string };
+  // Auth + rate limit check (tier read from DB, not trusted from body)
+  const rateLimit = await checkAnalysisRateLimit();
+  if (!rateLimit.allowed) {
+    return new Response(
+      JSON.stringify({ error: rateLimit.reason }),
+      { status: rateLimit.reason === "Unauthorized" ? 401 : 429,
+        headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  let body: { symbol?: string; interval?: string; tradingStyle?: string };
   try {
     body = await request.json();
   } catch {
@@ -23,7 +34,9 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const { symbol, tier = "free", interval = "1day", tradingStyle } = body;
+  // Use real tier from DB — ignore any tier the client may have sent
+  const { symbol, interval = "1day", tradingStyle } = body;
+  const tier = rateLimit.tier;
 
   if (!symbol) {
     return new Response(JSON.stringify({ error: "Symbol required" }), {
