@@ -92,6 +92,7 @@ export function QuickSimWidget({
   const [isManualOverride, setIsManualOverride] = useState(false);
   const [slWasCapped, setSlWasCapped] = useState(false);
   const [selectedStyle, setSelectedStyle] = useState<"auto" | "safe" | "balanced" | "aggressive" | null>(null);
+  const [isStyleModified, setIsStyleModified] = useState(false);
 
   const slNum = parseFloat(sl);
   const tpNum = parseFloat(tp);
@@ -229,6 +230,7 @@ export function QuickSimWidget({
     setIsManualOverride(false);
     setSlWasCapped(false);
     setSelectedStyle("auto");
+    setIsStyleModified(false);
     const fallbackBuffer = currentPrice * 0.003;
     const structureBuffer = currentPrice * 0.001;
 
@@ -290,6 +292,7 @@ export function QuickSimWidget({
   const handleStyleSelect = (styleKey: "safe" | "balanced" | "aggressive") => {
     const style = TRADE_STYLES.find(s => s.key === styleKey)!;
     setSelectedStyle(styleKey);
+    setIsStyleModified(false);
     setIsManualOverride(false);
     setSlWasCapped(false);
 
@@ -600,7 +603,7 @@ export function QuickSimWidget({
             step="any"
             placeholder={side === "long" ? `< ${formatPrice(currentPrice)}` : `> ${formatPrice(currentPrice)}`}
             value={sl}
-            onChange={(e) => { setSl(e.target.value); setIsManualOverride(true); setSlWasCapped(false); setSelectedStyle(null); }}
+            onChange={(e) => { setSl(e.target.value); setIsManualOverride(true); setSlWasCapped(false); setIsStyleModified(true); }}
             className={`text-sm tabular-nums ${
               sl && !slValid ? "border-red-500 focus-visible:ring-red-500" : ""
             }`}
@@ -653,7 +656,7 @@ export function QuickSimWidget({
             step="any"
             placeholder={side === "long" ? `> ${formatPrice(currentPrice)}` : `< ${formatPrice(currentPrice)}`}
             value={tp}
-            onChange={(e) => { setTp(e.target.value); setIsManualOverride(true); setSelectedStyle(null); }}
+            onChange={(e) => { setTp(e.target.value); setIsManualOverride(true); setIsStyleModified(true); }}
             className={`text-sm tabular-nums ${
               tp && !tpValid ? "border-red-500 focus-visible:ring-red-500" : ""
             }`}
@@ -744,7 +747,7 @@ export function QuickSimWidget({
                 {side === "long" ? "Raise TP" : "Lower TP"} to{" "}
                 <button
                   type="button"
-                  onClick={() => { setTp(minTpForRR.toFixed(decimals)); setIsManualOverride(true); setSelectedStyle(null); }}
+                  onClick={() => { setTp(minTpForRR.toFixed(decimals)); setIsManualOverride(true); setIsStyleModified(true); }}
                   className="font-bold underline decoration-dotted underline-offset-2 hover:text-amber-700 dark:hover:text-amber-300 transition-colors tabular-nums"
                 >
                   {formatPrice(minTpForRR)}
@@ -757,7 +760,7 @@ export function QuickSimWidget({
                 {side === "long" ? "tighten SL" : "tighten SL"} to{" "}
                 <button
                   type="button"
-                  onClick={() => { setSl(tighterSlForRR.toFixed(decimals)); setIsManualOverride(true); setSelectedStyle(null); }}
+                  onClick={() => { setSl(tighterSlForRR.toFixed(decimals)); setIsManualOverride(true); setIsStyleModified(true); }}
                   className="font-bold underline decoration-dotted underline-offset-2 hover:text-amber-700 dark:hover:text-amber-300 transition-colors tabular-nums"
                 >
                   {formatPrice(tighterSlForRR)}
@@ -849,6 +852,7 @@ export function QuickSimWidget({
 
             {TRADE_STYLES.map((style) => {
               const isActive = selectedStyle === style.key;
+              const isActiveModified = isActive && isStyleModified;
               const slPips = atr > 0 ? Math.round(style.atrMult * (atrAnalysis?.pips ?? 0)) : null;
               return (
                 <button
@@ -856,8 +860,12 @@ export function QuickSimWidget({
                   type="button"
                   disabled={!atr && !support.length}
                   onClick={() => handleStyleSelect(style.key)}
-                  className={`flex flex-col items-center gap-0.5 rounded-lg border px-1.5 py-2 text-center transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-                    isActive ? style.activeClass : `${style.colorClass} hover:opacity-80`
+                  className={`relative flex flex-col items-center gap-0.5 rounded-lg border px-1.5 py-2 text-center transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                    isActiveModified
+                      ? style.activeClass + " opacity-70"
+                      : isActive
+                      ? style.activeClass
+                      : `${style.colorClass} hover:opacity-80`
                   }`}
                 >
                   <span className="text-sm leading-none">{style.icon}</span>
@@ -865,14 +873,46 @@ export function QuickSimWidget({
                   <span className="text-[8px] opacity-60">
                     {slPips ? `${slPips}${atrAnalysis?.pipLabel ?? "p"} · 1:${style.rr}` : `1:${style.rr}`}
                   </span>
+                  {isActiveModified && (
+                    <span className="absolute -top-1 -right-1 rounded-full bg-orange-400 h-2 w-2" title="Modified" />
+                  )}
                 </button>
               );
             })}
           </div>
-          {selectedStyle && selectedStyle !== null && (
-            <p className="text-[10px] text-muted-foreground text-center">
-              {selectedStyle === "auto" ? "AI structure levels applied" : `${selectedStyle.charAt(0).toUpperCase() + selectedStyle.slice(1)} style applied`} — adjust manually if needed
-            </p>
+          {selectedStyle && (
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10px] text-muted-foreground">
+                {isStyleModified
+                  ? <span className="text-orange-500 font-medium">
+                      {selectedStyle === "auto" ? "Auto" : selectedStyle.charAt(0).toUpperCase() + selectedStyle.slice(1)} (modified)
+                    </span>
+                  : <span>
+                      {selectedStyle === "auto" ? "AI structure levels" : `${selectedStyle.charAt(0).toUpperCase() + selectedStyle.slice(1)} style`} applied
+                    </span>
+                }
+              </p>
+              {isStyleModified && selectedStyle !== "auto" && (
+                <button
+                  type="button"
+                  onClick={() => handleStyleSelect(selectedStyle as "safe" | "balanced" | "aggressive")}
+                  className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <RefreshCw className="h-2.5 w-2.5" />
+                  Reset
+                </button>
+              )}
+              {isStyleModified && selectedStyle === "auto" && (
+                <button
+                  type="button"
+                  onClick={handleAutoFill}
+                  className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <RefreshCw className="h-2.5 w-2.5" />
+                  Reset
+                </button>
+              )}
+            </div>
           )}
         </div>
       ) : (
