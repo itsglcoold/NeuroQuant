@@ -742,7 +742,7 @@ export function QuickSimWidget({
           <p className="text-[11px] text-amber-600 dark:text-amber-400 leading-relaxed">
             <span className="font-semibold">R:R below 1:{rrMinForRegime}</span>
             {regime?.regime === "trending" ? " — trending market, target 1:3 to let winners run." : " — TP is less than 2× your SL distance."}{" "}
-            {minTpForRR !== null && (
+            {minTpForRR !== null && minTpForRR.toFixed(decimals) !== tpNum.toFixed(decimals) && (
               <>
                 {side === "long" ? "Raise TP" : "Lower TP"} to{" "}
                 <button
@@ -754,10 +754,11 @@ export function QuickSimWidget({
                 </button>
               </>
             )}
-            {minTpForRR !== null && tighterSlForRR !== null && " or "}
-            {tighterSlForRR !== null && (
+            {minTpForRR !== null && minTpForRR.toFixed(decimals) !== tpNum.toFixed(decimals) &&
+             tighterSlForRR !== null && tighterSlForRR.toFixed(decimals) !== slNum.toFixed(decimals) && " or "}
+            {tighterSlForRR !== null && tighterSlForRR.toFixed(decimals) !== slNum.toFixed(decimals) && (
               <>
-                {side === "long" ? "tighten SL" : "tighten SL"} to{" "}
+                tighten SL to{" "}
                 <button
                   type="button"
                   onClick={() => { setSl(tighterSlForRR.toFixed(decimals)); setIsManualOverride(true); setIsStyleModified(true); }}
