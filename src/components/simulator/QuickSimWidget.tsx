@@ -91,6 +91,7 @@ export function QuickSimWidget({
   const [switchedConfirmation, setSwitchedConfirmation] = useState("");
   const [isManualOverride, setIsManualOverride] = useState(false);
   const [slWasCapped, setSlWasCapped] = useState(false);
+  const [selectedStyle, setSelectedStyle] = useState<"safe" | "balanced" | "aggressive" | null>(null);
 
   const slNum = parseFloat(sl);
   const tpNum = parseFloat(tp);
@@ -134,6 +135,18 @@ export function QuickSimWidget({
 
   const rrMinForRegime = regime?.regime === "trending" ? 3.0 : 2.0;
   const rrTooLow = rrRatio !== null && rrRatio < rrMinForRegime;
+
+  // Concrete price targets for R:R warning — what TP or SL needs to be to hit minimum R:R
+  const minTpForRR = rrTooLow && slValid
+    ? side === "long"
+      ? currentPrice + rrMinForRegime * (currentPrice - slNum)
+      : currentPrice - rrMinForRegime * (slNum - currentPrice)
+    : null;
+  const tighterSlForRR = rrTooLow && tpValid
+    ? side === "long"
+      ? currentPrice - (tpNum - currentPrice) / rrMinForRegime
+      : currentPrice + (currentPrice - tpNum) / rrMinForRegime
+    : null;
 
   // SL distance in ATR units — how much breathing room the SL has relative to market volatility
   const slDistanceInATR =
@@ -263,6 +276,49 @@ export function QuickSimWidget({
       const qualifyingTp = validTp.filter((s) => s <= minTp);
       const tpPrice = qualifyingTp.length > 0 ? Math.min(...qualifyingTp) : minTp;
       setTp(tpPrice.toFixed(decimals));
+    }
+  };
+
+  // Trade style presets — ATR-based auto-fill with different risk profiles
+  const TRADE_STYLES = [
+    { key: "safe" as const,       label: "Safe",       icon: "🛡️", atrMult: 1.5, rr: 2.0, colorClass: "border-blue-500/40 bg-blue-500/8 text-blue-600 dark:text-blue-400",  activeClass: "border-blue-500 bg-blue-500/15 shadow-sm" },
+    { key: "balanced" as const,   label: "Balanced",   icon: "⚖️", atrMult: 1.2, rr: 2.5, colorClass: "border-green-500/40 bg-green-500/8 text-green-600 dark:text-green-400", activeClass: "border-green-500 bg-green-500/15 shadow-sm" },
+    { key: "aggressive" as const, label: "Aggressive", icon: "⚡", atrMult: 1.0, rr: 3.0, colorClass: "border-amber-500/40 bg-amber-500/8 text-amber-600 dark:text-amber-400",  activeClass: "border-amber-500 bg-amber-500/15 shadow-sm" },
+  ];
+
+  const handleStyleSelect = (styleKey: "safe" | "balanced" | "aggressive") => {
+    const style = TRADE_STYLES.find(s => s.key === styleKey)!;
+    setSelectedStyle(styleKey);
+    setIsManualOverride(false);
+    setSlWasCapped(false);
+
+    if (atr > 0) {
+      // ATR-based: pure volatility-proportional levels
+      const slDist = style.atrMult * atr;
+      const tpDist = style.rr * slDist;
+      if (side === "long") {
+        setSl((currentPrice - slDist).toFixed(decimals));
+        setTp((currentPrice + tpDist).toFixed(decimals));
+      } else {
+        setSl((currentPrice + slDist).toFixed(decimals));
+        setTp((currentPrice - tpDist).toFixed(decimals));
+      }
+    } else {
+      // No ATR available — fall back to structure levels with target R:R
+      const fallbackBuffer = currentPrice * 0.003;
+      if (side === "long") {
+        const validSl = support.filter(s => s < currentPrice);
+        const slPrice = validSl.length > 0 ? Math.max(...validSl) - currentPrice * 0.001 : currentPrice - fallbackBuffer;
+        const tpPrice = currentPrice + style.rr * Math.abs(currentPrice - slPrice);
+        setSl(slPrice.toFixed(decimals));
+        setTp(tpPrice.toFixed(decimals));
+      } else {
+        const validSl = resistance.filter(r => r > currentPrice);
+        const slPrice = validSl.length > 0 ? Math.min(...validSl) + currentPrice * 0.001 : currentPrice + fallbackBuffer;
+        const tpPrice = currentPrice - style.rr * Math.abs(slPrice - currentPrice);
+        setSl(slPrice.toFixed(decimals));
+        setTp(tpPrice.toFixed(decimals));
+      }
     }
   };
 
@@ -468,7 +524,7 @@ export function QuickSimWidget({
       {/* Side Toggle */}
       <div className="grid grid-cols-2 gap-2">
         <button
-          onClick={() => { setSide("long"); setIsManualOverride(false); setSlWasCapped(false); }}
+          onClick={() => { setSide("long"); setIsManualOverride(false); setSlWasCapped(false); setSelectedStyle(null); setSl(""); setTp(""); }}
           className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 transition-all ${
             side === "long"
               ? "border-green-500 bg-green-500/10 text-green-600 dark:text-green-400 shadow-sm"
@@ -482,7 +538,7 @@ export function QuickSimWidget({
           <span className="text-[9px] opacity-70 font-medium">Bet on rise</span>
         </button>
         <button
-          onClick={() => { setSide("short"); setIsManualOverride(false); setSlWasCapped(false); }}
+          onClick={() => { setSide("short"); setIsManualOverride(false); setSlWasCapped(false); setSelectedStyle(null); setSl(""); setTp(""); }}
           className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 transition-all ${
             side === "short"
               ? "border-red-500 bg-red-500/10 text-red-600 dark:text-red-400 shadow-sm"
@@ -537,7 +593,7 @@ export function QuickSimWidget({
             step="any"
             placeholder={side === "long" ? `< ${formatPrice(currentPrice)}` : `> ${formatPrice(currentPrice)}`}
             value={sl}
-            onChange={(e) => { setSl(e.target.value); setIsManualOverride(true); setSlWasCapped(false); }}
+            onChange={(e) => { setSl(e.target.value); setIsManualOverride(true); setSlWasCapped(false); setSelectedStyle(null); }}
             className={`text-sm tabular-nums ${
               sl && !slValid ? "border-red-500 focus-visible:ring-red-500" : ""
             }`}
@@ -590,7 +646,7 @@ export function QuickSimWidget({
             step="any"
             placeholder={side === "long" ? `> ${formatPrice(currentPrice)}` : `< ${formatPrice(currentPrice)}`}
             value={tp}
-            onChange={(e) => { setTp(e.target.value); setIsManualOverride(true); }}
+            onChange={(e) => { setTp(e.target.value); setIsManualOverride(true); setSelectedStyle(null); }}
             className={`text-sm tabular-nums ${
               tp && !tpValid ? "border-red-500 focus-visible:ring-red-500" : ""
             }`}
@@ -673,8 +729,34 @@ export function QuickSimWidget({
       {rrTooLow && (
         <div className="flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/30 p-2.5">
           <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
-          <p className="text-[11px] text-amber-600 dark:text-amber-400">
-            <span className="font-semibold">R:R below 1:{rrMinForRegime}</span> — {regime?.regime === "trending" ? "trending market, target 1:3 to let winners run." : "your TP is less than 2× your SL distance."} Move TP further or SL closer to entry.
+          <p className="text-[11px] text-amber-600 dark:text-amber-400 leading-relaxed">
+            <span className="font-semibold">R:R below 1:{rrMinForRegime}</span>
+            {regime?.regime === "trending" ? " — trending market, target 1:3 to let winners run." : " — TP is less than 2× your SL distance."}{" "}
+            {minTpForRR !== null && (
+              <>
+                {side === "long" ? "Raise TP" : "Lower TP"} to{" "}
+                <button
+                  type="button"
+                  onClick={() => { setTp(minTpForRR.toFixed(decimals)); setIsManualOverride(true); setSelectedStyle(null); }}
+                  className="font-bold underline decoration-dotted underline-offset-2 hover:text-amber-700 dark:hover:text-amber-300 transition-colors tabular-nums"
+                >
+                  {formatPrice(minTpForRR)}
+                </button>
+              </>
+            )}
+            {minTpForRR !== null && tighterSlForRR !== null && " or "}
+            {tighterSlForRR !== null && (
+              <>
+                {side === "long" ? "tighten SL" : "tighten SL"} to{" "}
+                <button
+                  type="button"
+                  onClick={() => { setSl(tighterSlForRR.toFixed(decimals)); setIsManualOverride(true); setSelectedStyle(null); }}
+                  className="font-bold underline decoration-dotted underline-offset-2 hover:text-amber-700 dark:hover:text-amber-300 transition-colors tabular-nums"
+                >
+                  {formatPrice(tighterSlForRR)}
+                </button>
+              </>
+            )}
           </p>
         </div>
       )}
@@ -711,19 +793,49 @@ export function QuickSimWidget({
         </div>
       )}
 
-      {/* Auto-fill AI Button */}
+      {/* Trade Style Selector */}
       {canAutoFill ? (
-        <button
-          onClick={handleAutoFill}
-          className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-blue-500/30 bg-blue-500/5 px-3 py-2 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 transition-colors"
-        >
-          <Zap className="h-3.5 w-3.5" />
-          Auto-fill Stop Loss / Take Profit
-        </button>
+        <div className="space-y-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <Zap className="h-3 w-3" />
+            AI fills SL &amp; TP — choose your style
+            {!atr && <span className="normal-case font-normal tracking-normal text-amber-500/80">(needs more data)</span>}
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {TRADE_STYLES.map((style) => {
+              const isActive = selectedStyle === style.key;
+              const slPips = atr > 0 ? Math.round(style.atrMult * (atrAnalysis?.pips ?? 0)) : null;
+              return (
+                <button
+                  key={style.key}
+                  type="button"
+                  disabled={!atr}
+                  onClick={() => handleStyleSelect(style.key)}
+                  className={`flex flex-col items-center gap-1 rounded-lg border px-2 py-2.5 text-center transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                    isActive ? style.activeClass : `${style.colorClass} hover:opacity-80`
+                  }`}
+                >
+                  <span className="text-base leading-none">{style.icon}</span>
+                  <span className="text-[11px] font-bold">{style.label}</span>
+                  <span className="text-[9px] opacity-70">
+                    SL {style.atrMult}×ATR
+                    {slPips ? ` · ${slPips}${atrAnalysis?.pipLabel ?? "p"}` : ""}
+                  </span>
+                  <span className="text-[9px] opacity-70">R:R 1:{style.rr}</span>
+                </button>
+              );
+            })}
+          </div>
+          {selectedStyle && (
+            <p className="text-[10px] text-muted-foreground text-center">
+              SL/TP filled — adjust manually if needed
+            </p>
+          )}
+        </div>
       ) : (
         <div className="flex items-center justify-center gap-1.5 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
           <Lock className="h-3 w-3" />
-          Auto-fill via AI — upgrade to Pro
+          Trade style presets — upgrade to Pro
         </div>
       )}
 
