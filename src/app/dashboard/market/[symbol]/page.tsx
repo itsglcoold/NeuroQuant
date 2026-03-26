@@ -44,6 +44,7 @@ import { PriceAlertButton } from "@/components/market/PriceAlertButton";
 import { TourButton } from "@/components/onboarding/TourButton";
 import { SimulatorOnboarding } from "@/components/simulator/SimulatorOnboarding";
 import { useSimulator } from "@/hooks/useSimulator";
+import { useMarketData } from "@/hooks/useMarketData";
 
 export const runtime = 'edge';
 
@@ -184,6 +185,7 @@ export default function MarketDetailPage() {
   ); // Default based on trading style
   const { canRunAnalysis, consumeAnalysis, analysesRemaining, analysesTotal, tier } = useUsageTracking();
   const simulator = useSimulator(tier);
+  const { prices: wsPrices } = useMarketData();
 
   const fetchMarketData = useCallback(async () => {
     setLoading(true);
@@ -768,7 +770,8 @@ export default function MarketDetailPage() {
       {(() => {
         const activeTrade = simulator.openTrades.find((t) => t.symbol === symbol);
         if (!activeTrade || !price) return null;
-        const currentPrice = price.price;
+        // Prefer WebSocket price (same source as simulator page) for consistent P&L
+        const currentPrice = wsPrices[symbol]?.price ?? price.price;
         const pnlPct = activeTrade.side === "long"
           ? ((currentPrice - activeTrade.entry_price) / activeTrade.entry_price) * 100
           : ((activeTrade.entry_price - currentPrice) / activeTrade.entry_price) * 100;
@@ -793,7 +796,7 @@ export default function MarketDetailPage() {
                 </Badge>
               </div>
               <button
-                onClick={async () => { await simulator.closeTrade(activeTrade.id, currentPrice); }}
+                onClick={async () => { await simulator.closeTrade(activeTrade.id, wsPrices[symbol]?.price ?? price.price); }}
                 className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:border-red-500/50 hover:text-red-500 transition-colors"
               >
                 <X className="h-3 w-3" />
