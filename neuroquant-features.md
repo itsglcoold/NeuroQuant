@@ -1,5 +1,5 @@
 # NeuroQuant — Complete Feature Overview
-> AI-powered market analysis platform | Version: March 2026 (Phase 1 complete) | Stack: Next.js 15.5 + Supabase + Cloudflare Pages
+> AI-powered market analysis platform | Version: March 2026 (sessie 2026-03-26) | Stack: Next.js 15.5 + Supabase + Cloudflare Pages
 
 ---
 
@@ -364,9 +364,15 @@ Research-backed improvements to simulator quality, based on institutional tradin
 ### 19.1 ATR Calculator (Wilder's Method)
 - **File:** `src/lib/atr-calculator.ts`
 - Proper Wilder's smoothing: seed with SMA of first 14 TRs, then EMA-style `atr = (atr×13 + TR) / 14`
-- **Pip utilities:** `getPipSize`, `priceToPips`, `pipsToPrice` (JPY pairs: 0.01, others: 0.0001)
+- **Pip utilities:** `getPipSize`, `getPipLabel`, `priceToPips`, `pipsToPrice`
+  - Forex JPY pairs: 0.01 → label "p"
+  - Standard forex: 0.0001 → label "p"
+  - POINTS_ASSETS (IXIC, SPX, DXY, XAU/USD, XAG/USD, CL): 1.0 → label "pts"
 - **Volatility ratio:** `ATR(14) / rolling-20-bar-avg-of-ATR(14)`; ratio > 1.5 = spike, avoid trading
-- Defaults per symbol for when price data is insufficient
+- **Outlier filter:** bars with H-L > 5% of close are excluded before ATR calc (corrupt/gap bars)
+- **Sanity check:** if ATR > 3% of current price, fall back to ATR_DEFAULTS (prevents wildly wrong values)
+- **ATRAnalysis** interface now includes `pipLabel` field ("p" or "pts")
+- Defaults per symbol (extended with IXIC: 25pts, SPX: 20pts)
 
 ### 19.2 Market Regime Detection
 - **File:** `src/lib/market-regime.ts`
@@ -387,9 +393,12 @@ Research-backed improvements to simulator quality, based on institutional tradin
 - **R:R warning** is context-aware: explains *why* based on current regime
 
 ### 19.4 ATR-Based SL Auto-Fill (improved)
-- SL = `max(structureSL from key levels, 1.5 × ATR)` for longs (inverted for shorts)
-- Ensures SL is never placed inside market noise (< 1 ATR = noise zone)
-- TP calculated to achieve the minimum R:R for the current regime
+- **Floor:** SL = `max(structureSL, 1.5×ATR)` — SL never inside market noise
+- **Ceiling:** SL = `min(uncappedSL, 3×ATR)` — SL never absurdly wide (e.g. USD/JPY 3391 pip bug was fixed this way)
+- Blue info banner shown when ceiling cap is applied: "SL adjusted to 3×ATR"
+- TP calculated to achieve minimum R:R for current regime
+- **ATR display in widget header:** "ATR 45p" (forex) or "ATR 24pts" (indices)
+- **SL width display under SL field:** "SL: 68p · ATR: 45p · 1.5×ATR" — color coded green/amber/red
 
 ### 19.5 Risk Metrics Library
 - **File:** `src/lib/risk-metrics.ts`
@@ -402,6 +411,13 @@ Research-backed improvements to simulator quality, based on institutional tradin
 - `useSimulator` hook subscribes to `postgres_changes` on `paper_trades` table
 - Trades auto-update when cron closes them externally — no manual refresh needed
 - Daily trade limit now correctly counts only **open** trades (closed trades no longer block new ones)
+
+---
+
+## 19.7 Simulator Empty State (onboarding)
+- When simulator page has no trades at all, a 3-step guide is shown:
+  1. Pick a market → 2. Run AI Analysis → 3. Open a trade
+- Quick-links to 5 popular markets: Gold, EUR/USD, GBP/USD, Crude Oil, S&P 500
 
 ---
 
@@ -443,6 +459,23 @@ Connect a real MetaTrader 5 account to NeuroQuant. View live trades and close th
 
 ---
 
+## 20b. Active Trade Card on Market Detail Page (March 2026)
+
+When a user has an open trade for a symbol, a card appears on the market detail page directly above the QuickSimWidget.
+
+### Shows:
+- Direction badge (BUY/SELL) + realtime P&L (% and $) — green/red
+- Entry price
+- Stop-Loss with distance-to-target ("X% away" or "⚠ breached")
+- Take-Profit with distance-to-target ("X% away" or "🎯 reached")
+- Close trade button (uses WebSocket price for closing)
+
+### Price source:
+- Uses `useMarketData()` WebSocket price (same as simulator page) — P&L is consistent across the app
+- Fallback to REST price if WebSocket not yet connected
+
+---
+
 ## 21. Pages (complete)
 
 | Page | Access | Description |
@@ -469,4 +502,15 @@ Connect a real MetaTrader 5 account to NeuroQuant. View live trades and close th
 
 ---
 
-*Updated: March 2026 | For internal review and AI consultant feedback only*
+---
+
+## 23. Security Notes (March 2026)
+
+- **AI prompts:** Fully server-side in `src/lib/ai/` — never sent to the browser
+- **API keys:** Cloudflare env vars only — never in client bundles
+- **Supabase RLS:** All user tables protected — users see only their own data
+- **Client-side exposure (unavoidable):** React bundles, API endpoint names, streamed analyst text
+- **Risk score + ATR libs:** Defined in `src/lib/` — may be bundled client-side (review before launch)
+- **MT5 webhook token:** In URL path — HMAC on payload protects integrity but token is visible in logs
+
+*Updated: 2026-03-26 | For internal review and AI consultant feedback only*
