@@ -11,7 +11,6 @@ import { useTradeWatcher } from "@/hooks/useTradeWatcher";
 import { useMarketData } from "@/hooks/useMarketData";
 import { INITIAL_VIRTUAL_BALANCE } from "@/types/simulator";
 import type { PaperTrade } from "@/types/simulator";
-import { TradeTile } from "@/components/simulator/TradeTile";
 import {
   TrendingUp,
   TrendingDown,
@@ -76,8 +75,6 @@ export default function SimulatorPage() {
   const [closedNotifications, setClosedNotifications] = useState<
     { symbol: string; pnl: number }[]
   >([]);
-
-  const [expandedTradeIds, setExpandedTradeIds] = useState<Set<string>>(new Set());
 
   // Trade journal: tradeId → { review, loading, open }
   const [journalState, setJournalState] = useState<
@@ -387,24 +384,117 @@ export default function SimulatorPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-2">
-            {openTrades.map((trade) => (
-              <TradeTile
-                key={trade.id}
-                trade={trade}
-                currentPrice={wsPrices[trade.symbol]?.price ?? null}
-                virtualBalance={stats.virtualBalance}
-                isExpanded={expandedTradeIds.has(trade.id)}
-                onToggle={() => setExpandedTradeIds((prev) => {
-                  const next = new Set(prev);
-                  if (next.has(trade.id)) next.delete(trade.id); else next.add(trade.id);
-                  return next;
-                })}
-                onClose={async (id, price) => { await closeTrade(id, price); refetch(); }}
-                onDelete={async (id) => { await deleteTrade(id); }}
-                showSymbolLink
-              />
-            ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {openTrades.map((trade) => {
+              const livePrice = wsPrices[trade.symbol]?.price ?? null;
+              const pnlPct = livePrice
+                ? trade.side === "long"
+                  ? ((livePrice - trade.entry_price) / trade.entry_price) * 100
+                  : ((trade.entry_price - livePrice) / trade.entry_price) * 100
+                : null;
+              const pnlDollar = pnlPct !== null ? (stats.virtualBalance * pnlPct) / 100 : null;
+              const isProfit = pnlPct !== null && pnlPct >= 0;
+              const snap = trade.analysis_snapshot;
+              const rrRatio = snap?.rrRatio ??
+                Math.abs(trade.tp_price - trade.entry_price) / Math.abs(trade.sl_price - trade.entry_price);
+
+              return (
+                <Card key={trade.id} className={`border ${isProfit ? "border-green-500/30" : "border-red-500/30"}`}>
+                  <CardContent className="py-3 px-4 space-y-2.5">
+                    {/* Header: symbol + direction + P&L */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Link
+                          href={`/dashboard/market/${encodeURIComponent(trade.symbol)}`}
+                          className="font-bold text-sm hover:text-blue-500 hover:underline transition-colors"
+                        >
+                          {trade.symbol}
+                        </Link>
+                        <Badge className={trade.side === "long"
+                          ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20"
+                          : "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
+                        }>
+                          {trade.side === "long"
+                            ? <TrendingUp className="h-3 w-3 mr-1" />
+                            : <TrendingDown className="h-3 w-3 mr-1" />}
+                          {trade.side === "long" ? "BUY" : "SELL"}
+                        </Badge>
+                      </div>
+                      {pnlPct !== null && (
+                        <span className={`text-sm font-bold tabular-nums shrink-0 ${isProfit ? "text-green-500" : "text-red-500"}`}>
+                          {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Entry / SL / TP */}
+                    <div className="grid grid-cols-3 gap-1.5 text-[11px]">
+                      <div>
+                        <p className="text-muted-foreground">Entry</p>
+                        <p className="font-semibold tabular-nums">{getPriceDisplay(trade.entry_price)}</p>
+                      </div>
+                      <div>
+                        <p className="text-red-500">SL</p>
+                        <p className="font-semibold tabular-nums">{getPriceDisplay(trade.sl_price)}</p>
+                      </div>
+                      <div>
+                        <p className="text-green-500">TP</p>
+                        <p className="font-semibold tabular-nums">{getPriceDisplay(trade.tp_price)}</p>
+                      </div>
+                    </div>
+
+                    {/* Metadata: R:R, Risk, ATR, Regime, AI */}
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground border-t border-border/50 pt-2">
+                      <span>R:R <span className="text-foreground font-semibold">1:{rrRatio.toFixed(1)}</span></span>
+                      {snap?.riskScore !== undefined && (
+                        <span>Score <span className={`font-semibold ${snap.riskScore >= 7 ? "text-green-500" : snap.riskScore >= 4 ? "text-amber-500" : "text-red-500"}`}>{snap.riskScore}/10</span></span>
+                      )}
+                      {snap?.atrPips !== undefined && snap.atrLabel && (
+                        <span>ATR <span className="text-foreground font-semibold">{snap.atrPips}{snap.atrLabel}</span></span>
+                      )}
+                      {snap && (
+                        <span className={snap.consensusDirection === "bullish" ? "text-green-500" : snap.consensusDirection === "bearish" ? "text-red-500" : "text-amber-500"}>
+                          AI {snap.sentimentLabel}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Dollar P&L + buttons */}
+                    <div className="flex items-center gap-2">
+                      {pnlDollar !== null && (
+                        <span className={`text-xs font-medium tabular-nums ${isProfit ? "text-green-500" : "text-red-500"}`}>
+                          {pnlDollar >= 0 ? "+" : "-"}${Math.abs(pnlDollar).toFixed(2)}
+                        </span>
+                      )}
+                      <div className="flex gap-1.5 ml-auto">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs h-7 px-3"
+                          disabled={!livePrice}
+                          onClick={async () => {
+                            if (livePrice) { await closeTrade(trade.id, livePrice); refetch(); }
+                          }}
+                        >
+                          <X className="h-3 w-3 mr-1" />
+                          Close
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs h-7 px-2 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                          onClick={async () => {
+                            if (confirm("Delete this trade?")) await deleteTrade(trade.id);
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
