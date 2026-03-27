@@ -4,12 +4,12 @@ import { analyzeTechnical as deepseekAnalyze } from "@/lib/ai/deepseek";
 import { analyzeTechnical as qwenAnalyze } from "@/lib/ai/qwen";
 import { analyzeTechnical as claudeAnalyze } from "@/lib/ai/claude";
 import { calculateConsensus } from "@/lib/ai/consensus";
-import { withTimeout, withRetry } from "@/lib/ai/timeout";
+import { withTimeout } from "@/lib/ai/timeout";
 import { checkAnalysisRateLimit } from "@/lib/ratelimit";
 import type { ModelOutput } from "@/types/analysis";
 
-/** Per-analyst timeout: 25 seconds max per AI call */
-const ANALYST_TIMEOUT_MS = 25_000;
+/** Per-analyst timeout: 20 seconds max per AI call (no retry — fail fast) */
+const ANALYST_TIMEOUT_MS = 20_000;
 
 export const runtime = 'edge';
 
@@ -124,17 +124,12 @@ export async function POST(request: NextRequest) {
           ];
 
           // Create promises that send results as they resolve
-          // Each analyst gets a timeout + 1 retry to ensure all 3 complete
+          // Each analyst gets a timeout — no retry (a slow model retrying doubles wait time)
           let successCount = 0;
 
           const promises = analysts.map(async (analyst, index) => {
             try {
-              const result = await withRetry(
-                () => withTimeout(analyst.fn(marketData), ANALYST_TIMEOUT_MS, analyst.name),
-                1,     // 1 retry on failure
-                500,   // 500ms delay before retry
-                analyst.name
-              );
+              const result = await withTimeout(analyst.fn(marketData), ANALYST_TIMEOUT_MS, analyst.name);
               modelOutputs.push(result);
               successCount++;
               send("analyst", { index, result });
