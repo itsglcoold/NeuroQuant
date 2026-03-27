@@ -24,7 +24,7 @@ export async function analyzeTechnical(marketData: {
   const context = buildMarketDataContext(marketData);
 
   const response = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-6",
     max_tokens: 1500,
     system: technicalAnalysisPrompt("claude", marketData.symbol, marketData.tradingStyle),
     messages: [
@@ -77,7 +77,7 @@ export async function analyzeFundamental(
   context: string
 ): Promise<FundamentalAnalysis> {
   const response = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-6",
     max_tokens: 2000,
     system: fundamentalAnalysisPrompt(),
     messages: [
@@ -117,7 +117,7 @@ export async function streamChat(
   systemPrompt: string
 ) {
   return client.messages.stream({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-6",
     max_tokens: 1500,
     system: systemPrompt,
     messages,
