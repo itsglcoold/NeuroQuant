@@ -69,6 +69,18 @@ export interface MarketSuggestion {
   timeframe: string;
   reasoning: string;
   keyLevel: number;
+  // Enrichment fields — added from OHLC analysis after AI screening
+  candlestickPattern?: {
+    name: string;
+    type: "bullish" | "bearish" | "neutral";
+    confidence: number;
+    description: string;
+  };
+  confluenceScore?: number;
+  confluenceGrade?: "Excellent" | "Good" | "Moderate" | "Poor";
+  marketRegime?: string;
+  adx?: number;
+  recommendation?: string;
 }
 
 export interface SuggestionRow {

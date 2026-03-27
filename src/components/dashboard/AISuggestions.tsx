@@ -131,10 +131,42 @@ function SuggestionCard({ suggestion, hoverColor = "blue", tradingStyle }: { sug
       </div>
 
       {/* Probability Alignment */}
-      <div className="mb-3 flex items-center justify-between text-[10px]">
+      <div className="mb-2 flex items-center justify-between text-[10px]">
         <span className="text-muted-foreground">Probability Alignment</span>
         <span className="font-semibold text-foreground">{suggestion.probabilityAlignment}%</span>
       </div>
+
+      {/* Enrichment — confluence score + candlestick pattern + regime */}
+      {(suggestion.confluenceScore !== undefined || suggestion.candlestickPattern) && (
+        <div className="mb-2 flex flex-wrap items-center gap-1">
+          {suggestion.confluenceScore !== undefined && (
+            <span className={cn(
+              "inline-flex items-center rounded border px-1.5 py-0.5 text-[9px] font-semibold",
+              suggestion.confluenceGrade === "Excellent" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" :
+              suggestion.confluenceGrade === "Good"      ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400" :
+              suggestion.confluenceGrade === "Moderate"  ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400" :
+                                                          "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400"
+            )}>
+              {suggestion.confluenceScore} · {suggestion.confluenceGrade}
+            </span>
+          )}
+          {suggestion.candlestickPattern && (
+            <span className={cn(
+              "inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[9px] font-medium",
+              suggestion.candlestickPattern.type === "bullish" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" :
+              suggestion.candlestickPattern.type === "bearish" ? "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400" :
+                                                                 "border-border bg-secondary/50 text-muted-foreground"
+            )}>
+              🕯 {suggestion.candlestickPattern.name}
+            </span>
+          )}
+          {suggestion.marketRegime && (
+            <span className="inline-flex items-center rounded border border-border bg-secondary/50 px-1.5 py-0.5 text-[9px] capitalize text-muted-foreground">
+              {suggestion.marketRegime}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Timeframe + Key Level */}
       <div className="mb-3 flex items-center gap-1.5">
@@ -416,7 +448,7 @@ export function AISuggestions({ tier }: AISuggestionsProps) {
                 <div className="mb-4 flex items-center justify-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 py-2.5 px-4">
                   <RefreshCw className="h-3.5 w-3.5 animate-spin text-blue-500" />
                   <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                    Updating — scanning 15 markets for fresh signals…
+                    Updating — scanning 15 markets + enriching with patterns &amp; confluence…
                   </span>
                 </div>
               )}
@@ -428,11 +460,10 @@ export function AISuggestions({ tier }: AISuggestionsProps) {
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
-                    Quick scan — based on price action only
+                    AI scan with candlestick patterns + confluence score
                   </p>
                   <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
-                    This overview does not include technical indicators like RSI, MACD, or Bollinger Bands.
-                    Always run a full analysis before trading.
+                    Each setup shows market regime, detected pattern (Bible methodology), and a confluence score (0–100). Always run a full analysis before trading.
                   </p>
                 </div>
               </div>

@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPrices } from "@/lib/market/eodhd";
+import { getPrices, getTimeSeries } from "@/lib/market/eodhd";
 import { MARKETS, SCREENING_ROWS } from "@/lib/market/symbols";
 import { marketScreeningPrompt, DISCLAIMER } from "@/lib/ai/prompts";
 import type { MarketSuggestion, SuggestionRow, SuggestionsResponse } from "@/types/analysis";
+import { detectAllPatterns } from "@/lib/candlestick-patterns";
+import { calculateConfluenceScore } from "@/lib/confluence-score";
+import { detectMarketRegime } from "@/lib/market-regime";
+import { getATRAnalysis } from "@/lib/atr-calculator";
 import OpenAI from "openai";
 
 export const runtime = "edge";
@@ -183,7 +187,96 @@ function mergeGroupSuggestions(
     .sort((a, b) => b.sources - a.sources || b.confidence - a.confidence);
 }
 
-function rawToMarketSuggestion(raw: RawSuggestion): MarketSuggestion {
+// ---------------------------------------------------------------------------
+// OHLC enrichment — candlestick patterns + regime + confluence
+// ---------------------------------------------------------------------------
+
+interface EnrichmentData {
+  candlestickPattern?: MarketSuggestion["candlestickPattern"];
+  confluenceScore?: number;
+  confluenceGrade?: "Excellent" | "Good" | "Moderate" | "Poor";
+  marketRegime?: string;
+  adx?: number;
+  recommendation?: string;
+}
+
+function calculateSwingSR(bars: Array<{ high: number; low: number }>): { support: number[]; resistance: number[] } {
+  const support: number[] = [];
+  const resistance: number[] = [];
+  for (let i = 2; i < bars.length - 2; i++) {
+    if (bars[i].low < bars[i-1].low && bars[i].low < bars[i-2].low &&
+        bars[i].low < bars[i+1].low && bars[i].low < bars[i+2].low) {
+      support.push(bars[i].low);
+    }
+    if (bars[i].high > bars[i-1].high && bars[i].high > bars[i-2].high &&
+        bars[i].high > bars[i+1].high && bars[i].high > bars[i+2].high) {
+      resistance.push(bars[i].high);
+    }
+  }
+  return { support: support.slice(-3), resistance: resistance.slice(0, 3) };
+}
+
+// Timeframe to use per trading style for OHLC enrichment
+const STYLE_OHLC_TIMEFRAME: Record<string, string> = {
+  scalping: "5min",
+  daytrading: "1h",
+  swing: "4h",
+};
+
+async function enrichSymbols(
+  suggestions: RawSuggestion[],
+  styleKey: string
+): Promise<Map<string, EnrichmentData>> {
+  const map = new Map<string, EnrichmentData>();
+  if (suggestions.length === 0) return map;
+  const timeframe = STYLE_OHLC_TIMEFRAME[styleKey] || "4h";
+
+  await Promise.allSettled(
+    suggestions.map(async (raw) => {
+      try {
+        const bars = await getTimeSeries(raw.symbol, timeframe, 50);
+        if (!bars || bars.length < 20) return;
+
+        const patterns = detectAllPatterns(bars);
+        const topPattern = patterns[0] ?? null;
+        const regime = detectMarketRegime(bars, raw.symbol);
+        const atr = getATRAnalysis(bars, raw.symbol);
+
+        const currentPrice = bars[bars.length - 1].close;
+        const { support, resistance } = calculateSwingSR(bars);
+        const atSupport = support.some(p => Math.abs(currentPrice - p) / currentPrice < 0.005);
+        const atResistance = resistance.some(p => Math.abs(currentPrice - p) / currentPrice < 0.005);
+
+        const confluence = calculateConfluenceScore({
+          adx: regime.adx,
+          isTrending: regime.regime === "trending",
+          trendDirection: raw.direction,
+          multiTfAlignment: Math.min(90, raw.confidence),
+          atSupport,
+          atResistance,
+          levelStrength: (atSupport || atResistance) ? 70 : 35,
+          pattern: topPattern ? { name: topPattern.name, type: topPattern.type, confidence: topPattern.confidence } : null,
+          atrRatio: atr.ratio,
+        });
+
+        map.set(raw.symbol, {
+          candlestickPattern: topPattern ? { name: topPattern.name, type: topPattern.type, confidence: topPattern.confidence, description: topPattern.description } : undefined,
+          confluenceScore: confluence.score,
+          confluenceGrade: confluence.grade,
+          marketRegime: regime.regime,
+          adx: regime.adx,
+          recommendation: confluence.recommendation,
+        });
+      } catch {
+        // Silent — enrichment is best-effort, never blocks suggestions
+      }
+    })
+  );
+
+  return map;
+}
+
+function rawToMarketSuggestion(raw: RawSuggestion, enrichment?: EnrichmentData): MarketSuggestion {
   const market = MARKETS.find((m) => m.symbol === raw.symbol);
   return {
     symbol: raw.symbol,
@@ -198,6 +291,7 @@ function rawToMarketSuggestion(raw: RawSuggestion): MarketSuggestion {
     timeframe: raw.timeframe || "Both",
     reasoning: raw.reasoning || "",
     keyLevel: raw.keyLevel || 0,
+    ...enrichment,
   };
 }
 
@@ -281,6 +375,13 @@ async function runScreening(timeoutMs: number = 90_000): Promise<SuggestionsResp
   const mergedDaytrading = mergeGroupSuggestions(deepseekGroups.daytrading, qwenGroups.daytrading);
   const mergedSwing = mergeGroupSuggestions(deepseekGroups.swing, qwenGroups.swing);
 
+  // Enrich suggestions in parallel with OHLC-based data (pattern + regime + confluence)
+  const [scalpingEnrich, daytradingEnrich, swingEnrich] = await Promise.all([
+    enrichSymbols(mergedScalping, "scalping"),
+    enrichSymbols(mergedDaytrading, "daytrading"),
+    enrichSymbols(mergedSwing, "swing"),
+  ]);
+
   // Build rows with metadata from SCREENING_ROWS config
   const rows: SuggestionRow[] = [
     {
@@ -289,7 +390,7 @@ async function runScreening(timeoutMs: number = 90_000): Promise<SuggestionsResp
       subtitle: SCREENING_ROWS[0].subtitle,
       timeframeFocus: SCREENING_ROWS[0].timeframeFocus,
       badgeColor: SCREENING_ROWS[0].badgeColor,
-      suggestions: mergedScalping.map(rawToMarketSuggestion),
+      suggestions: mergedScalping.map(s => rawToMarketSuggestion(s, scalpingEnrich.get(s.symbol))),
     },
     {
       key: SCREENING_ROWS[1].key,
@@ -297,7 +398,7 @@ async function runScreening(timeoutMs: number = 90_000): Promise<SuggestionsResp
       subtitle: SCREENING_ROWS[1].subtitle,
       timeframeFocus: SCREENING_ROWS[1].timeframeFocus,
       badgeColor: SCREENING_ROWS[1].badgeColor,
-      suggestions: mergedDaytrading.map(rawToMarketSuggestion),
+      suggestions: mergedDaytrading.map(s => rawToMarketSuggestion(s, daytradingEnrich.get(s.symbol))),
     },
     {
       key: SCREENING_ROWS[2].key,
@@ -305,7 +406,7 @@ async function runScreening(timeoutMs: number = 90_000): Promise<SuggestionsResp
       subtitle: SCREENING_ROWS[2].subtitle,
       timeframeFocus: SCREENING_ROWS[2].timeframeFocus,
       badgeColor: SCREENING_ROWS[2].badgeColor,
-      suggestions: mergedSwing.map(rawToMarketSuggestion),
+      suggestions: mergedSwing.map(s => rawToMarketSuggestion(s, swingEnrich.get(s.symbol))),
     },
   ];
 
