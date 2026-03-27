@@ -18,6 +18,8 @@ import {
 import { calculateATR, getATRAnalysis, priceToPips } from "@/lib/atr-calculator";
 import { calculateRiskScore } from "@/lib/risk-score";
 import { detectMarketRegime } from "@/lib/market-regime";
+import { detectAllPatterns } from "@/lib/candlestick-patterns";
+import { calculateConfluenceScore } from "@/lib/confluence-score";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -134,6 +136,14 @@ export function QuickSimWidget({
     [timeSeries, symbol]
   );
 
+  // Candlestick pattern on the last candle(s) of the current timeSeries
+  const entryPattern = useMemo(() => {
+    if (!timeSeries || timeSeries.length < 2) return null;
+    const patterns = detectAllPatterns(timeSeries);
+    return patterns[0] ?? null;
+  }, [timeSeries]);
+
+
   const rrMinForRegime = regime?.regime === "trending" ? 3.0 : 2.0;
   const rrTooLow = rrRatio !== null && rrRatio < rrMinForRegime;
 
@@ -198,6 +208,26 @@ export function QuickSimWidget({
   // Support/resistance helper values for free-tier guidance
   // Only suggest levels on the correct side of the entry price
   const { support, resistance } = consensus.mergedKeyLevels;
+
+  // Confluence score (trend × level × signal) using data already available
+  const confluenceResult = useMemo(() => {
+    const atSupport     = support.some(s => Math.abs(currentPrice - s) / currentPrice < 0.005);
+    const atResistance  = resistance.some(r => Math.abs(currentPrice - r) / currentPrice < 0.005);
+    return calculateConfluenceScore({
+      adx:             regime?.adx ?? 25,
+      isTrending:      regime?.regime === "trending",
+      trendDirection:  consensus.consensusDirection === "bullish" ? "bullish"
+                     : consensus.consensusDirection === "bearish" ? "bearish" : "neutral",
+      multiTfAlignment: typeof consensus.agreementLevel === "number" ? consensus.agreementLevel : 50,
+      atSupport,
+      atResistance,
+      levelStrength:   (atSupport || atResistance) ? 70 : 35,
+      pattern:         entryPattern ? { name: entryPattern.name, type: entryPattern.type, confidence: entryPattern.confidence } : null,
+      atrRatio:        atrAnalysis?.ratio ?? 1,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regime, consensus, support, resistance, currentPrice, entryPattern, atrAnalysis]);
+
   const validSlSupport = support.filter((s) => s < currentPrice);
   const validSlResistance = resistance.filter((r) => r > currentPrice);
   const validTpResistance = resistance.filter((r) => r > currentPrice);
@@ -366,6 +396,11 @@ export function QuickSimWidget({
       regime: regime?.regime,
       riskScore: riskScore?.score ?? undefined,
       rrRatio: rrRatio ? Math.round(rrRatio * 10) / 10 : undefined,
+      entryPattern: entryPattern?.name,
+      entryPatternType: entryPattern?.type,
+      entryPatternConfidence: entryPattern?.confidence,
+      confluenceScore: confluenceResult.score,
+      confluenceGrade: confluenceResult.grade,
     };
 
     const result = await onOpenTrade({

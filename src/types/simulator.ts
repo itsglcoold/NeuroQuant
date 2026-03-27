@@ -30,6 +30,13 @@ export interface AnalysisSnapshot {
   regime?: string;       // "trending" | "ranging" | "choppy"
   riskScore?: number;    // 1–10
   rrRatio?: number;      // e.g. 2.0
+  // Candlestick pattern at entry
+  entryPattern?: string;             // e.g. "Bearish Engulfing"
+  entryPatternType?: "bullish" | "bearish" | "neutral";
+  entryPatternConfidence?: number;   // 0–100
+  // Confluence score (trend × level × signal)
+  confluenceScore?: number;          // 0–100
+  confluenceGrade?: "Excellent" | "Good" | "Moderate" | "Poor";
 }
 
 export interface SimulatorStats {
