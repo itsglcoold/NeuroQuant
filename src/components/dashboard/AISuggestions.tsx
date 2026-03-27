@@ -406,7 +406,7 @@ export function AISuggestions({ tier }: AISuggestionsProps) {
               <div className="flex items-center justify-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 py-2.5 px-4">
                 <RefreshCw className="h-3.5 w-3.5 animate-spin text-blue-500" />
                 <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                  Scanning markets across 3 trading styles…
+                  Scanning all 28 markets across 3 trading styles…
                 </span>
               </div>
               {/* Skeleton rows */}
@@ -448,7 +448,7 @@ export function AISuggestions({ tier }: AISuggestionsProps) {
                 <div className="mb-4 flex items-center justify-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 py-2.5 px-4">
                   <RefreshCw className="h-3.5 w-3.5 animate-spin text-blue-500" />
                   <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                    Updating — scanning 15 markets + enriching with patterns &amp; confluence…
+                    Updating — scanning 28 markets + enriching with patterns &amp; confluence…
                   </span>
                 </div>
               )}

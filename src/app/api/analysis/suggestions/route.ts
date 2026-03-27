@@ -98,11 +98,31 @@ type ParsedGroups = {
   swing: RawSuggestion[];
 };
 
+// All 28 markets grouped by trading style
+// Scalping: high-liquidity, tight-spread markets
+// Day Trading: major forex + oil + active JPY crosses
+// Swing: all remaining forex pairs including crosses
+const ALL_MARKETS_BY_STYLE = {
+  scalping: ["IXIC", "SPX", "XAU/USD", "DXY", "EUR/USD"],
+  daytrading: ["GBP/USD", "USD/JPY", "CL", "EUR/JPY", "GBP/JPY", "AUD/JPY", "NZD/JPY", "CAD/JPY"],
+  swing: [
+    "XAG/USD", "AUD/USD", "USD/CAD", "NZD/USD", "USD/CHF",
+    "EUR/GBP", "GBP/AUD", "GBP/NZD", "GBP/CAD", "GBP/CHF",
+    "AUD/CAD", "AUD/CHF", "AUD/NZD", "EUR/AUD", "NZD/CAD",
+  ],
+} as const;
+
+const ALL_MARKETS_FLAT = [
+  ...ALL_MARKETS_BY_STYLE.scalping,
+  ...ALL_MARKETS_BY_STYLE.daytrading,
+  ...ALL_MARKETS_BY_STYLE.swing,
+]; // 28 markets
+
 /** Build a symbol→row lookup for fallback splitting */
 const symbolToRow = new Map<string, keyof ParsedGroups>();
-for (const row of SCREENING_ROWS) {
-  for (const sym of row.symbols) {
-    symbolToRow.set(sym, row.key);
+for (const [style, symbols] of Object.entries(ALL_MARKETS_BY_STYLE)) {
+  for (const sym of symbols) {
+    symbolToRow.set(sym, style as keyof ParsedGroups);
   }
 }
 
@@ -296,18 +316,24 @@ function rawToMarketSuggestion(raw: RawSuggestion, enrichment?: EnrichmentData):
 }
 
 async function runScreening(timeoutMs: number = 90_000): Promise<SuggestionsResponse> {
-  // Only fetch prices for the 15 assets in SCREENING_ROWS
-  const allSymbols = SCREENING_ROWS.flatMap((r) => [...r.symbols]);
-  const pricesArray = await getPrices(allSymbols);
+  // Fetch prices for ALL 28 markets so AI can pick the best setups across the full universe
+  const pricesArray = await getPrices([...ALL_MARKETS_FLAT]);
   const priceMap = new Map(pricesArray.map((p) => [p.symbol, p]));
 
-  // Build context with group labels so AI understands the structure
-  let context = `MARKET SCREENING DATA (${allSymbols.length} markets in 3 groups):\n\n`;
+  // Build context grouped by trading style
+  const STYLE_LABELS: Record<string, { label: string; timeframe: string }> = {
+    scalping:   { label: "SCALPING",    timeframe: "1m / 5m" },
+    daytrading: { label: "DAY TRADING", timeframe: "15m / 1H" },
+    swing:      { label: "SWING TRADING", timeframe: "4H / Daily" },
+  };
 
-  for (const row of SCREENING_ROWS) {
-    context += `--- ${row.label.toUpperCase()} (${row.timeframeFocus}) ---\n`;
+  let context = `MARKET SCREENING DATA (${ALL_MARKETS_FLAT.length} markets in 3 groups):\n\n`;
+
+  for (const [style, symbols] of Object.entries(ALL_MARKETS_BY_STYLE)) {
+    const meta = STYLE_LABELS[style];
+    context += `--- ${meta.label} (${meta.timeframe}) ---\n`;
     context += `Symbol | Price | Change% | High | Low | Open | PrevClose\n`;
-    for (const symbol of row.symbols) {
+    for (const symbol of symbols) {
       const p = priceMap.get(symbol);
       if (!p || p.price === 0) continue;
       context += `${symbol} | ${p.price} | ${p.changePercent.toFixed(2)}% | ${p.high} | ${p.low} | ${p.open} | ${p.previousClose}\n`;
@@ -330,7 +356,7 @@ async function runScreening(timeoutMs: number = 90_000): Promise<SuggestionsResp
           { role: "user", content: userMessage },
         ],
         temperature: 0.2,
-        max_tokens: 1500,
+        max_tokens: 2000,
       }),
       perModelTimeout
     ),
@@ -342,7 +368,7 @@ async function runScreening(timeoutMs: number = 90_000): Promise<SuggestionsResp
           { role: "user", content: userMessage },
         ],
         temperature: 0.2,
-        max_tokens: 1500,
+        max_tokens: 2000,
       }),
       perModelTimeout
     ),
@@ -421,7 +447,7 @@ async function runScreening(timeoutMs: number = 90_000): Promise<SuggestionsResp
     generatedAt: now.toISOString(),
     expiresAt: expiresAt.toISOString(),
     disclaimer: DISCLAIMER,
-    marketsScanned: allSymbols.length,
+    marketsScanned: ALL_MARKETS_FLAT.length,
   };
 }
 
