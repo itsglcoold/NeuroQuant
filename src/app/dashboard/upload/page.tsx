@@ -312,6 +312,32 @@ export default function ChartUploadPage() {
                 )}
               </div>
 
+              {/* Market Structure */}
+              {result.marketStructure && (
+                <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-3">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-purple-500 mb-1">Market Structure</h4>
+                  <p className="text-sm text-foreground/80">{result.marketStructure}</p>
+                </div>
+              )}
+
+              {/* Key levels above/below */}
+              {(result.keyLevelAbove || result.keyLevelBelow) && (
+                <div className="grid grid-cols-2 gap-3">
+                  {result.keyLevelBelow != null && (
+                    <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-2.5 text-center">
+                      <p className="text-xs text-green-500 font-semibold uppercase tracking-wider mb-0.5">Nearest Support</p>
+                      <p className="text-base font-bold tabular-nums">{result.keyLevelBelow}</p>
+                    </div>
+                  )}
+                  {result.keyLevelAbove != null && (
+                    <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-2.5 text-center">
+                      <p className="text-xs text-red-500 font-semibold uppercase tracking-wider mb-0.5">Nearest Resistance</p>
+                      <p className="text-base font-bold tabular-nums">{result.keyLevelAbove}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {result.indicators.length > 0 && (
                 <div>
                   <h4 className="text-sm font-semibold text-foreground/80 mb-2">Indicator Readings</h4>
@@ -323,6 +349,31 @@ export default function ChartUploadPage() {
                       </li>
                     ))}
                   </ul>
+                </div>
+              )}
+
+              {/* Stop Loss & Targets */}
+              {(result.stopLossZone || (result.targetZones && result.targetZones.length > 0)) && (
+                <div className="grid grid-cols-1 gap-3">
+                  {result.stopLossZone && (
+                    <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-red-500 mb-1">Stop Loss Zone</h4>
+                      <p className="text-sm text-foreground/80">{result.stopLossZone}</p>
+                    </div>
+                  )}
+                  {result.targetZones && result.targetZones.length > 0 && (
+                    <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3">
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-green-500 mb-1.5">Target Zones</h4>
+                      <ul className="space-y-1">
+                        {result.targetZones.map((t, i) => (
+                          <li key={i} className="text-sm text-foreground/80 flex items-start gap-1.5">
+                            <span className="text-green-500 font-bold">T{i + 1}</span>
+                            <span>{t}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
 

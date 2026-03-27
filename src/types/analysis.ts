@@ -39,6 +39,11 @@ export interface ChartAnalysisResult {
   supportLevels: number[];
   resistanceLevels: number[];
   indicators: string[];
+  marketStructure?: string | null;
+  keyLevelAbove?: number | null;
+  keyLevelBelow?: number | null;
+  stopLossZone?: string | null;
+  targetZones?: string[];
   scalpOutlook?: string | null;
   swingOutlook?: string | null;
   analysis: string;

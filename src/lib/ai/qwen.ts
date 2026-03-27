@@ -86,13 +86,13 @@ export async function analyzeChart(imageBase64: string): Promise<ChartAnalysisRe
           },
           {
             type: "text",
-            text: "Analyze this financial chart. Identify patterns, trends, support/resistance levels, and any visible indicators.",
+            text: "Perform a complete professional technical analysis of this financial chart. Follow all 9 steps in your instructions.",
           },
         ],
       },
     ],
     temperature: 0.3,
-    max_tokens: 1500,
+    max_tokens: 3000,
   });
 
   let content = response.choices[0]?.message?.content || "";

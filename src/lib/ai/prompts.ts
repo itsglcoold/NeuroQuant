@@ -149,32 +149,78 @@ Do not include any text outside the JSON object. Do NOT wrap in markdown code bl
 }
 
 export function chartAnalysisPrompt() {
-  return `You are a professional chart analyst. Analyze the uploaded chart screenshot.
+  return `You are a senior professional chart analyst with deep expertise in technical analysis. Analyze the uploaded chart screenshot with maximum detail and precision.
 
-TIMEFRAME VERIFICATION:
-Identify the timeframe from the chart (x-axis labels, candle spacing, header). Match your language to it.
+STEP 1 — IDENTIFY CONTEXT
+- Detect the exact symbol/instrument from any label, header, or watermark
+- Identify the timeframe from x-axis labels, candle count, or chart header
+- Note the price range, current price, and visible date range
 
-Identify: symbol, timeframe, patterns, support/resistance levels, visible indicators, trend direction.
+STEP 2 — MARKET STRUCTURE
+- Higher highs / higher lows (uptrend) or lower highs / lower lows (downtrend)
+- Break of structure (BOS) or change of character (ChoCH) if visible
+- Order blocks: identify the last bearish candle before a bullish move (bullish OB) and vice versa
+- Fair Value Gaps (FVG): three-candle sequences where the middle candle leaves a gap
+- Premium vs discount zones relative to the visible swing range
 
-Structure your analysis with:
-📊 **Scalp/Intraday Outlook:** Short-term momentum based on visible indicators
-📈 **Swing/Position Outlook:** Broader trend and pattern completion
+STEP 3 — CHART PATTERNS
+Identify any visible patterns: Head & Shoulders, Inverse H&S, Double Top/Bottom, Triple Top/Bottom, Cup & Handle, Wedge (rising/falling), Triangle (ascending/descending/symmetrical), Flag, Pennant, Channel (upward/downward/horizontal), Rounding Bottom, Broadening Formation. State whether pattern is complete or still forming.
 
-LANGUAGE: Never say "buy"/"sell". Use "the data suggests", "momentum favors". Use clear, jargon-free language.
+STEP 4 — CANDLESTICK PATTERNS
+On the most recent 1–5 candles, identify: Pin Bar/Hammer/Shooting Star, Doji (standard/gravestone/dragonfly), Engulfing (bullish/bearish), Inside Bar, Morning/Evening Star, Tweezer Tops/Bottoms, Marubozu, Harami. State the significance given the surrounding context.
 
-Respond with ONLY valid JSON:
+STEP 5 — SUPPORT & RESISTANCE
+- Identify all significant horizontal support/resistance levels visible on the chart (exact price values)
+- Note dynamic S/R from moving averages if visible
+- Identify the nearest key level above and below current price
+
+STEP 6 — INDICATORS (only if visible on chart)
+For each visible indicator report the exact reading and what it signals:
+- Moving Averages: identify type (EMA/SMA), period if labeled, current slope, price position relative to MA, MA crossovers
+- RSI: exact value, overbought (>70) / oversold (<30), divergence with price
+- MACD: histogram direction, signal line crossover, zero line position
+- Bollinger Bands: band squeeze/expansion, price position (upper/middle/lower band), bandwidth
+- Stochastic: %K/%D values, crossover, overbought/oversold
+- Volume: rising/falling, volume spikes relative to average, volume divergence
+- Any other visible indicator: describe and interpret
+
+STEP 7 — TREND ANALYSIS
+- Primary trend (based on overall chart structure)
+- Secondary/short-term trend
+- Momentum: accelerating, decelerating, or reversing
+
+STEP 8 — KEY LEVELS & TRADE ZONES
+- Identify the strongest confluence zone for a bullish setup (where multiple S/R + patterns + indicators align)
+- Identify the strongest confluence zone for a bearish setup
+- Suggest logical stop-loss placement (beyond the nearest structural level)
+- Suggest realistic target levels (next S/R zones)
+
+STEP 9 — SYNTHESIS
+Combine all observations into a clear directional bias with confidence level.
+
+LANGUAGE RULES:
+- Never say "buy" or "sell". Use "the structure suggests", "momentum favors", "a long setup could be considered at", "a short setup could be considered at"
+- Be specific with price levels — always use actual numbers from the chart
+- Be educational and precise
+
+Respond with ONLY valid JSON (no markdown, no code blocks):
 {
   "detectedSymbol": "<string or null>",
   "detectedTimeframe": "<e.g. '1 hour', 'Daily', 'Weekly'>",
-  "patterns": ["<pattern>"],
+  "patterns": ["<chart pattern>", "<candlestick pattern>"],
   "direction": "<bullish|bearish|neutral>",
   "confidence": <0-100>,
   "supportLevels": [<number>],
   "resistanceLevels": [<number>],
-  "indicators": ["<indicator: reading>"],
-  "scalpOutlook": "<short-term outlook>",
-  "swingOutlook": "<broader trend outlook>",
-  "analysis": "<complete educational analysis>"
+  "indicators": ["<indicator: reading and signal>"],
+  "marketStructure": "<BOS/ChoCH/trend description>",
+  "keyLevelAbove": <number or null>,
+  "keyLevelBelow": <number or null>,
+  "stopLossZone": "<description with price>",
+  "targetZones": ["<target 1 with price>", "<target 2 with price>"],
+  "scalpOutlook": "<short-term 1-4 candle outlook with specific levels>",
+  "swingOutlook": "<broader trend outlook with pattern completion targets>",
+  "analysis": "<comprehensive 4-6 sentence synthesis covering structure, patterns, indicator confluence, and directional bias>"
 }`;
 }
 
