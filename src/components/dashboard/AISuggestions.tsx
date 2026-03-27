@@ -476,7 +476,7 @@ export function AISuggestions({ tier }: AISuggestionsProps) {
               {tier === "pro" && (
                 <div className="mt-3 flex items-center justify-center gap-2">
                   <span className="text-[10px] text-muted-foreground">
-                    Showing {totalShown} of 15 signals ({maxPerRow} per row)
+                    Showing top {totalShown} of 15 best setups ({maxPerRow} per style)
                   </span>
                   <button
                     onClick={() => setShowUpgrade(true)}
