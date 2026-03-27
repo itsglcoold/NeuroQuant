@@ -27,7 +27,7 @@ export async function analyzeTechnical(marketData: {
   const context = buildMarketDataContext(marketData);
 
   const response = await getClient().chat.completions.create({
-    model: "qwen-max-latest", // most capable Qwen text model
+    model: "qwen3-max-2025-09-23", // most powerful general-purpose Qwen model
     messages: [
       { role: "system", content: technicalAnalysisPrompt("qwen", marketData.symbol, marketData.tradingStyle) },
       { role: "user", content: `Analyze the following market data:\n\n${context}` },
@@ -74,7 +74,7 @@ export async function analyzeTechnical(marketData: {
 
 export async function analyzeChart(imageBase64: string): Promise<ChartAnalysisResult> {
   const response = await getClient().chat.completions.create({
-    model: "qwen-vl-max", // most capable Qwen vision model
+    model: "qwen3.5-plus-2026-02-15", // native vision-language, most capable multimodal
     messages: [
       { role: "system", content: chartAnalysisPrompt() },
       {
