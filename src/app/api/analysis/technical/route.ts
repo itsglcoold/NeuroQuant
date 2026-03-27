@@ -8,8 +8,8 @@ import { withTimeout } from "@/lib/ai/timeout";
 import { checkAnalysisRateLimit } from "@/lib/ratelimit";
 import type { ModelOutput } from "@/types/analysis";
 
-/** Per-analyst timeout: 20 seconds max per AI call (no retry — fail fast) */
-const ANALYST_TIMEOUT_MS = 20_000;
+/** Per-analyst timeout: 25 seconds max per AI call (no retry — fail fast) */
+const ANALYST_TIMEOUT_MS = 25_000;
 
 export const runtime = 'edge';
 
