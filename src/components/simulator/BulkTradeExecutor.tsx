@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Zap, ChevronDown, ChevronUp, ExternalLink, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { MARKETS } from "@/lib/market/symbols";
+import { MARKETS, getSymbolTradingStyle } from "@/lib/market/symbols";
 
 const CATEGORIES = [
   { key: "all",     label: "All" },
@@ -35,7 +35,10 @@ export function BulkTradeExecutor() {
     setPopupBlocked(false);
     let blocked = false;
     for (const symbol of Array.from(selected)) {
-      const w = window.open(`/dashboard/market/${encodeURIComponent(symbol)}?autoAnalyse=true`, "_blank");
+      const style = getSymbolTradingStyle(symbol)?.key;
+      const params = new URLSearchParams({ autoAnalyse: "true" });
+      if (style) params.set("style", style);
+      const w = window.open(`/dashboard/market/${encodeURIComponent(symbol)}?${params}`, "_blank");
       if (!w) blocked = true;
     }
     if (blocked) setPopupBlocked(true);

@@ -1,5 +1,5 @@
 # NeuroQuant — Complete Feature Overview
-> AI-powered market analysis platform | Version: March 2026 (sessie 2026-03-26) | Stack: Next.js 15.5 + Supabase + Cloudflare Pages
+> AI-powered market analysis platform | Version: March 2026 (sessie 2026-03-29) | Stack: Next.js 15.5 + Supabase + Cloudflare Pages
 
 ---
 
@@ -36,9 +36,9 @@ The core feature of the platform. Three independent AI models analyze the same m
 ### Models
 | Model | Name in App | Provider | Weight | Specialty |
 |---|---|---|---|---|
-| DeepSeek | Analyst Alpha | DeepSeek API | 40% | Quantitative / Technical indicators |
-| Qwen | Analyst Beta | Alibaba DashScope | 40% | Visual patterns / Chart structure |
-| Claude | Analyst Gamma | Anthropic | 20% | Macro / Fundamental / Cross-market |
+| DeepSeek V3 (`deepseek-chat`) | Analyst Alpha | DeepSeek API | 40% | Quantitative / Technical indicators |
+| Qwen3-Max (`qwen3-max-2025-09-23`) | Analyst Beta | Alibaba DashScope | 40% | Visual patterns / Chart structure |
+| Claude Opus 4.6 (`claude-opus-4-6`) | Analyst Gamma | Anthropic | 20% | Macro / Fundamental / Cross-market |
 
 ### Consensus Output
 - **Direction:** Bullish / Bearish / Neutral
@@ -60,7 +60,7 @@ Analysis results stream via SSE (Server-Sent Events) with events:
 `status` → `market_data` → `analyst_alpha` → `analyst_beta` → `analyst_gamma` → `consensus`
 
 ### Timeouts
-- 25s per analyst
+- 35s per analyst (verhoogd van 25s om grotere modellen te accommoderen)
 - Graceful degradation: if one AI times out, consensus still formed from remaining results
 
 ---
@@ -163,32 +163,45 @@ Displayed in the simulator widget before opening a trade. Combines three factors
 ## 7. Chart Upload & Image Analysis
 
 - **Upload:** Drag-drop or file browse (PNG/JPG/WebP, max 5MB)
-- **AI Model:** Qwen vision (qwen3.5-plus multimodal)
+- **AI Model:** Qwen3.5-Plus vision (`qwen3.5-plus-2026-02-15`) — native vision-language, SOTA multimodal
 - **Pro+ only**
 
-### What the AI Detects
-- Market symbol (e.g. "XAUUSD" → XAU/USD)
-- Timeframe (e.g. "1H", "Daily")
-- Trading style (scalping / daytrading / swing)
-- Chart patterns: Head-and-shoulders, Double top/bottom, Triangles, Flags, Wedges, Pennants, Fibonacci
-- Support & Resistance levels (extracted from chart)
-- Visible indicators (RSI, MACD, Moving Averages, Bollinger Bands)
-- Direction (Bullish / Bearish / Neutral) + Confidence %
+### 9-Step Professional Analysis
+1. Context (symbol, timeframe, price range)
+2. Market Structure (BOS, ChoCH, order blocks, Fair Value Gaps, premium/discount zones)
+3. Chart Patterns (H&S, double top/bottom, wedge, triangle, flag, pennant, channel, etc.)
+4. Candlestick Patterns (pin bar, engulfing, doji, inside bar, morning/evening star, etc.)
+5. Support & Resistance (exact price levels)
+6. Indicators (every visible indicator with exact value and signal)
+7. Trend Analysis (primary + secondary trend, momentum)
+8. Key Trade Zones (SL placement, target levels with S/R confluence)
+9. Synthesis (directional bias + confidence)
 
-### Output
-- Scalp Outlook (for scalping/daytrading styles)
-- Swing Outlook (for swing styles)
-- Detailed written analysis
+### Output Fields
+- Symbol, Timeframe, Trading Style detection
+- Direction (Bullish / Bearish / Neutral) + Confidence %
+- Detected Patterns (chart + candlestick)
+- Support & Resistance levels
+- Market Structure description
+- Nearest Support / Nearest Resistance callouts
+- Indicator Readings (with exact values)
+- Stop Loss Zone (with price)
+- T1 / T2 Target Zones (with prices)
+- Scalp Outlook + Swing Outlook
+- Full written analysis
 
 ---
 
 ## 8. AI Market Research (Daily Suggestions)
 
-- Scans all 25+ markets to find best current opportunities
+- Scans **alle 28 markten** (5 scalping + 8 daytrading + 15 swing) — AI kiest beste 15 (5 per stijl)
 - **Groups results by trading style:** Scalping / Daytrading / Swing Trading
-- **Each suggestion shows:** Symbol, Direction, Confidence %, Sentiment label, Probability alignment, Key level, Reasoning, Timeframe
+- **Each suggestion shows:** Symbol, Direction, Confidence %, Sentiment label, Probability alignment, Key level, Reasoning, Timeframe, Candlestick Pattern, Confluence Score/Grade, Market Regime
+- **OHLC enrichment** per suggestion: candlestick pattern + regime + confluence score berekend na AI-merge
+  - Scalping: 5min bars · Daytrading: 1h bars · Swing: 4h bars
 - **Cache:** 30 min fresh, 4 hours stale (serves stale if refresh fails)
 - **Pro+ only**
+- Premium: toont alle 15 · Pro: toont top 9 (3 per stijl)
 
 ---
 
@@ -260,9 +273,9 @@ Displayed in the simulator widget before opening a trade. Combines three factors
 | Backend | Next.js API routes (Edge Runtime / Cloudflare Workers) |
 | Database | Supabase (PostgreSQL) — profiles, paper_trades, trade_journal |
 | Auth | Supabase Auth (magic link + Google OAuth) |
-| AI — Technical | DeepSeek API (deepseek-chat) |
-| AI — Chart/Visual | Alibaba DashScope (qwen3.5-plus, qwen-plus) |
-| AI — Strategic | Anthropic Claude (claude-sonnet-4) |
+| AI — Technical | DeepSeek API (`deepseek-chat` V3) |
+| AI — Chart/Visual | Alibaba DashScope (`qwen3-max-2025-09-23` tekst · `qwen3.5-plus-2026-02-15` vision) |
+| AI — Strategic | Anthropic Claude (`claude-opus-4-6`) |
 | Market data | EODHD (WebSocket + REST) |
 | Payments | Stripe (checkout, customer portal, webhooks) |
 | Email | Resend SMTP (smtp.resend.com:465) |
@@ -513,4 +526,35 @@ When a user has an open trade for a symbol, a card appears on the market detail 
 - **Risk score + ATR libs:** Defined in `src/lib/` — may be bundled client-side (review before launch)
 - **MT5 webhook token:** In URL path — HMAC on payload protects integrity but token is visible in logs
 
-*Updated: 2026-03-26 | For internal review and AI consultant feedback only*
+---
+
+## 24. Sessie 2026-03-27 — Candlestick Patterns + Confluence Score
+
+### Simulator
+- **Candlestick pattern detection** bij trade-open (The Candlestick Trading Bible methode)
+  - Detecteert: Hammer, Shooting Star, Doji varianten, Engulfing, Inside Bar, Tweezers, Morning/Evening Star
+  - `src/lib/candlestick-patterns.ts`
+- **Confluence Score** (3-factor model): Trend 40% / Level 35% / Signal 25% → score 0–100
+  - Grades: Excellent (≥80) / Good (≥65) / Moderate (≥50) / Poor (<50)
+  - `src/lib/confluence-score.ts`
+- Beide opgeslagen in `analysis_snapshot` JSONB (geen DB migratie nodig)
+
+### AI Market Research
+- 28 markten gescand → AI kiest beste 15 (5 per stijl)
+- Elke suggestie verrijkt met candlestick pattern + confluence score + market regime
+
+---
+
+## 25. Sessie 2026-03-29 — Model Upgrades + Chart Analyse Uitgebreid
+
+### Kritieke fix: alle AI modellen upgraded
+Alle drie analysts draaiden op inferieure modellen — gecorrigeerd naar beste beschikbaar.
+
+### Chart analyse: 9-staps prompt (zie sectie 7)
+- max_tokens verhoogd: 1500 → 3000
+- Nieuwe UI velden: Market Structure, Nearest S/R, Stop Loss Zone, T1/T2 Targets
+
+### Paper Trading Test
+- 28 trades gezet (1 per markt) op 2026-03-29 — evaluatie volgt over paar dagen
+
+*Updated: 2026-03-29 | For internal review and AI consultant feedback only*
