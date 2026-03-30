@@ -32,12 +32,11 @@ export function BulkTradeExecutor() {
   const selectCat  = (cat: string) => setSelected(new Set(MARKETS.filter((m) => m.category === cat).map((m) => m.symbol)));
 
   const openTabs = () => {
-    // Stagger tab opens by 150ms each — browsers block simultaneous window.open calls
-    Array.from(selected).forEach((symbol, i) => {
-      setTimeout(() => {
-        window.open(`/dashboard/market/${encodeURIComponent(symbol)}?autoAnalyse=true`, "_blank");
-      }, i * 150);
-    });
+    // Synchronous loop — must stay in the same user-gesture call stack.
+    // setTimeout breaks the gesture chain and causes browsers to block all but the first tab.
+    for (const symbol of Array.from(selected)) {
+      window.open(`/dashboard/market/${encodeURIComponent(symbol)}?autoAnalyse=true`, "_blank");
+    }
   };
 
   const count = selected.size;
