@@ -98,7 +98,7 @@ export function MarketCard({
                 {changePercent !== undefined && typeof changePercent === "number"
                   ? `${isPositive ? "+" : ""}${changePercent.toFixed(2)}%`
                   : change !== undefined && typeof change === "number"
-                    ? `${isPositive ? "+" : ""}${change.toFixed(2)}`
+                    ? formatChange(change, symbol)
                     : "0.00"}
               </div>
             )}
@@ -117,8 +117,7 @@ export function MarketCard({
                       isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
                     )}
                   >
-                    {isPositive ? "+" : ""}
-                    {typeof change === "number" ? change.toFixed(2) : "0.00"}
+                    {typeof change === "number" ? formatChange(change, symbol) : "0.00"}
                   </span>
                 )}
               </div>
@@ -133,6 +132,20 @@ export function MarketCard({
       </Card>
     </Link>
   );
+}
+
+function formatChange(change: number, symbol: string): string {
+  // Determine precision: forex pairs need 4 decimals, everything else 2
+  const isForex = symbol.includes("/") && !["XAU/USD", "XAG/USD"].includes(symbol);
+  const isJpy = symbol.includes("JPY");
+  const decimals = isForex ? (isJpy ? 3 : 4) : 2;
+
+  // Prevent -0.00 / +0.00: if absolute value rounds to zero, return plain 0
+  const rounded = parseFloat(Math.abs(change).toFixed(decimals));
+  if (rounded === 0) return `0.${"0".repeat(decimals)}`;
+
+  const sign = change >= 0 ? "+" : "-";
+  return `${sign}${Math.abs(change).toFixed(decimals)}`;
 }
 
 function getCurrencyPrefix(symbol: string): string {
