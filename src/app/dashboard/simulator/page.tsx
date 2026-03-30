@@ -11,6 +11,7 @@ import { BulkTradeExecutor } from "@/components/simulator/BulkTradeExecutor";
 import { useTradeWatcher } from "@/hooks/useTradeWatcher";
 import { useMarketData } from "@/hooks/useMarketData";
 import { INITIAL_VIRTUAL_BALANCE } from "@/types/simulator";
+import { MARKETS } from "@/lib/market/symbols";
 import type { PaperTrade } from "@/types/simulator";
 import {
   TrendingUp,
@@ -341,19 +342,15 @@ export default function SimulatorPage() {
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Open a market, run AI analysis, then open a trade in the simulator widget.
                   </p>
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {[
-                      { label: "Gold", symbol: "XAU/USD" },
-                      { label: "EUR/USD", symbol: "EUR/USD" },
-                      { label: "GBP/USD", symbol: "GBP/USD" },
-                      { label: "S&P 500", symbol: "SPX" },
-                    ].map(({ label, symbol }) => (
+                  <div className="grid grid-cols-5 sm:grid-cols-7 gap-1 mt-2">
+                    {MARKETS.map((m) => (
                       <Link
-                        key={symbol}
-                        href={`/dashboard/market/${encodeURIComponent(symbol)}`}
-                        className="rounded border border-border bg-background px-2 py-0.5 text-[10px] font-medium hover:bg-muted hover:border-blue-500/30 hover:text-blue-500 transition-colors"
+                        key={m.symbol}
+                        href={`/dashboard/market/${encodeURIComponent(m.symbol)}`}
+                        className="flex flex-col items-center gap-0.5 rounded-lg border border-border p-1.5 hover:border-blue-500/30 hover:bg-blue-500/5 transition-colors"
                       >
-                        {label}
+                        <span className="text-sm">{m.emoji}</span>
+                        <span className="text-[9px] font-medium text-muted-foreground text-center leading-tight truncate w-full text-center">{m.symbol}</span>
                       </Link>
                     ))}
                   </div>
