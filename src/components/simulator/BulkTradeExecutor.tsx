@@ -115,13 +115,10 @@ export function BulkTradeExecutor() {
           >
             <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
             {count === 0
-              ? "Select markets to open"
-              : `Open ${count} market${count > 1 ? "s" : ""} in tabs`}
+              ? "Select markets to analyse"
+              : `Analyse ${count} market${count > 1 ? "s" : ""} in tabs`}
           </Button>
 
-          <p className="text-[10px] text-muted-foreground text-center">
-            Each tab opens the market page where you can run AI analysis and open a trade manually.
-          </p>
         </CardContent>
       )}
     </Card>

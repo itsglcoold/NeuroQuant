@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +10,6 @@ import { BulkTradeExecutor } from "@/components/simulator/BulkTradeExecutor";
 import { useTradeWatcher } from "@/hooks/useTradeWatcher";
 import { useMarketData } from "@/hooks/useMarketData";
 import { INITIAL_VIRTUAL_BALANCE } from "@/types/simulator";
-import { MARKETS } from "@/lib/market/symbols";
 import type { PaperTrade } from "@/types/simulator";
 import {
   TrendingUp,
@@ -30,9 +28,7 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
-  Search,
   Zap,
-  PlayCircle,
 } from "lucide-react";
 
 function formatPnl(pnl: number): string {
@@ -302,56 +298,11 @@ export default function SimulatorPage() {
 
       {/* Empty state — no trades at all */}
       {openTrades.length === 0 && closedTrades.length === 0 && (
-        <Card className="border border-dashed border-blue-500/20 bg-blue-500/5">
-          <CardContent className="py-8 px-6 space-y-6">
-            <div className="text-center space-y-1">
-              <p className="font-semibold text-base">No trades yet</p>
-              <p className="text-sm text-muted-foreground">
-                Open trades via one of the two methods below. All trades appear here automatically.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Option A — Multi-tab */}
-              <div className="flex gap-3 rounded-lg border border-blue-500/20 bg-blue-500/5 p-4">
-                <div className="shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/10">
-                  <Zap className="h-4 w-4 text-blue-500" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-blue-500 uppercase tracking-wide mb-0.5">Multi-market</p>
-                  <p className="text-sm font-semibold">Multi-Market Analyser</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Use the card above — select markets and open them all in tabs for AI analysis.
-                  </p>
-                </div>
-              </div>
-
-              {/* Option B — Single */}
-              <div className="flex gap-3 rounded-lg border border-border p-4">
-                <div className="shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-green-500/10">
-                  <Search className="h-4 w-4 text-green-500" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Single Trade</p>
-                  <p className="text-sm font-semibold">Go to a market page</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Open a market, run AI analysis, then open a trade in the simulator widget.
-                  </p>
-                  <div className="grid grid-cols-5 sm:grid-cols-7 gap-1 mt-2">
-                    {MARKETS.map((m) => (
-                      <Link
-                        key={m.symbol}
-                        href={`/dashboard/market/${encodeURIComponent(m.symbol)}`}
-                        className="flex flex-col items-center gap-0.5 rounded-lg border border-border p-1.5 hover:border-blue-500/30 hover:bg-blue-500/5 transition-colors"
-                      >
-                        <span className="text-sm">{m.emoji}</span>
-                        <span className="text-[9px] font-medium text-muted-foreground text-center leading-tight truncate w-full text-center">{m.symbol}</span>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
+        <Card className="border border-dashed border-border">
+          <CardContent className="py-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              No trades yet. Use the Multi-Market Analyser above to open market tabs and run AI analysis.
+            </p>
           </CardContent>
         </Card>
       )}
