@@ -387,11 +387,11 @@ export function BulkTradeExecutor({
           <div className="flex flex-wrap gap-1.5">
             {[
               { label: `All (${MARKETS.length})`, action: selectAll, cls: "border-border text-muted-foreground hover:bg-accent" },
+              { label: "None", action: deselectAll, cls: "border-border text-muted-foreground hover:bg-accent" },
               { label: "Forex", action: () => selectCat("forex"), cls: "border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10" },
               { label: "Metals", action: () => selectCat("metals"), cls: "border-yellow-500/30 text-yellow-600 dark:text-yellow-500 hover:bg-yellow-500/10" },
               { label: "Energy", action: () => selectCat("energy"), cls: "border-emerald-500/30 text-emerald-600 dark:text-emerald-500 hover:bg-emerald-500/10" },
               { label: "Indices", action: () => selectCat("indices"), cls: "border-indigo-500/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10" },
-              { label: "None", action: deselectAll, cls: "border-border text-muted-foreground hover:bg-accent" },
             ].map(({ label, action, cls }) => (
               <button key={label} onClick={action} className={cn("px-2 py-1 rounded text-[10px] font-medium border transition-colors", cls)}>
                 {label}
