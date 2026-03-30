@@ -42,7 +42,22 @@ function defaultTfForSymbol(symbol: string): TF {
   }
 }
 
+// ── Decimal precision per symbol ─────────────────────────────────────────────
+function fmtPrice(price: number, symbol: string): string {
+  if (symbol.includes("JPY")) return price.toFixed(3);
+  if (symbol === "XAU/USD" || symbol === "XAG/USD") return price.toFixed(2);
+  if (price >= 100) return price.toFixed(2);
+  if (price >= 1) return price.toFixed(5);
+  return price.toFixed(5);
+}
+
 // ── Per-market row state ─────────────────────────────────────────────────────
+interface AnalystSignal {
+  name: string; // "Alpha" | "Beta" | "Gamma"
+  direction: "bullish" | "bearish" | "neutral";
+  confidence: number;
+}
+
 interface MarketRow {
   symbol: string;
   category: string;
@@ -55,6 +70,7 @@ interface MarketRow {
   direction?: "bullish" | "bearish" | "neutral";
   confidence?: number;    // 0–100 (|consensusScore|)
   agreementLevel?: string;
+  analysts?: AnalystSignal[];
   scanning?: boolean;
   scanError?: string;
   // After execute:
@@ -86,12 +102,15 @@ function computeSlTp(price: number, atr: number, style: StyleKey, side: "long" |
 }
 
 // ── Consume the analysis SSE stream — same endpoint as manual flow ───────────
+const ANALYST_NAMES = ["Alpha", "Beta", "Gamma"];
+
 async function analyzeMarket(symbol: string, tf: TF): Promise<{
   price: number;
   atr: number;
   direction: "bullish" | "bearish" | "neutral";
   confidence: number;
   agreementLevel: string;
+  analysts: AnalystSignal[];
 }> {
   const interval = TF_TO_INTERVAL[tf];
   const tradingStyle = getSymbolTradingStyle(symbol)?.key;
@@ -116,6 +135,7 @@ async function analyzeMarket(symbol: string, tf: TF): Promise<{
   let direction: "bullish" | "bearish" | "neutral" = "neutral";
   let confidence = 0;
   let agreementLevel = "low";
+  let analysts: AnalystSignal[] = [];
 
   while (true) {
     const { done, value } = await reader.read();
@@ -136,6 +156,13 @@ async function analyzeMarket(symbol: string, tf: TF): Promise<{
           direction = data.consensus?.consensusDirection ?? "neutral";
           confidence = Math.round(Math.abs(data.consensus?.consensusScore ?? 0));
           agreementLevel = data.consensus?.agreementLevel ?? "low";
+          // Extract individual analyst results from consensusResult
+          const individual = data.consensus?.individualAnalyses ?? [];
+          analysts = individual.map((a: { direction: string; confidence: number }, i: number) => ({
+            name: ANALYST_NAMES[i] ?? `A${i + 1}`,
+            direction: a.direction as "bullish" | "bearish" | "neutral",
+            confidence: Math.round(a.confidence),
+          }));
         }
       } catch { /* skip malformed SSE lines */ }
     }
@@ -143,7 +170,7 @@ async function analyzeMarket(symbol: string, tf: TF): Promise<{
 
   const atr = timeSeries.length >= 15 ? calculateATR(timeSeries, 14) : price * 0.005;
 
-  return { price, atr, direction, confidence, agreementLevel };
+  return { price, atr, direction, confidence, agreementLevel, analysts };
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -255,8 +282,9 @@ export function BulkTradeExecutor({
 
       if (result.success) {
         opened++;
+        const { slPrice: sl, tpPrice: tp } = computeSlTp(row.price!, row.atr!, row.style, side);
         setRows((p) => p.map((r) => r.symbol === row.symbol
-          ? { ...r, execStatus: "opened", execReason: `${row.style} · ${side}` } : r));
+          ? { ...r, execStatus: "opened", execReason: `${side} @ ${fmtPrice(row.price!, row.symbol)} · SL ${fmtPrice(sl, row.symbol)} · TP ${fmtPrice(tp, row.symbol)}` } : r));
       } else if (result.error?.toLowerCase().includes("limit")) {
         limitHit = true;
         skipped++;
@@ -418,15 +446,32 @@ export function BulkTradeExecutor({
                       ) : row.scanError ? (
                         <span className="text-red-500 text-[10px]">{row.scanError}</span>
                       ) : row.direction ? (
-                        <div className="flex items-center justify-end gap-1">
-                          {row.direction === "bullish" ? <TrendingUp className="h-3 w-3 text-green-500" /> :
-                           row.direction === "bearish" ? <TrendingDown className="h-3 w-3 text-red-500" /> :
-                           <Minus className="h-3 w-3 text-muted-foreground" />}
-                          <span className={cn("text-[10px] font-semibold tabular-nums",
-                            (row.confidence ?? 0) >= minConfidence ? "text-foreground" : "text-muted-foreground")}>
-                            {row.confidence}%
-                          </span>
-                          {(row.confidence ?? 0) < minConfidence && <AlertTriangle className="h-3 w-3 text-amber-500" />}
+                        <div className="flex flex-col items-end gap-0.5">
+                          {/* Consensus */}
+                          <div className="flex items-center gap-1">
+                            {row.direction === "bullish" ? <TrendingUp className="h-3 w-3 text-green-500" /> :
+                             row.direction === "bearish" ? <TrendingDown className="h-3 w-3 text-red-500" /> :
+                             <Minus className="h-3 w-3 text-muted-foreground" />}
+                            <span className={cn("text-[10px] font-semibold tabular-nums",
+                              (row.confidence ?? 0) >= minConfidence ? "text-foreground" : "text-muted-foreground")}>
+                              {row.confidence}%
+                            </span>
+                            {(row.confidence ?? 0) < minConfidence && <AlertTriangle className="h-3 w-3 text-amber-500" />}
+                          </div>
+                          {/* Analyst breakdown */}
+                          {row.analysts && row.analysts.length > 0 && (
+                            <div className="flex items-center gap-0.5">
+                              {row.analysts.map((a) => (
+                                <span key={a.name} title={`${a.name}: ${a.direction} ${a.confidence}%`}
+                                  className={cn("text-[8px] font-semibold px-0.5 rounded tabular-nums",
+                                    a.direction === "bullish" ? "text-green-500" :
+                                    a.direction === "bearish" ? "text-red-400" : "text-muted-foreground"
+                                  )}>
+                                  {a.name[0]}{a.confidence}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <span className="text-muted-foreground text-[10px]">—</span>
@@ -436,9 +481,24 @@ export function BulkTradeExecutor({
                     {/* Exec status column */}
                     <td className="p-2 text-right">
                       {row.execStatus === "executing" && <Loader2 className="h-3 w-3 animate-spin text-blue-500 ml-auto" />}
-                      {row.execStatus === "opened" && <CheckCircle2 className="h-3 w-3 text-green-500 ml-auto" />}
-                      {row.execStatus === "skipped" && <Minus className="h-3 w-3 text-muted-foreground ml-auto" />}
-                      {row.execStatus === "failed" && <XCircle className="h-3 w-3 text-red-500 ml-auto" />}
+                      {row.execStatus === "opened" && (
+                        <div className="flex flex-col items-end gap-0.5">
+                          <CheckCircle2 className="h-3 w-3 text-green-500" />
+                          {row.execReason && <span className="text-[8px] text-green-500/70 leading-tight max-w-[120px] text-right">{row.execReason}</span>}
+                        </div>
+                      )}
+                      {row.execStatus === "skipped" && (
+                        <div className="flex flex-col items-end gap-0.5">
+                          <Minus className="h-3 w-3 text-muted-foreground" />
+                          {row.execReason && <span className="text-[8px] text-muted-foreground leading-tight">{row.execReason}</span>}
+                        </div>
+                      )}
+                      {row.execStatus === "failed" && (
+                        <div className="flex flex-col items-end gap-0.5">
+                          <XCircle className="h-3 w-3 text-red-500" />
+                          {row.execReason && <span className="text-[8px] text-red-400 leading-tight">{row.execReason}</span>}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
