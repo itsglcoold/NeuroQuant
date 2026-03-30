@@ -11,17 +11,19 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MARKETS, getSymbolTradingStyle } from "@/lib/market/symbols";
-import { calculateATR } from "@/lib/atr-calculator";
+import { getATRAnalysis } from "@/lib/atr-calculator";
+import { TRADE_STYLES, TradeStyleKey, computeSlTpFromATR } from "@/lib/trade-calculator";
 import type { AnalysisSnapshot } from "@/types/simulator";
 
-// ── Style definitions (mirror QuickSimWidget exactly) ────────────────────────
-const STYLES = {
-  auto:       { label: "Auto",       atrMult: 1.2, rr: 2.5 },
-  safe:       { label: "Safe",       atrMult: 1.5, rr: 2.0 },
-  balanced:   { label: "Balanced",   atrMult: 1.2, rr: 2.5 },
-  aggressive: { label: "Aggressive", atrMult: 1.0, rr: 3.0 },
-} as const;
-type StyleKey = keyof typeof STYLES;
+// StyleKey — "auto" maps to "balanced" at execution time
+type StyleKey = TradeStyleKey | "auto";
+
+const STYLE_OPTIONS: { key: StyleKey; label: string }[] = [
+  { key: "auto",       label: "Auto" },
+  { key: "safe",       label: TRADE_STYLES.safe.label },
+  { key: "balanced",   label: TRADE_STYLES.balanced.label },
+  { key: "aggressive", label: TRADE_STYLES.aggressive.label },
+];
 
 const TIMEFRAMES = ["1D", "4H", "1H", "15m", "5m"] as const;
 type TF = typeof TIMEFRAMES[number];
@@ -92,15 +94,6 @@ interface BulkTradeExecutorProps {
   dailyLimit: number | typeof Infinity;
 }
 
-// ── SL/TP — same formula as QuickSimWidget handleStyleSelect ─────────────────
-function computeSlTp(price: number, atr: number, style: StyleKey, side: "long" | "short") {
-  const s = STYLES[style === "auto" ? "balanced" : style];
-  const slDist = s.atrMult * Math.max(atr, price * 0.003);
-  return side === "long"
-    ? { slPrice: price - slDist, tpPrice: price + s.rr * slDist }
-    : { slPrice: price + slDist, tpPrice: price - s.rr * slDist };
-}
-
 // ── Consume the analysis SSE stream — same endpoint as manual flow ───────────
 const ANALYST_NAMES = ["Alpha", "Beta", "Gamma"];
 
@@ -168,7 +161,10 @@ async function analyzeMarket(symbol: string, tf: TF): Promise<{
     }
   }
 
-  const atr = timeSeries.length >= 15 ? calculateATR(timeSeries, 14) : price * 0.005;
+  // Use getATRAnalysis (same as QuickSimWidget) — includes outlier-bar filtering
+  const atr = timeSeries.length >= 15
+    ? getATRAnalysis(timeSeries, symbol).value
+    : 0; // 0 → bulk executor skips trade (can't compute SL/TP safely)
 
   return { price, atr, direction, confidence, agreementLevel, analysts };
 }
@@ -277,12 +273,13 @@ export function BulkTradeExecutor({
       setRows((p) => p.map((r) => r.symbol === row.symbol ? { ...r, execStatus: "executing" } : r));
 
       const side: "long" | "short" = row.direction === "bullish" ? "long" : "short";
-      const { slPrice, tpPrice } = computeSlTp(row.price!, row.atr!, row.style, side);
+      const resolvedStyle: TradeStyleKey = row.style === "auto" ? "balanced" : row.style;
+      const { slPrice, tpPrice } = computeSlTpFromATR(row.price!, row.atr!, resolvedStyle, side);
       const result = await openTrade({ symbol: row.symbol, side, entryPrice: row.price!, slPrice, tpPrice });
 
       if (result.success) {
         opened++;
-        const { slPrice: sl, tpPrice: tp } = computeSlTp(row.price!, row.atr!, row.style, side);
+        const { slPrice: sl, tpPrice: tp } = computeSlTpFromATR(row.price!, row.atr!, resolvedStyle, side);
         setRows((p) => p.map((r) => r.symbol === row.symbol
           ? { ...r, execStatus: "opened", execReason: `${side} @ ${fmtPrice(row.price!, row.symbol)} · SL ${fmtPrice(sl, row.symbol)} · TP ${fmtPrice(tp, row.symbol)}` } : r));
       } else if (result.error?.toLowerCase().includes("limit")) {
@@ -349,12 +346,12 @@ export function BulkTradeExecutor({
               <div className="space-y-1">
                 <p className="text-[10px] text-muted-foreground">Style</p>
                 <div className="flex gap-1">
-                  {(Object.keys(STYLES) as StyleKey[]).map((s) => (
-                    <button key={s} onClick={() => setGlobalStyle(s)} className={cn(
+                  {STYLE_OPTIONS.map(({ key, label }) => (
+                    <button key={key} onClick={() => setGlobalStyle(key)} className={cn(
                       "px-2 py-1 rounded text-[10px] font-semibold border transition-colors",
-                      globalStyle === s ? "border-blue-500 bg-blue-500/15 text-blue-600 dark:text-blue-400" : "border-border text-muted-foreground hover:bg-accent"
+                      globalStyle === key ? "border-blue-500 bg-blue-500/15 text-blue-600 dark:text-blue-400" : "border-border text-muted-foreground hover:bg-accent"
                     )}>
-                      {STYLES[s].label}
+                      {label}
                     </button>
                   ))}
                 </div>
@@ -427,8 +424,8 @@ export function BulkTradeExecutor({
                     <td className="p-2 hidden sm:table-cell">
                       <select value={row.style} onChange={(e) => setRowStyle(row.symbol, e.target.value as StyleKey)}
                         className="bg-transparent text-[10px] border border-border rounded px-1 py-0.5 cursor-pointer text-muted-foreground">
-                        {(Object.keys(STYLES) as StyleKey[]).map((s) => (
-                          <option key={s} value={s}>{STYLES[s].label}</option>
+                        {STYLE_OPTIONS.map(({ key, label }) => (
+                          <option key={key} value={key}>{label}</option>
                         ))}
                       </select>
                     </td>

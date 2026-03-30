@@ -28,6 +28,7 @@ import { Input } from "@/components/ui/input";
 import type { ConsensusResult } from "@/types/analysis";
 import type { AnalysisSnapshot } from "@/types/simulator";
 import type { UserTier } from "@/hooks/useUsageTracking";
+import { TRADE_STYLES as SHARED_TRADE_STYLES, computeSlTpFromATR } from "@/lib/trade-calculator";
 
 // Human-readable timeframe labels
 const TIMEFRAME_LABELS: Record<string, string> = {
@@ -324,11 +325,11 @@ export function QuickSimWidget({
     }
   };
 
-  // Trade style presets — ATR-based auto-fill with different risk profiles
+  // Trade style presets — numbers come from shared lib (same as BulkTradeExecutor)
   const TRADE_STYLES = [
-    { key: "safe" as const,       label: "Safe",       icon: "🛡️", atrMult: 1.5, rr: 2.0, colorClass: "border-blue-500/40 bg-blue-500/8 text-blue-600 dark:text-blue-400",  activeClass: "border-blue-500 bg-blue-500/15 shadow-sm" },
-    { key: "balanced" as const,   label: "Balanced",   icon: "⚖️", atrMult: 1.2, rr: 2.5, colorClass: "border-green-500/40 bg-green-500/8 text-green-600 dark:text-green-400", activeClass: "border-green-500 bg-green-500/15 shadow-sm" },
-    { key: "aggressive" as const, label: "Aggressive", icon: "⚡", atrMult: 1.0, rr: 3.0, colorClass: "border-amber-500/40 bg-amber-500/8 text-amber-600 dark:text-amber-400",  activeClass: "border-amber-500 bg-amber-500/15 shadow-sm" },
+    { key: "safe" as const,       ...SHARED_TRADE_STYLES.safe,       colorClass: "border-blue-500/40 bg-blue-500/8 text-blue-600 dark:text-blue-400",  activeClass: "border-blue-500 bg-blue-500/15 shadow-sm" },
+    { key: "balanced" as const,   ...SHARED_TRADE_STYLES.balanced,   colorClass: "border-green-500/40 bg-green-500/8 text-green-600 dark:text-green-400", activeClass: "border-green-500 bg-green-500/15 shadow-sm" },
+    { key: "aggressive" as const, ...SHARED_TRADE_STYLES.aggressive, colorClass: "border-amber-500/40 bg-amber-500/8 text-amber-600 dark:text-amber-400",  activeClass: "border-amber-500 bg-amber-500/15 shadow-sm" },
   ];
 
   const handleStyleSelect = (styleKey: "safe" | "balanced" | "aggressive") => {
@@ -339,16 +340,10 @@ export function QuickSimWidget({
     setSlWasCapped(false);
 
     if (atr > 0) {
-      // ATR-based: pure volatility-proportional levels
-      const slDist = style.atrMult * atr;
-      const tpDist = style.rr * slDist;
-      if (side === "long") {
-        setSl((currentPrice - slDist).toFixed(decimals));
-        setTp((currentPrice + tpDist).toFixed(decimals));
-      } else {
-        setSl((currentPrice + slDist).toFixed(decimals));
-        setTp((currentPrice - tpDist).toFixed(decimals));
-      }
+      // ATR-based: use shared formula — identical to BulkTradeExecutor
+      const { slPrice, tpPrice } = computeSlTpFromATR(currentPrice, atr, styleKey, side);
+      setSl(slPrice.toFixed(decimals));
+      setTp(tpPrice.toFixed(decimals));
     } else {
       // No ATR available — fall back to structure levels with target R:R
       const fallbackBuffer = currentPrice * 0.003;
