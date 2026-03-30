@@ -116,7 +116,7 @@ export function BulkTradeExecutor() {
             <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/8 p-3 text-xs text-amber-600 dark:text-amber-400">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
               <span>
-                Je browser blokkeert pop-ups. Klik op het icoontje in de adresbalk en kies <strong>"Pop-ups altijd toestaan voor deze site"</strong>, dan werkt de knop direct.
+                Your browser is blocking pop-ups. Click the pop-up icon in the address bar and select <strong>"Always allow pop-ups for this site"</strong>, then the button will work directly.
               </span>
             </div>
           )}
