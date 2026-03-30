@@ -10,6 +10,7 @@ import {
   getWeekendRiskSettings,
   saveWeekendRiskSettings,
   getWeekendRisk,
+  getMarketSessionStatus,
   DEFAULT_WEEKEND_RISK_SETTINGS,
   type WeekendRiskSettings,
 } from "@/lib/weekend-risk";
@@ -18,6 +19,7 @@ export default function WeekendRiskSettingsPage() {
   const [settings, setSettings] = useState<WeekendRiskSettings>(DEFAULT_WEEKEND_RISK_SETTINGS);
   const [saved, setSaved] = useState(false);
   const weekendRisk = getWeekendRisk();
+  const session = getMarketSessionStatus();
 
   useEffect(() => {
     setSettings(getWeekendRiskSettings());
@@ -51,7 +53,7 @@ export default function WeekendRiskSettingsPage() {
                 {weekendRisk.isClosed ? "Markets Closed" : weekendRisk.isRisky ? "Weekend Risk Active" : "Normal Trading Hours"}
               </p>
               <p className="text-xs text-muted-foreground">
-                {weekendRisk.reason || "No weekend risk detected — safe to trade."}
+                {session.nextEventLabel}
               </p>
             </div>
           </div>
@@ -125,8 +127,9 @@ export default function WeekendRiskSettingsPage() {
       <Card className="border-blue-500/20 bg-blue-500/5">
         <CardContent className="pt-4 pb-4 text-xs text-muted-foreground space-y-1">
           <p className="font-semibold text-foreground">Why weekend gaps are dangerous</p>
-          <p>When markets reopen on Sunday night, price can jump significantly from Friday&apos;s close — skipping your Stop Loss entirely. This results in a larger loss than expected.</p>
+          <p>When markets reopen on Sunday night (22:00 UTC), price can jump significantly from Friday&apos;s close (22:00 UTC) — skipping your Stop Loss entirely. This results in a larger loss than expected.</p>
           <p>Forex majors typically gap 5–30 pips. Indices and metals can gap 0.3–1%+. News over the weekend (geopolitical events, economic data) is the main cause.</p>
+          <p className="text-foreground/60 font-medium">All times are based on UTC market hours, regardless of your local timezone.</p>
         </CardContent>
       </Card>
 

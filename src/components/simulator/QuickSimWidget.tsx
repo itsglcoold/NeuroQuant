@@ -20,7 +20,8 @@ import { calculateRiskScore } from "@/lib/risk-score";
 import { detectMarketRegime } from "@/lib/market-regime";
 import { detectAllPatterns } from "@/lib/candlestick-patterns";
 import { calculateConfluenceScore } from "@/lib/confluence-score";
-import { getWeekendRisk, getWeekendRiskSettings } from "@/lib/weekend-risk";
+import { getWeekendRisk, getWeekendRiskSettings, getMarketSessionStatus } from "@/lib/weekend-risk";
+import { MarketSessionIndicator } from "@/components/simulator/MarketSessionIndicator";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -230,7 +231,7 @@ export function QuickSimWidget({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regime, consensus, support, resistance, currentPrice, entryPattern, atrAnalysis]);
 
-  // Weekend risk
+  // Weekend risk (UTC-based)
   const weekendRisk = getWeekendRisk();
   const weekendSettings = getWeekendRiskSettings();
   const showWeekendWarning = weekendRisk.isRisky && weekendSettings.warnOnFriday && !weekendWarningDismissed;
@@ -456,9 +457,7 @@ export function QuickSimWidget({
           </div>
           <div>
             <h3 className="text-sm font-bold">Quick Simulator</h3>
-            <p className="text-[10px] text-muted-foreground">
-              Paper trade based on AI analysis
-            </p>
+            <MarketSessionIndicator />
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
