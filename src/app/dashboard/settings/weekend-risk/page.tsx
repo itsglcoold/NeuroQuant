@@ -2,10 +2,29 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { ShieldAlert, CheckCircle2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={cn(
+        "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none",
+        checked ? "bg-blue-500" : "bg-muted"
+      )}
+    >
+      <span className={cn(
+        "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform",
+        checked ? "translate-x-5" : "translate-x-0"
+      )} />
+    </button>
+  );
+}
 import {
   getWeekendRiskSettings,
   saveWeekendRiskSettings,
@@ -68,13 +87,10 @@ export default function WeekendRiskSettingsPage() {
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <Label className="text-sm font-medium">Warn before Friday trades</Label>
+              <p className="text-sm font-medium">Warn before Friday trades</p>
               <p className="text-xs text-muted-foreground mt-0.5">Show a warning banner when opening trades on Friday</p>
             </div>
-            <Switch
-              checked={settings.warnOnFriday}
-              onCheckedChange={(v) => setSettings({ ...settings, warnOnFriday: v })}
-            />
+            <Toggle checked={settings.warnOnFriday} onChange={(v) => setSettings({ ...settings, warnOnFriday: v })} />
           </div>
         </CardContent>
       </Card>
@@ -87,18 +103,15 @@ export default function WeekendRiskSettingsPage() {
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <Label className="text-sm font-medium">Reduce position size on Fridays</Label>
+              <p className="text-sm font-medium">Reduce position size on Fridays</p>
               <p className="text-xs text-muted-foreground mt-0.5">Automatically reduce lot size to limit weekend exposure</p>
             </div>
-            <Switch
-              checked={settings.reducePositionSize}
-              onCheckedChange={(v) => setSettings({ ...settings, reducePositionSize: v })}
-            />
+            <Toggle checked={settings.reducePositionSize} onChange={(v) => setSettings({ ...settings, reducePositionSize: v })} />
           </div>
 
           {settings.reducePositionSize && (
             <div className="space-y-2 pt-1">
-              <Label className="text-sm">Size multiplier on Friday</Label>
+              <p className="text-sm">Size multiplier on Friday</p>
               <div className="flex items-center gap-3">
                 <input
                   type="range"
