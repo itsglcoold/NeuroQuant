@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Zap, ChevronDown, ChevronUp, ExternalLink, ArrowRight } from "lucide-react";
+import { Zap, ChevronDown, ChevronUp, ExternalLink, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MARKETS } from "@/lib/market/symbols";
 
@@ -18,23 +18,30 @@ const CATEGORIES = [
 export function BulkTradeExecutor() {
   const [expanded, setExpanded] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [showLinks, setShowLinks] = useState(false);
+  const [popupBlocked, setPopupBlocked] = useState(false);
 
-  const toggle = (symbol: string) => {
-    setShowLinks(false);
+  const toggle = (symbol: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
       next.has(symbol) ? next.delete(symbol) : next.add(symbol);
       return next;
     });
+
+  const selectAll  = () => setSelected(new Set(MARKETS.map((m) => m.symbol)));
+  const selectNone = () => setSelected(new Set());
+  const selectCat  = (cat: string) => setSelected(new Set(MARKETS.filter((m) => m.category === cat).map((m) => m.symbol)));
+
+  const openTabs = () => {
+    setPopupBlocked(false);
+    let blocked = false;
+    for (const symbol of Array.from(selected)) {
+      const w = window.open(`/dashboard/market/${encodeURIComponent(symbol)}?autoAnalyse=true`, "_blank");
+      if (!w) blocked = true;
+    }
+    if (blocked) setPopupBlocked(true);
   };
 
-  const selectAll  = () => { setShowLinks(false); setSelected(new Set(MARKETS.map((m) => m.symbol))); };
-  const selectNone = () => { setShowLinks(false); setSelected(new Set()); };
-  const selectCat  = (cat: string) => { setShowLinks(false); setSelected(new Set(MARKETS.filter((m) => m.category === cat).map((m) => m.symbol))); };
-
   const count = selected.size;
-  const selectedMarkets = MARKETS.filter((m) => selected.has(m.symbol));
 
   return (
     <Card className="border-blue-500/20 bg-blue-500/3">
@@ -104,54 +111,30 @@ export function BulkTradeExecutor() {
             })}
           </div>
 
-          {/* Step 1: show "Ready to open" button */}
-          {!showLinks && (
-            <button
-              disabled={count === 0}
-              onClick={() => count > 0 && setShowLinks(true)}
-              className={cn(
-                "w-full flex items-center justify-center gap-1.5 rounded-lg border px-4 h-9 text-sm font-medium transition-colors",
-                count === 0
-                  ? "border-border text-muted-foreground opacity-50 cursor-not-allowed"
-                  : "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20"
-              )}
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              {count === 0 ? "Select markets to analyse" : `Analyse ${count} market${count > 1 ? "s" : ""} in tabs`}
-            </button>
-          )}
-
-          {/* Step 2: each market as its own clickable link — browser allows one tab per click */}
-          {showLinks && selectedMarkets.length > 0 && (
-            <div className="space-y-1.5">
-              <p className="text-[10px] text-muted-foreground font-medium">
-                Click each market to open its analysis tab:
-              </p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                {selectedMarkets.map((m) => (
-                  <a
-                    key={m.symbol}
-                    href={`/dashboard/market/${encodeURIComponent(m.symbol)}?autoAnalyse=true`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between gap-2 rounded-lg border border-blue-500/40 bg-blue-500/8 px-3 py-2 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-500/15 hover:border-blue-500 transition-colors"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <span>{m.emoji}</span>
-                      <span>{m.symbol}</span>
-                    </span>
-                    <ArrowRight className="h-3 w-3 shrink-0" />
-                  </a>
-                ))}
-              </div>
-              <button
-                onClick={() => setShowLinks(false)}
-                className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-              >
-                ← Back to selection
-              </button>
+          {/* Popup blocked warning */}
+          {popupBlocked && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/8 p-3 text-xs text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <span>
+                Je browser blokkeert pop-ups. Klik op het icoontje in de adresbalk en kies <strong>"Pop-ups altijd toestaan voor deze site"</strong>, dan werkt de knop direct.
+              </span>
             </div>
           )}
+
+          {/* Open tabs button */}
+          <button
+            disabled={count === 0}
+            onClick={openTabs}
+            className={cn(
+              "w-full flex items-center justify-center gap-1.5 rounded-lg border px-4 h-9 text-sm font-medium transition-colors",
+              count === 0
+                ? "border-border text-muted-foreground opacity-50 cursor-not-allowed"
+                : "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20"
+            )}
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            {count === 0 ? "Select markets to analyse" : `Analyse ${count} market${count > 1 ? "s" : ""} in tabs`}
+          </button>
         </CardContent>
       )}
     </Card>
