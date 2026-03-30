@@ -460,10 +460,10 @@ export function AISuggestions({ tier }: AISuggestionsProps) {
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
-                    AI scan with candlestick patterns + confluence score
+                    AI scan with pattern recognition + confluence score
                   </p>
                   <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
-                    Each setup shows market regime, detected pattern (Bible methodology), and a confluence score (0–100). Always run a full analysis before trading.
+                    Each setup shows market regime, detected pattern, and a confluence score (0–100). Always run a full analysis before trading.
                   </p>
                 </div>
               </div>
