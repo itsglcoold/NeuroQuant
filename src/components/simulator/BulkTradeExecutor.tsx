@@ -17,7 +17,7 @@ const CATEGORIES = [
 ];
 
 export function BulkTradeExecutor() {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const toggle = (symbol: string) =>
