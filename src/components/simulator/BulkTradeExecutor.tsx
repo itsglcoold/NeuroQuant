@@ -10,7 +10,8 @@ import {
   CheckCircle2, XCircle, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { MARKETS } from "@/lib/market/symbols";
+import { MARKETS, getSymbolTradingStyle } from "@/lib/market/symbols";
+
 import type { BulkScanResult } from "@/app/api/trades/bulk-scan/route";
 import type { AnalysisSnapshot } from "@/types/simulator";
 
@@ -25,6 +26,18 @@ type StyleKey = keyof typeof STYLES;
 
 const TIMEFRAMES = ["1D", "4H", "1H", "15m", "5m"] as const;
 type TF = typeof TIMEFRAMES[number];
+
+/** Map trading style → best scan timeframe (avoid 5m noise, use one step up) */
+function defaultTfForSymbol(symbol: string): TF {
+  const style = getSymbolTradingStyle(symbol);
+  if (!style) return "1H";
+  switch (style.key) {
+    case "scalping":   return "15m"; // 5m has too much noise — use 15m
+    case "daytrading": return "1H";
+    case "swing":      return "4H";
+    default:           return "1H";
+  }
+}
 
 // ── Per-market row state ─────────────────────────────────────────────────────
 interface MarketRow {
@@ -84,7 +97,7 @@ export function BulkTradeExecutor({
 
   // Global defaults
   const [globalStyle, setGlobalStyle] = useState<StyleKey>("auto");
-  const [globalTf, setGlobalTf] = useState<TF>("1D");
+  const [globalTf, setGlobalTf] = useState<TF>("1H");
   const [minConfidence, setMinConfidence] = useState(50);
 
   // Market rows — initialised from MARKETS
@@ -94,7 +107,7 @@ export function BulkTradeExecutor({
       category: m.category,
       selected: true,
       style: "auto" as StyleKey,
-      timeframe: "1D" as TF,
+      timeframe: defaultTfForSymbol(m.symbol),
     }))
   );
 
