@@ -297,13 +297,8 @@ export default function SimulatorPage() {
         </Card>
       </div>
 
-      {/* Bulk Trade Executor */}
-      <BulkTradeExecutor
-        openTrade={openTrade}
-        canOpenTrade={canOpenTrade}
-        tradesRemaining={tradesRemaining}
-        dailyLimit={dailyLimit}
-      />
+      {/* Multi-Market Analyser */}
+      <BulkTradeExecutor />
 
       {/* Empty state — no trades at all */}
       {openTrades.length === 0 && closedTrades.length === 0 && (
@@ -317,16 +312,16 @@ export default function SimulatorPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Option A — Bulk */}
+              {/* Option A — Multi-tab */}
               <div className="flex gap-3 rounded-lg border border-blue-500/20 bg-blue-500/5 p-4">
                 <div className="shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/10">
                   <Zap className="h-4 w-4 text-blue-500" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-blue-500 uppercase tracking-wide mb-0.5">Fastest</p>
-                  <p className="text-sm font-semibold">Bulk Trade Executor</p>
+                  <p className="text-xs font-semibold text-blue-500 uppercase tracking-wide mb-0.5">Multi-market</p>
+                  <p className="text-sm font-semibold">Multi-Market Analyser</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Use the card above — select markets, scan with AI, open all trades in one click.
+                    Use the card above — select markets and open them all in tabs for AI analysis.
                   </p>
                 </div>
               </div>
