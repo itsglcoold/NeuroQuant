@@ -69,6 +69,7 @@ export function useUsageTracking() {
     if (typeof window === "undefined") return "free";
     return (localStorage.getItem(TIER_KEY) as UserTier) || "free";
   });
+  const [tierLoaded, setTierLoaded] = useState(false);
 
   const [usage, setUsage] = useState<UsageData>(loadUsage);
 
@@ -82,6 +83,7 @@ export function useUsageTracking() {
         if (!user) {
           setTier("free");
           localStorage.removeItem(TIER_KEY);
+          setTierLoaded(true);
           return;
         }
 
@@ -106,6 +108,8 @@ export function useUsageTracking() {
         localStorage.setItem(TIER_KEY, dbTier);
       } catch {
         // Best-effort — fall back to localStorage value
+      } finally {
+        setTierLoaded(true);
       }
     }
 
@@ -172,6 +176,7 @@ export function useUsageTracking() {
 
   return {
     tier,
+    tierLoaded,
     usage,
     analysesRemaining,
     analysesTotal,

@@ -186,7 +186,7 @@ export default function MarketDetailPage() {
   const [selectedInterval, setSelectedInterval] = useState(
     INTERVALS[tradingStyle ? (STYLE_DEFAULT_INTERVAL[tradingStyle] ?? 5) : 5]
   ); // Default based on trading style
-  const { canRunAnalysis, consumeAnalysis, analysesRemaining, analysesTotal, tier } = useUsageTracking();
+  const { canRunAnalysis, consumeAnalysis, analysesRemaining, analysesTotal, tier, tierLoaded } = useUsageTracking();
   const simulator = useSimulator(tier);
   const { prices: wsPrices } = useMarketData();
 
@@ -217,13 +217,14 @@ export default function MarketDetailPage() {
   }, [fetchMarketData]);
 
   // Auto-start analysis when opened via Multi-Market Analyser (?autoAnalyse=true)
+  // Wait for tierLoaded so we don't fire before the DB tier check completes
   useEffect(() => {
-    if (!autoAnalyse || loading || analyzing || consensus) return;
+    if (!autoAnalyse || loading || !tierLoaded || analyzing || consensus) return;
     // Clear param from URL so a manual refresh doesn't re-trigger
     window.history.replaceState({}, "", window.location.pathname);
     runAnalysis();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoAnalyse, loading]);
+  }, [autoAnalyse, loading, tierLoaded]);
 
   async function runAnalysis(intervalOverride?: string) {
     if (!canRunAnalysis) {
