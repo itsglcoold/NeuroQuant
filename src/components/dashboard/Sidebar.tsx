@@ -20,6 +20,7 @@ import {
   Zap,
   LineChart,
   Activity,
+  ShieldAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -130,6 +131,11 @@ const navItems: NavItem[] = [
     href: "/dashboard/live-trading",
     icon: Activity,
     badge: "PREMIUM",
+  },
+  {
+    label: "Weekend Risk",
+    href: "/dashboard/settings/weekend-risk",
+    icon: ShieldAlert,
   },
   {
     label: "Settings",

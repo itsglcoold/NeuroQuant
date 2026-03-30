@@ -20,6 +20,7 @@ import { calculateRiskScore } from "@/lib/risk-score";
 import { detectMarketRegime } from "@/lib/market-regime";
 import { detectAllPatterns } from "@/lib/candlestick-patterns";
 import { calculateConfluenceScore } from "@/lib/confluence-score";
+import { getWeekendRisk, getWeekendRiskSettings } from "@/lib/weekend-risk";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,6 +96,7 @@ export function QuickSimWidget({
   const [slWasCapped, setSlWasCapped] = useState(false);
   const [selectedStyle, setSelectedStyle] = useState<"auto" | "safe" | "balanced" | "aggressive" | null>(null);
   const [isStyleModified, setIsStyleModified] = useState(false);
+  const [weekendWarningDismissed, setWeekendWarningDismissed] = useState(false);
 
   const slNum = parseFloat(sl);
   const tpNum = parseFloat(tp);
@@ -227,6 +229,11 @@ export function QuickSimWidget({
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regime, consensus, support, resistance, currentPrice, entryPattern, atrAnalysis]);
+
+  // Weekend risk
+  const weekendRisk = getWeekendRisk();
+  const weekendSettings = getWeekendRiskSettings();
+  const showWeekendWarning = weekendRisk.isRisky && weekendSettings.warnOnFriday && !weekendWarningDismissed;
 
   const validSlSupport = support.filter((s) => s < currentPrice);
   const validSlResistance = resistance.filter((r) => r > currentPrice);
@@ -378,6 +385,7 @@ export function QuickSimWidget({
 
   const handleSubmit = async () => {
     if (!formValid) return;
+    if (weekendRisk.isClosed) return; // markets closed, button disabled anyway
     setSubmitting(true);
     setErrorMsg("");
     setSuccessMsg("");
@@ -962,21 +970,59 @@ export function QuickSimWidget({
         </div>
       )}
 
+      {/* Weekend Risk Warning */}
+      {showWeekendWarning && (
+        <div className={`rounded-lg border p-3 text-xs space-y-2 ${
+          weekendRisk.riskLevel === "high"
+            ? "border-red-500/30 bg-red-500/10"
+            : "border-amber-500/30 bg-amber-500/10"
+        }`}>
+          <div className="flex items-start gap-2">
+            <ShieldAlert className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${weekendRisk.riskLevel === "high" ? "text-red-500" : "text-amber-500"}`} />
+            <div className="space-y-1 flex-1">
+              <p className={`font-semibold ${weekendRisk.riskLevel === "high" ? "text-red-500" : "text-amber-500"}`}>
+                Weekend Risk
+              </p>
+              <p className="text-muted-foreground">{weekendRisk.reason}</p>
+              {weekendRisk.isClosed && (
+                <p className="font-medium text-red-500">Trading is disabled while markets are closed.</p>
+              )}
+            </div>
+          </div>
+          {!weekendRisk.isClosed && (
+            <button
+              type="button"
+              onClick={() => setWeekendWarningDismissed(true)}
+              className="w-full text-center text-[11px] font-medium text-muted-foreground hover:text-foreground underline underline-offset-2"
+            >
+              I understand — proceed anyway
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Open Trade Button */}
       <Button
         data-tour="open-trade"
         onClick={handleSubmit}
-        disabled={!formValid || submitting}
+        disabled={!formValid || submitting || weekendRisk.isClosed}
         className={`w-full font-bold ${
-          side === "long"
-            ? "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
-            : "bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600"
+          weekendRisk.isClosed
+            ? "bg-muted text-muted-foreground cursor-not-allowed"
+            : side === "long"
+              ? "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
+              : "bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600"
         } text-white shadow-md`}
       >
         {submitting ? (
           <span className="flex items-center gap-2">
             <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             Opening...
+          </span>
+        ) : weekendRisk.isClosed ? (
+          <span className="flex items-center gap-2">
+            <ShieldAlert className="h-4 w-4" />
+            Markets Closed (Weekend)
           </span>
         ) : (
           <span className="flex items-center gap-2">
