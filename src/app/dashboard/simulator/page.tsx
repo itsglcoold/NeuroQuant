@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useUsageTracking } from "@/hooks/useUsageTracking";
 import { useSimulator } from "@/hooks/useSimulator";
+import { BulkTradeExecutor } from "@/components/simulator/BulkTradeExecutor";
 import { useTradeWatcher } from "@/hooks/useTradeWatcher";
 import { useMarketData } from "@/hooks/useMarketData";
 import { INITIAL_VIRTUAL_BALANCE } from "@/types/simulator";
@@ -66,6 +67,7 @@ export default function SimulatorPage() {
     canOpenTrade,
     tradesRemaining,
     dailyLimit,
+    openTrade,
     closeTrade,
     deleteTrade,
     resetSimulator,
@@ -293,6 +295,14 @@ export default function SimulatorPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Bulk Trade Executor */}
+      <BulkTradeExecutor
+        openTrade={openTrade}
+        canOpenTrade={canOpenTrade}
+        tradesRemaining={tradesRemaining}
+        dailyLimit={dailyLimit}
+      />
 
       {/* Empty state — no trades at all */}
       {openTrades.length === 0 && closedTrades.length === 0 && (
