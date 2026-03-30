@@ -32,8 +32,11 @@ export function BulkTradeExecutor() {
   const selectCat  = (cat: string) => setSelected(new Set(MARKETS.filter((m) => m.category === cat).map((m) => m.symbol)));
 
   const openTabs = () => {
-    selected.forEach((symbol) => {
-      window.open(`/dashboard/market/${encodeURIComponent(symbol)}`, "_blank");
+    // Stagger tab opens by 150ms each — browsers block simultaneous window.open calls
+    Array.from(selected).forEach((symbol, i) => {
+      setTimeout(() => {
+        window.open(`/dashboard/market/${encodeURIComponent(symbol)}?autoAnalyse=true`, "_blank");
+      }, i * 150);
     });
   };
 

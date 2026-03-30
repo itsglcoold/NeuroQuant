@@ -168,6 +168,7 @@ export default function MarketDetailPage() {
   const symbol = decodeURIComponent(params.symbol as string);
   const market = getMarketBySymbol(symbol);
   const tradingStyle = searchParams.get("style") || undefined; // scalping | daytrading | swing
+  const autoAnalyse = searchParams.get("autoAnalyse") === "true";
 
   const [price, setPrice] = useState<MarketPrice | null>(null);
   const [indicators, setIndicators] = useState<TechnicalIndicators | null>(null);
@@ -214,6 +215,15 @@ export default function MarketDetailPage() {
   useEffect(() => {
     fetchMarketData();
   }, [fetchMarketData]);
+
+  // Auto-start analysis when opened via Multi-Market Analyser (?autoAnalyse=true)
+  useEffect(() => {
+    if (!autoAnalyse || loading || analyzing || consensus) return;
+    // Clear param from URL so a manual refresh doesn't re-trigger
+    window.history.replaceState({}, "", window.location.pathname);
+    runAnalysis();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoAnalyse, loading]);
 
   async function runAnalysis(intervalOverride?: string) {
     if (!canRunAnalysis) {
