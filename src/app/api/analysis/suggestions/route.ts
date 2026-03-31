@@ -172,6 +172,106 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 // ---------------------------------------------------------------------------
+// Indicator calculations from OHLC bars
+// ---------------------------------------------------------------------------
+
+type OHLCBar = { datetime: string; open: number; high: number; low: number; close: number };
+type BarsMap = Map<string, OHLCBar[]>;
+
+interface IndicatorSummary {
+  rsi: number;
+  sma20: number | null;
+  sma50: number | null;
+  macd: "bullish" | "bearish" | "flat";
+  bbPos: "near_upper" | "upper_half" | "mid" | "lower_half" | "near_lower";
+}
+
+function _calcEMA(values: number[], period: number): number {
+  const k = 2 / (period + 1);
+  let ema = values[0];
+  for (let i = 1; i < values.length; i++) ema = values[i] * k + ema * (1 - k);
+  return ema;
+}
+
+function _calcRSI(closes: number[], period = 14): number {
+  if (closes.length < period + 1) return 50;
+  let gains = 0, losses = 0;
+  for (let i = closes.length - period; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff > 0) gains += diff; else losses -= diff;
+  }
+  const avgGain = gains / period;
+  const avgLoss = losses / period;
+  if (avgLoss === 0) return 100;
+  return Math.round(100 - 100 / (1 + avgGain / avgLoss));
+}
+
+function _calcSMA(closes: number[], period: number): number | null {
+  if (closes.length < period) return null;
+  return closes.slice(-period).reduce((a, b) => a + b, 0) / period;
+}
+
+function _calcMACDDirection(closes: number[]): "bullish" | "bearish" | "flat" {
+  if (closes.length < 27) return "flat";
+  const ema12 = _calcEMA(closes.slice(-12), 12);
+  const ema26 = _calcEMA(closes.slice(-26), 26);
+  const macd = ema12 - ema26;
+  const threshold = closes[closes.length - 1] * 0.0001;
+  if (macd > threshold) return "bullish";
+  if (macd < -threshold) return "bearish";
+  return "flat";
+}
+
+function _calcBBPosition(closes: number[]): IndicatorSummary["bbPos"] {
+  if (closes.length < 20) return "mid";
+  const sma = _calcSMA(closes, 20)!;
+  const std = Math.sqrt(closes.slice(-20).reduce((s, c) => s + (c - sma) ** 2, 0) / 20);
+  const upper = sma + 2 * std;
+  const lower = sma - 2 * std;
+  const range = upper - lower;
+  if (range === 0) return "mid";
+  const pos = (closes[closes.length - 1] - lower) / range;
+  if (pos >= 0.85) return "near_upper";
+  if (pos >= 0.55) return "upper_half";
+  if (pos >= 0.45) return "mid";
+  if (pos >= 0.15) return "lower_half";
+  return "near_lower";
+}
+
+function calcIndicators(bars: OHLCBar[]): IndicatorSummary {
+  const closes = bars.map(b => b.close);
+  return {
+    rsi: _calcRSI(closes),
+    sma20: _calcSMA(closes, 20),
+    sma50: _calcSMA(closes, 50),
+    macd: _calcMACDDirection(closes),
+    bbPos: _calcBBPosition(closes),
+  };
+}
+
+function fmtPrice(n: number): string {
+  if (n >= 1000) return n.toFixed(2);
+  if (n >= 10) return n.toFixed(3);
+  return n.toFixed(5);
+}
+
+async function prefetchBarsForGroup(
+  symbols: readonly string[],
+  timeframe: string
+): Promise<BarsMap> {
+  const map: BarsMap = new Map();
+  await Promise.allSettled(
+    symbols.map(async (symbol) => {
+      try {
+        const bars = await getTimeSeries(symbol, timeframe, 60);
+        if (bars && bars.length >= 20) map.set(symbol, bars);
+      } catch { /* best-effort */ }
+    })
+  );
+  return map;
+}
+
+// ---------------------------------------------------------------------------
 // Core screening logic
 // ---------------------------------------------------------------------------
 
@@ -245,7 +345,8 @@ const STYLE_OHLC_TIMEFRAME: Record<string, string> = {
 
 async function enrichSymbols(
   suggestions: RawSuggestion[],
-  styleKey: string
+  styleKey: string,
+  prefetchedBars?: BarsMap
 ): Promise<Map<string, EnrichmentData>> {
   const map = new Map<string, EnrichmentData>();
   if (suggestions.length === 0) return map;
@@ -254,7 +355,7 @@ async function enrichSymbols(
   await Promise.allSettled(
     suggestions.map(async (raw) => {
       try {
-        const bars = await getTimeSeries(raw.symbol, timeframe, 50);
+        const bars = prefetchedBars?.get(raw.symbol) ?? await getTimeSeries(raw.symbol, timeframe, 50);
         if (!bars || bars.length < 20) return;
 
         const patterns = detectAllPatterns(bars);
@@ -316,11 +417,22 @@ function rawToMarketSuggestion(raw: RawSuggestion, enrichment?: EnrichmentData):
 }
 
 async function runScreening(timeoutMs: number = 90_000): Promise<SuggestionsResponse> {
-  // Fetch prices for ALL 28 markets so AI can pick the best setups across the full universe
-  const pricesArray = await getPrices([...ALL_MARKETS_FLAT]);
-  const priceMap = new Map(pricesArray.map((p) => [p.symbol, p]));
+  // Fetch prices + OHLC bars for ALL 28 markets in parallel
+  const [pricesArray, scalpingBars, daytradingBars, swingBars] = await Promise.all([
+    getPrices([...ALL_MARKETS_FLAT]),
+    prefetchBarsForGroup(ALL_MARKETS_BY_STYLE.scalping, STYLE_OHLC_TIMEFRAME.scalping),
+    prefetchBarsForGroup(ALL_MARKETS_BY_STYLE.daytrading, STYLE_OHLC_TIMEFRAME.daytrading),
+    prefetchBarsForGroup(ALL_MARKETS_BY_STYLE.swing, STYLE_OHLC_TIMEFRAME.swing),
+  ]);
 
-  // Build context grouped by trading style
+  const priceMap = new Map(pricesArray.map((p) => [p.symbol, p]));
+  const allBars: Record<string, BarsMap> = {
+    scalping: scalpingBars,
+    daytrading: daytradingBars,
+    swing: swingBars,
+  };
+
+  // Build context grouped by trading style — includes technical indicators
   const STYLE_LABELS: Record<string, { label: string; timeframe: string }> = {
     scalping:   { label: "SCALPING",    timeframe: "1m / 5m" },
     daytrading: { label: "DAY TRADING", timeframe: "15m / 1H" },
@@ -331,12 +443,24 @@ async function runScreening(timeoutMs: number = 90_000): Promise<SuggestionsResp
 
   for (const [style, symbols] of Object.entries(ALL_MARKETS_BY_STYLE)) {
     const meta = STYLE_LABELS[style];
+    const barsMap = allBars[style];
     context += `--- ${meta.label} (${meta.timeframe}) ---\n`;
-    context += `Symbol | Price | Change% | High | Low | Open | PrevClose\n`;
+    context += `Symbol | Price | Change% | High | Low | RSI | MACD | BB | SMA20 | SMA50\n`;
     for (const symbol of symbols) {
       const p = priceMap.get(symbol);
       if (!p || p.price === 0) continue;
-      context += `${symbol} | ${p.price} | ${p.changePercent.toFixed(2)}% | ${p.high} | ${p.low} | ${p.open} | ${p.previousClose}\n`;
+      const bars = barsMap?.get(symbol);
+      const ind = bars ? calcIndicators(bars) : null;
+      let line = `${symbol} | ${p.price} | ${p.changePercent.toFixed(2)}%`;
+      line += ` | H:${p.high} L:${p.low}`;
+      if (ind) {
+        line += ` | RSI:${ind.rsi}`;
+        line += ` | MACD:${ind.macd}`;
+        line += ` | BB:${ind.bbPos}`;
+        if (ind.sma20) line += ` | SMA20:${fmtPrice(ind.sma20)}`;
+        if (ind.sma50) line += ` | SMA50:${fmtPrice(ind.sma50)}`;
+      }
+      context += line + `\n`;
     }
     context += `\n`;
   }
@@ -401,11 +525,11 @@ async function runScreening(timeoutMs: number = 90_000): Promise<SuggestionsResp
   const mergedDaytrading = mergeGroupSuggestions(deepseekGroups.daytrading, qwenGroups.daytrading);
   const mergedSwing = mergeGroupSuggestions(deepseekGroups.swing, qwenGroups.swing);
 
-  // Enrich suggestions in parallel with OHLC-based data (pattern + regime + confluence)
+  // Enrich suggestions — reuse pre-fetched bars (no duplicate OHLC requests)
   const [scalpingEnrich, daytradingEnrich, swingEnrich] = await Promise.all([
-    enrichSymbols(mergedScalping, "scalping"),
-    enrichSymbols(mergedDaytrading, "daytrading"),
-    enrichSymbols(mergedSwing, "swing"),
+    enrichSymbols(mergedScalping, "scalping", scalpingBars),
+    enrichSymbols(mergedDaytrading, "daytrading", daytradingBars),
+    enrichSymbols(mergedSwing, "swing", swingBars),
   ]);
 
   // Build rows with metadata from SCREENING_ROWS config
