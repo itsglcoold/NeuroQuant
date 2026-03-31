@@ -157,7 +157,7 @@ function getPriceDecimals(price: number | null | undefined): number {
 
 // Map trading style to a sensible default interval
 const STYLE_DEFAULT_INTERVAL: Record<string, number> = {
-  scalping: 1,   // 5m
+  scalping: 2,   // 15m
   daytrading: 3, // 1H
   swing: 5,      // 1D
 };
