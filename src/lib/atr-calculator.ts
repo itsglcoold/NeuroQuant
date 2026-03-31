@@ -85,13 +85,23 @@ export function calculateATR(bars: OHLCBar[], period = 14): number {
 // ---------------------------------------------------------------------------
 
 const ATR_DEFAULTS: Record<string, number> = {
+  // Majors
   "EUR/USD": 0.0050, "GBP/USD": 0.0060, "USD/JPY": 0.50,
   "USD/CHF": 0.0050, "AUD/USD": 0.0045, "NZD/USD": 0.0045,
-  "USD/CAD": 0.0050, "EUR/JPY": 0.60,  "GBP/JPY": 0.70,
-  "AUD/JPY": 0.45,   "XAU/USD": 15.0,  "XAG/USD": 0.30,
-  "CL":      0.80,   "DXY":     0.20,
-  // Indices — ATR in price points (1 point = $1)
-  "IXIC":    25.0,   "SPX":     20.0,
+  "USD/CAD": 0.0050,
+  // JPY crosses
+  "EUR/JPY": 0.60,   "GBP/JPY": 0.70,  "AUD/JPY": 0.45,
+  "NZD/JPY": 0.40,   "CAD/JPY": 0.55,
+  // EUR crosses
+  "EUR/GBP": 0.0035, "EUR/AUD": 0.0070,
+  // GBP crosses
+  "GBP/AUD": 0.0100, "GBP/NZD": 0.0120, "GBP/CAD": 0.0095, "GBP/CHF": 0.0080,
+  // AUD/NZD crosses
+  "AUD/CAD": 0.0055, "AUD/CHF": 0.0055, "AUD/NZD": 0.0060,
+  "NZD/CAD": 0.0050,
+  // Metals / Energy / Indices
+  "XAU/USD": 15.0,   "XAG/USD": 0.30,   "CL": 0.80,
+  "DXY":     0.20,   "IXIC":    25.0,   "SPX": 20.0,
 };
 
 /**
@@ -121,9 +131,9 @@ export function getATRAnalysis(bars: OHLCBar[], symbol: string): ATRAnalysis {
 
   const atr14 = calculateATR(workingBars, 14);
 
-  // Sanity check: ATR > 3% of current price means the data is corrupt — fall back to defaults
+  // Sanity check: ATR too high (>3%) or too low (<0.02%) means corrupt data — use defaults
   const lastClose = workingBars[workingBars.length - 1]?.close ?? 0;
-  if (lastClose > 0 && atr14 > lastClose * 0.03) {
+  if (lastClose > 0 && (atr14 > lastClose * 0.03 || atr14 < lastClose * 0.0002)) {
     return {
       value: fallbackValue,
       ratio: 1.0,

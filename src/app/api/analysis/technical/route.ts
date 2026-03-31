@@ -57,8 +57,11 @@ export async function POST(request: NextRequest) {
         // Step 1: Fetch market data in parallel
         send("status", { message: "Fetching live market data…" });
 
-        // Adjust bar count based on interval — shorter intervals need more bars
-        const barCount = ["1min", "5min"].includes(interval) ? 60 : ["15min", "1h"].includes(interval) ? 40 : 30;
+        // Adjust bar count — getATRAnalysis needs ≥35 bars to skip fallback
+        const barCount = ["1min", "5min"].includes(interval) ? 60
+          : ["15min", "1h"].includes(interval) ? 40
+          : ["4h"].includes(interval) ? 45
+          : 50; // 1day
 
         // Fetch market data — use allSettled so one failure doesn't crash everything
         // Map short intervals to "1h" for indicators — 1min/5min/15min indicators are too noisy
