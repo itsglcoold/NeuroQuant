@@ -138,15 +138,14 @@ export async function POST(request: NextRequest) {
               send("analyst", { index, result });
               return result;
             } catch (err) {
-              const errMsg = err instanceof Error ? err.message : String(err);
-              console.error(`${analyst.name} failed:`, errMsg);
+              console.error(`${analyst.name} failed:`, err instanceof Error ? err.message : err);
               const fallback: ModelOutput = {
                 model: `Analyst ${analyst.name}`,
                 sentiment: 0,
                 direction: "neutral",
                 confidence: 0, // 0 confidence → consensus redistributes weight to other models
                 keyLevels: { support: [], resistance: [] },
-                reasoning: `[DEBUG] ${analyst.name} error: ${errMsg.slice(0, 200)}`,
+                reasoning: "Analysis unavailable — model timed out. Remaining analysts have been reweighted for consensus.",
                 timestamp: new Date().toISOString(),
               };
               modelOutputs.push(fallback);
