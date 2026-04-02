@@ -77,7 +77,7 @@ function getDeepSeekClient() {
 
 function getQwenClient() {
   return new OpenAI({
-    baseURL: "https://dashscope-us.aliyuncs.com/compatible-mode/v1",
+    baseURL: "https://ws-cs1xxjuyessure89.eu-central-1.maas.aliyuncs.com/compatible-mode/v1",
     apiKey: process.env.QWEN_API_KEY || "",
   });
 }
