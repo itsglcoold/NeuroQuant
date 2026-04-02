@@ -136,12 +136,12 @@ export async function getPrice(symbol: string): Promise<MarketPrice> {
     }
   }
 
-  const prevClose = safeFloat(data.previousClose);
+  // EODHD returns NA for change/change_p on some symbols (e.g. XAUUSD.FOREX, XAGUSD.FOREX, DXY.INDX)
+  // Also use open as fallback when previousClose is NA
+  const prevClose = safeFloat(data.previousClose) || safeFloat(data.open);
   let change = safeFloat(data.change);
   let changePercent = safeFloat(data.change_p);
 
-  // EODHD returns NA for change/change_p on some symbols (e.g. XAUUSD.FOREX, XAGUSD.FOREX)
-  // Calculate from price - previousClose when available
   if (change === 0 && price > 0 && prevClose > 0) {
     change = price - prevClose;
     changePercent = (change / prevClose) * 100;
