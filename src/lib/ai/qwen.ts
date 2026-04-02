@@ -34,7 +34,9 @@ export async function analyzeTechnical(marketData: {
     ],
     temperature: 0.3,
     max_tokens: 1500,
-  });
+    enable_thinking: false, // Disable Qwen3 thinking mode — without this the model spends 30-60s reasoning before answering
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
 
   let content = response.choices[0]?.message?.content || "";
 

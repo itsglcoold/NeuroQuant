@@ -485,7 +485,8 @@ async function runScreening(timeoutMs: number = 90_000): Promise<SuggestionsResp
       perModelTimeout
     ),
     withTimeout(
-      getQwenClient().chat.completions.create({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (getQwenClient().chat.completions.create as any)({
         model: "qwen3.6-plus",
         messages: [
           { role: "system", content: systemMessage },
@@ -493,6 +494,7 @@ async function runScreening(timeoutMs: number = 90_000): Promise<SuggestionsResp
         ],
         temperature: 0.2,
         max_tokens: 2000,
+        enable_thinking: false, // Disable Qwen3 thinking mode to avoid 30-60s reasoning delay
       }),
       perModelTimeout
     ),
