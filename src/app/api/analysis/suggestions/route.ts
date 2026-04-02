@@ -486,7 +486,7 @@ async function runScreening(timeoutMs: number = 90_000): Promise<SuggestionsResp
     ),
     withTimeout(
       getQwenClient().chat.completions.create({
-        model: "qwen-plus",
+        model: "qwen3.6-plus",
         messages: [
           { role: "system", content: systemMessage },
           { role: "user", content: userMessage },

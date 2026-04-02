@@ -27,7 +27,7 @@ export async function analyzeTechnical(marketData: {
   const context = buildMarketDataContext(marketData);
 
   const response = await getClient().chat.completions.create({
-    model: "qwen3-max-2025-09-23", // most powerful general-purpose Qwen model
+    model: "qwen3.6-plus", // latest model on Frankfurt MaaS workspace
     messages: [
       { role: "system", content: technicalAnalysisPrompt("qwen", marketData.symbol, marketData.tradingStyle) },
       { role: "user", content: `Analyze the following market data:\n\n${context}` },
