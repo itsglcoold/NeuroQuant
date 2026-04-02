@@ -485,17 +485,21 @@ async function runScreening(timeoutMs: number = 90_000): Promise<SuggestionsResp
       perModelTimeout
     ),
     withTimeout(
-      getQwenClient().chat.completions.create({
-        model: "qwen3.6-plus",
-        messages: [
-          { role: "system", content: systemMessage },
-          { role: "user", content: userMessage },
-        ],
-        temperature: 0.2,
-        max_tokens: 2000,
-        // @ts-ignore — enable_thinking is a Qwen3-specific param not in OpenAI types
-        enable_thinking: false,
-      }),
+      (() => {
+        // Disable Qwen3 thinking mode — enable_thinking is not in OpenAI types so injected via Object.assign
+        const p: OpenAI.ChatCompletionCreateParamsNonStreaming = {
+          model: "qwen3.6-plus",
+          messages: [
+            { role: "system", content: systemMessage },
+            { role: "user", content: userMessage },
+          ],
+          temperature: 0.2,
+          max_tokens: 2000,
+          stream: false,
+        };
+        Object.assign(p, { enable_thinking: false });
+        return getQwenClient().chat.completions.create(p);
+      })(),
       perModelTimeout
     ),
   ]);

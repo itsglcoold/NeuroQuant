@@ -26,17 +26,20 @@ export async function analyzeTechnical(marketData: {
 }): Promise<ModelOutput> {
   const context = buildMarketDataContext(marketData);
 
-  const response = await getClient().chat.completions.create({
-    model: "qwen3.6-plus", // latest model on Frankfurt MaaS workspace
+  // Disable Qwen3 thinking mode — without this the model spends 30-60s reasoning before answering.
+  // enable_thinking is not in the OpenAI type definitions, so we inject it via Object.assign.
+  const qwenParams: OpenAI.ChatCompletionCreateParamsNonStreaming = {
+    model: "qwen3.6-plus",
     messages: [
       { role: "system", content: technicalAnalysisPrompt("qwen", marketData.symbol, marketData.tradingStyle) },
       { role: "user", content: `Analyze the following market data:\n\n${context}` },
     ],
     temperature: 0.3,
     max_tokens: 1500,
-    // @ts-ignore — enable_thinking is a Qwen3-specific param not in OpenAI types
-    enable_thinking: false, // Disable Qwen3 thinking mode — without this the model spends 30-60s reasoning before answering
-  });
+    stream: false,
+  };
+  Object.assign(qwenParams, { enable_thinking: false });
+  const response = await getClient().chat.completions.create(qwenParams);
 
   let content = response.choices[0]?.message?.content || "";
 
