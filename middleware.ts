@@ -10,6 +10,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next({ request });
   }
 
+  // Skip middleware for auth routes — running getUser() on /auth/callback
+  // can interfere with the PKCE code_verifier cookie before the route handler uses it,
+  // causing OAuth to require a second login attempt.
+  if (request.nextUrl.pathname.startsWith("/auth/")) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });
