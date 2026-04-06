@@ -470,7 +470,9 @@ async function runScreening(timeoutMs: number = 90_000): Promise<SuggestionsResp
   const systemMessage = marketScreeningPrompt();
 
   // Run DeepSeek + Qwen in parallel with individual timeouts
-  const perModelTimeout = Math.min(timeoutMs - 5000, 60_000);
+  // Keep per-model timeout short — both run in parallel so max wait = max(deepseek, qwen)
+  // Cloudflare Pages kills requests ~30-60s; fail fast and serve stale instead
+  const perModelTimeout = Math.min(timeoutMs - 5000, 20_000);
 
   const [deepseekRes, qwenRes] = await Promise.allSettled([
     withTimeout(
@@ -481,7 +483,7 @@ async function runScreening(timeoutMs: number = 90_000): Promise<SuggestionsResp
           { role: "user", content: userMessage },
         ],
         temperature: 0.2,
-        max_tokens: 2000,
+        max_tokens: 1200,
       }),
       perModelTimeout
     ),
@@ -494,8 +496,8 @@ async function runScreening(timeoutMs: number = 90_000): Promise<SuggestionsResp
             { role: "user", content: userMessage },
           ],
           temperature: 0.2,
-          max_tokens: 2000,
-          enable_thinking: false, // Qwen3 MaaS param — disable thinking mode to avoid 60-90s delay
+          max_tokens: 1200,
+          enable_thinking: false,
         } as OpenAI.ChatCompletionCreateParamsNonStreaming
       ),
       perModelTimeout
@@ -654,7 +656,7 @@ export async function GET(request: NextRequest) {
   // 4. NO usable cache → must scan now
   // ---------------------------------------------------------------------------
   try {
-    const result = await runScreening(90_000);
+    const result = await runScreening(50_000);
 
     await setCachedResult(result);
     memoryCache = { data: result, cachedAt: Date.now() };
@@ -664,14 +666,13 @@ export async function GET(request: NextRequest) {
       _stale: false,
     });
   } catch (error) {
-    // If scan fails but we have ANY old cached data, return it rather than error
+    console.error("Suggestions scan failed:", error instanceof Error ? error.message : error);
     if (bestCached) {
       return NextResponse.json({
         ...sliceByTier(bestCached, maxPerRow),
         _stale: true,
       });
     }
-    console.error("Suggestions API error:", error);
     return NextResponse.json(
       { error: "Suggestions temporarily unavailable" },
       { status: 503 }
