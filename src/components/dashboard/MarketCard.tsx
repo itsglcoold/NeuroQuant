@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { MarketCategory } from "@/types/market";
 import { CATEGORY_COLORS } from "@/lib/market/symbols";
+import { getMarketStatus } from "@/lib/market/holidays";
 
 const STYLE_BADGE_COLORS: Record<string, string> = {
   red: "bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20",
@@ -46,6 +47,10 @@ export function MarketCard({
   const colors = category ? CATEGORY_COLORS[category] : null;
   const styleParam = tradingStyle ? `?style=${tradingStyle.key}` : "";
 
+  // Detect market closure: price present but change is exactly 0 on a non-trading day
+  const marketStatus = getMarketStatus();
+  const isClosed = hasData && change === 0 && changePercent === 0 && marketStatus.status !== "open";
+
   return (
     <Link href={`/dashboard/market/${encodeURIComponent(symbol)}${styleParam}`} prefetch={false}>
       <Card className={cn("group relative border border-border bg-card transition-all hover:bg-accent", colors ? `border-l-4 ${colors.border}` : "", isPinned ? "ring-1 ring-amber-400/30" : "")}>
@@ -81,26 +86,37 @@ export function MarketCard({
               </div>
             </div>
 
-            {hasData && change !== undefined && (
-              <div
-                className={cn(
-                  "flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-medium",
-                  isPositive
-                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                    : "bg-red-500/10 text-red-600 dark:text-red-400"
-                )}
-              >
-                {isPositive ? (
-                  <TrendingUp className="h-3 w-3" />
-                ) : (
-                  <TrendingDown className="h-3 w-3" />
-                )}
-                {changePercent !== undefined && typeof changePercent === "number"
-                  ? `${isPositive ? "+" : ""}${changePercent.toFixed(2)}%`
-                  : change !== undefined && typeof change === "number"
-                    ? formatChange(change, symbol)
-                    : "0.00"}
-              </div>
+            {hasData && (
+              isClosed ? (
+                <div className="flex flex-col items-end gap-0.5">
+                  <div className="rounded-md px-1.5 py-0.5 text-xs font-medium bg-muted text-muted-foreground">
+                    --
+                  </div>
+                  <span className="text-[9px] font-semibold text-amber-500 dark:text-amber-400 uppercase tracking-wide">
+                    {marketStatus.label}
+                  </span>
+                </div>
+              ) : change !== undefined && (
+                <div
+                  className={cn(
+                    "flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-medium",
+                    isPositive
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                      : "bg-red-500/10 text-red-600 dark:text-red-400"
+                  )}
+                >
+                  {isPositive ? (
+                    <TrendingUp className="h-3 w-3" />
+                  ) : (
+                    <TrendingDown className="h-3 w-3" />
+                  )}
+                  {changePercent !== undefined && typeof changePercent === "number"
+                    ? `${isPositive ? "+" : ""}${changePercent.toFixed(2)}%`
+                    : change !== undefined && typeof change === "number"
+                      ? formatChange(change, symbol)
+                      : "0.00"}
+                </div>
+              )
             )}
           </div>
 
@@ -114,10 +130,12 @@ export function MarketCard({
                   <span
                     className={cn(
                       "text-xs tabular-nums",
-                      isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                      isClosed
+                        ? "text-muted-foreground"
+                        : isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
                     )}
                   >
-                    {typeof change === "number" ? formatChange(change, symbol) : "0.00"}
+                    {isClosed ? "--" : typeof change === "number" ? formatChange(change, symbol) : "0.00"}
                   </span>
                 )}
               </div>
