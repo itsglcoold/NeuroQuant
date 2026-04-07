@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     // 2. Get unique symbols and fetch prices
     const uniqueSymbols = [...new Set(openTrades.map((t) => t.symbol as string))];
     const pricesArray = await getPrices(uniqueSymbols);
-    const priceMap = new Map(pricesArray.map((p) => [p.symbol, p.price]));
+    const priceMap = new Map(pricesArray.map((p) => [p.symbol, p]));
 
     // 3. Evaluate SL/TP for each trade
     const tradesToClose: {
@@ -60,32 +60,42 @@ export async function GET(request: NextRequest) {
       side: string;
     }[] = [];
 
-    for (const trade of openTrades) {
-      const currentPrice = priceMap.get(trade.symbol as string);
-      if (!currentPrice || currentPrice === 0) continue;
+    const todayUTC = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
 
+    for (const trade of openTrades) {
+      const priceData = priceMap.get(trade.symbol as string);
+      if (!priceData || priceData.price === 0) continue;
+
+      const currentPrice = priceData.price;
       const entryPrice = trade.entry_price as number;
       const slPrice = trade.sl_price as number;
       const tpPrice = trade.tp_price as number;
       const side = trade.side as string;
 
+      // Use session High/Low for trades opened today — catches intraday TP/SL
+      // touches that occur between cron runs (e.g. brief spike that bounces back).
+      // For older trades use current price only to avoid stale session data.
+      const openedToday = (trade.opened_at as string)?.slice(0, 10) === todayUTC;
+      const sessionHigh = openedToday && priceData.high > 0 ? priceData.high : currentPrice;
+      const sessionLow  = openedToday && priceData.low  > 0 ? priceData.low  : currentPrice;
+
       let shouldClose = false;
       let closePrice = currentPrice;
 
       if (side === "long") {
-        if (currentPrice <= slPrice) {
+        if (sessionLow <= slPrice) {
           shouldClose = true;
           closePrice = slPrice;
-        } else if (currentPrice >= tpPrice) {
+        } else if (sessionHigh >= tpPrice) {
           shouldClose = true;
           closePrice = tpPrice;
         }
       } else {
         // short
-        if (currentPrice >= slPrice) {
+        if (sessionHigh >= slPrice) {
           shouldClose = true;
           closePrice = slPrice;
-        } else if (currentPrice <= tpPrice) {
+        } else if (sessionLow <= tpPrice) {
           shouldClose = true;
           closePrice = tpPrice;
         }
@@ -144,14 +154,14 @@ export async function GET(request: NextRequest) {
       const missingSymbols = alertSymbols.filter((s) => !priceMap.has(s));
       if (missingSymbols.length > 0) {
         const extraPrices = await getPrices(missingSymbols);
-        for (const p of extraPrices) priceMap.set(p.symbol, p.price);
+        for (const p of extraPrices) priceMap.set(p.symbol, p);
       }
 
       const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
       const now = new Date().toISOString();
 
       for (const alert of activeAlerts as { id: string; user_id: string; symbol: string; target_price: number; direction: string }[]) {
-        const currentPrice = priceMap.get(alert.symbol);
+        const currentPrice = priceMap.get(alert.symbol)?.price;
         if (!currentPrice) continue;
 
         const triggered =
