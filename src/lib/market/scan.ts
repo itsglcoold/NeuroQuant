@@ -21,6 +21,9 @@ function getDeepSeekClient() {
     baseURL: "https://api.deepseek.com",
     apiKey: process.env.DEEPSEEK_API_KEY || "",
     maxRetries: 0,
+    // Force Cloudflare's native fetch — nodejs_compat causes the SDK to try
+    // Node.js http modules which don't work in the Cloudflare Workers runtime
+    fetch: globalThis.fetch,
   });
 }
 
@@ -29,6 +32,7 @@ function getQwenClient() {
     baseURL: "https://ws-cs1xxjuyessure89.eu-central-1.maas.aliyuncs.com/compatible-mode/v1",
     apiKey: process.env.QWEN_API_KEY || "",
     maxRetries: 0,
+    fetch: globalThis.fetch,
   });
 }
 
