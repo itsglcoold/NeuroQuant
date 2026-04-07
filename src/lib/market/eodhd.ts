@@ -69,6 +69,7 @@ async function fetchEodhd(
 
   const response = await fetch(url, {
     next: { revalidate: cacheSecs },
+    signal: AbortSignal.timeout(8000), // 8s max per EODHD call — prevents hanging connections
   });
   if (!response.ok) {
     // Check for rate limit error
