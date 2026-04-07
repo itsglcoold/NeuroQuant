@@ -356,37 +356,22 @@ export async function runMarketScan(timeoutMs: number = 25_000): Promise<Suggest
     swing:      { label: "SWING TRADING", timeframe: "4H / Daily" },
   };
 
-  // Fetch prices + OHLC bars for all 28 markets in parallel
-  const [pricesArray, scalpingBars, daytradingBars, swingBars] = await Promise.all([
-    getPrices([...ALL_MARKETS_FLAT]),
-    prefetchBarsForGroup(ALL_MARKETS_BY_STYLE.scalping,   STYLE_OHLC_TIMEFRAME.scalping),
-    prefetchBarsForGroup(ALL_MARKETS_BY_STYLE.daytrading, STYLE_OHLC_TIMEFRAME.daytrading),
-    prefetchBarsForGroup(ALL_MARKETS_BY_STYLE.swing,      STYLE_OHLC_TIMEFRAME.swing),
-  ]);
-
+  // Fetch prices only — 28 calls, stays well within Cloudflare's 50 subrequest limit.
+  // (28 prices + 2 AI + ~15 enrichment = ~45 total — pre-fetching OHLC for all 28 pushed
+  // total to 58 calls which silently killed the AI fetch calls with "Connection error")
+  const pricesArray = await getPrices([...ALL_MARKETS_FLAT]);
   const priceMap = new Map(pricesArray.map((p) => [p.symbol, p]));
-  const allBars: Record<string, BarsMap> = { scalping: scalpingBars, daytrading: daytradingBars, swing: swingBars };
 
-  // Build context for AI
+  // Build context for AI — price action data only
   let context = `MARKET SCREENING DATA (${ALL_MARKETS_FLAT.length} markets in 3 groups):\n\n`;
   for (const [style, symbols] of Object.entries(ALL_MARKETS_BY_STYLE)) {
     const meta = STYLE_LABELS[style];
-    const barsMap = allBars[style];
     context += `--- ${meta.label} (${meta.timeframe}) ---\n`;
-    context += `Symbol | Price | Change% | High | Low | RSI | MACD | BB | SMA20 | SMA50\n`;
+    context += `Symbol | Price | Change% | High | Low\n`;
     for (const symbol of symbols) {
       const p = priceMap.get(symbol);
       if (!p || p.price === 0) continue;
-      const bars = barsMap?.get(symbol);
-      const ind = bars ? calcIndicators(bars) : null;
-      let line = `${symbol} | ${p.price} | ${p.changePercent.toFixed(2)}%`;
-      line += ` | H:${p.high} L:${p.low}`;
-      if (ind) {
-        line += ` | RSI:${ind.rsi} | MACD:${ind.macd} | BB:${ind.bbPos}`;
-        if (ind.sma20) line += ` | SMA20:${fmtPrice(ind.sma20)}`;
-        if (ind.sma50) line += ` | SMA50:${fmtPrice(ind.sma50)}`;
-      }
-      context += line + `\n`;
+      context += `${symbol} | ${p.price} | ${p.changePercent.toFixed(2)}% | H:${p.high} L:${p.low}\n`;
     }
     context += `\n`;
   }
@@ -460,10 +445,11 @@ export async function runMarketScan(timeoutMs: number = 25_000): Promise<Suggest
   const mergedDaytrading = mergeGroupSuggestions(deepseekGroups.daytrading, qwenGroups.daytrading);
   const mergedSwing      = mergeGroupSuggestions(deepseekGroups.swing,      qwenGroups.swing);
 
+  // Enrich only the ~15 selected symbols — enrichSymbols fetches OHLC on-demand
   const [scalpingEnrich, daytradingEnrich, swingEnrich] = await Promise.all([
-    enrichSymbols(mergedScalping,   "scalping",   scalpingBars),
-    enrichSymbols(mergedDaytrading, "daytrading", daytradingBars),
-    enrichSymbols(mergedSwing,      "swing",      swingBars),
+    enrichSymbols(mergedScalping,   "scalping"),
+    enrichSymbols(mergedDaytrading, "daytrading"),
+    enrichSymbols(mergedSwing,      "swing"),
   ]);
 
   const rows: SuggestionRow[] = [
