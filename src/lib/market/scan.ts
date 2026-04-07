@@ -260,7 +260,7 @@ function fmtPrice(n: number): string {
 const STYLE_OHLC_TIMEFRAME: Record<string, string> = {
   scalping: "5min",
   daytrading: "1h",
-  swing: "4h",
+  swing: "1day", // EOD has better coverage than 4h intraday for forex crosses
 };
 
 async function prefetchBarsForGroup(symbols: readonly string[], timeframe: string): Promise<BarsMap> {
