@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runMarketScan } from "@/lib/market/scan";
+import { getMarketStatus } from "@/lib/market/holidays";
 
 export const runtime = "edge";
 
-// Maximum time for a single scan — keep under 25s to stay within Cloudflare limits
 const SCAN_TIMEOUT_MS = 25_000;
 
 export async function GET(request: NextRequest) {
@@ -12,6 +12,12 @@ export async function GET(request: NextRequest) {
   const secret = request.nextUrl.searchParams.get("secret");
   if (!secret || secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Skip scan on weekends and public holidays — markets closed, no value
+  const marketStatus = getMarketStatus();
+  if (marketStatus.status !== "open") {
+    return NextResponse.json({ skipped: true, reason: marketStatus.label });
   }
 
   try {
