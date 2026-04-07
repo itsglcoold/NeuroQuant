@@ -391,7 +391,7 @@ export async function runMarketScan(timeoutMs: number = 25_000): Promise<Suggest
   const systemMessage = marketScreeningPrompt();
 
   // Per-model timeout — both run in parallel so max wait = slower of the two
-  const perModelTimeout = Math.min(timeoutMs - 3000, 20_000);
+  const perModelTimeout = Math.min(timeoutMs - 5000, 40_000);
 
   const [deepseekRes, qwenRes] = await Promise.allSettled([
     withTimeout(
@@ -423,21 +423,32 @@ export async function runMarketScan(timeoutMs: number = 25_000): Promise<Suggest
     ),
   ]);
 
-  if (deepseekRes.status === "rejected") console.error("DeepSeek scan failed:", deepseekRes.reason?.message);
-  if (qwenRes.status === "rejected")    console.error("Qwen scan failed:", qwenRes.reason?.message);
+  const deepseekError = deepseekRes.status === "rejected" ? deepseekRes.reason?.message : null;
+  const qwenError     = qwenRes.status === "rejected"    ? qwenRes.reason?.message    : null;
+  if (deepseekError) console.error("DeepSeek scan failed:", deepseekError);
+  if (qwenError)     console.error("Qwen scan failed:", qwenError);
 
-  const deepseekGroups = deepseekRes.status === "fulfilled"
-    ? parseScreeningResponse(deepseekRes.value.choices[0]?.message?.content || "{}")
-    : { scalping: [], daytrading: [], swing: [] };
-  const qwenGroups = qwenRes.status === "fulfilled"
-    ? parseScreeningResponse(qwenRes.value.choices[0]?.message?.content || "{}")
-    : { scalping: [], daytrading: [], swing: [] };
+  const deepseekContent = deepseekRes.status === "fulfilled" ? (deepseekRes.value.choices[0]?.message?.content || "{}") : "{}";
+  const qwenContent     = qwenRes.status     === "fulfilled" ? (qwenRes.value.choices[0]?.message?.content     || "{}") : "{}";
+
+  // Log first 300 chars of each response to diagnose parse failures
+  console.log("DeepSeek response:", deepseekContent.slice(0, 300));
+  console.log("Qwen response:",     qwenContent.slice(0, 300));
+
+  const deepseekGroups = parseScreeningResponse(deepseekContent);
+  const qwenGroups     = parseScreeningResponse(qwenContent);
 
   const totalResults =
     deepseekGroups.scalping.length + deepseekGroups.daytrading.length + deepseekGroups.swing.length +
     qwenGroups.scalping.length + qwenGroups.daytrading.length + qwenGroups.swing.length;
 
-  if (totalResults === 0) throw new Error("Both AI models returned no results");
+  if (totalResults === 0) {
+    const reason = [
+      deepseekError ? `DeepSeek: ${deepseekError}` : `DeepSeek: parsed 0 results (raw: ${deepseekContent.slice(0, 100)})`,
+      qwenError     ? `Qwen: ${qwenError}`         : `Qwen: parsed 0 results (raw: ${qwenContent.slice(0, 100)})`,
+    ].join(" | ");
+    throw new Error(`Both AI models returned no results — ${reason}`);
+  }
 
   const mergedScalping   = mergeGroupSuggestions(deepseekGroups.scalping,   qwenGroups.scalping);
   const mergedDaytrading = mergeGroupSuggestions(deepseekGroups.daytrading, qwenGroups.daytrading);

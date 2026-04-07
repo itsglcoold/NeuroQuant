@@ -5,7 +5,7 @@ import { getMarketStatus } from "@/lib/market/holidays";
 
 export const runtime = "edge";
 
-const SCAN_TIMEOUT_MS = 25_000;
+const SCAN_TIMEOUT_MS = 55_000; // Cron is background — no user waiting, can take longer
 
 export async function GET(request: NextRequest) {
   // Verify cron secret — rejects all unauthorized callers
