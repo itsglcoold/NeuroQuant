@@ -391,8 +391,9 @@ export async function runMarketScan(timeoutMs: number = 25_000): Promise<Suggest
   const systemMessage = marketScreeningPrompt();
 
   // Per-model timeout — both run in parallel so max wait = slower of the two
-  // cron-job.org closes connection after 30s; EODHD takes ~8s → AI gets max 20s
-  const perModelTimeout = Math.min(timeoutMs - 5000, 20_000);
+  // cron-job.org closes connection after 30s; EODHD takes ~8s → AI gets max 18s
+  // max_tokens=800 keeps response time ~12s (15 suggestions × ~50 tokens each)
+  const perModelTimeout = Math.min(timeoutMs - 5000, 18_000);
 
   const [deepseekRes, qwenRes] = await Promise.allSettled([
     withTimeout(
@@ -403,7 +404,7 @@ export async function runMarketScan(timeoutMs: number = 25_000): Promise<Suggest
           { role: "user", content: userMessage },
         ],
         temperature: 0.2,
-        max_tokens: 1200,
+        max_tokens: 800,
       }),
       perModelTimeout
     ),
@@ -416,7 +417,7 @@ export async function runMarketScan(timeoutMs: number = 25_000): Promise<Suggest
             { role: "user", content: userMessage },
           ],
           temperature: 0.2,
-          max_tokens: 1200,
+          max_tokens: 800,
           enable_thinking: false,
         } as OpenAI.ChatCompletionCreateParamsNonStreaming
       ),

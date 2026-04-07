@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runMarketScan } from "@/lib/market/scan";
 import { getMarketStatus } from "@/lib/market/holidays";
 
 export const runtime = "edge";
+
+// Budget: cron-job.org closes connection after 30s.
+// EODHD phase: ~8s (AbortSignal.timeout(8000) per call, all parallel)
+// AI phase: ~12s (max_tokens=800, reduced from 1200 to fit within 30s)
+// Total: ~20s — well within the 30s window.
+const SCAN_TIMEOUT_MS = 28_000;
 
 export async function GET(request: NextRequest) {
   // Verify cron secret — rejects all unauthorized callers
@@ -19,35 +24,30 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ skipped: true, reason: marketStatus.label });
   }
 
-  // Schedule the scan to run AFTER the response is sent.
-  // This is critical: cron-job.org closes the HTTP connection after 30s.
-  // If we await the scan here, Cloudflare kills the worker at 30s and aborts
-  // in-flight AI calls → "Connection error." With after(), the response goes
-  // out immediately and the scan runs via ctx.waitUntil() with no HTTP timeout.
-  after(async () => {
-    try {
-      const result = await runMarketScan(55_000);
+  try {
+    const result = await runMarketScan(SCAN_TIMEOUT_MS);
 
-      const supabase = createAdminClient();
-      const { error } = await supabase
-        .from("market_scan_cache")
-        .upsert({ id: "latest", data: result, scanned_at: new Date().toISOString() });
+    // Persist to Supabase — single row upsert (id = 'latest')
+    const supabase = createAdminClient();
+    const { error } = await supabase
+      .from("market_scan_cache")
+      .upsert({ id: "latest", data: result, scanned_at: new Date().toISOString() });
 
-      if (error) {
-        console.error("Background scan: failed to save to Supabase:", error.message);
-      } else {
-        console.log("Background scan: saved", result.marketsScanned, "markets to Supabase");
-      }
-    } catch (err) {
-      console.error("Background scan failed:", err instanceof Error ? err.message : err);
+    if (error) {
+      console.error("Failed to save scan to Supabase:", error.message);
+      return NextResponse.json({ error: "Failed to save scan result" }, { status: 500 });
     }
-  });
 
-  // Return immediately — cron-job.org sees this within milliseconds, not 30+ seconds
-  return NextResponse.json({
-    ok: true,
-    started: true,
-    message: "Scan started in background",
-    triggered_at: new Date().toISOString(),
-  });
+    return NextResponse.json({
+      ok: true,
+      scanned_at: new Date().toISOString(),
+      markets: result.marketsScanned,
+    });
+  } catch (error) {
+    console.error("Cron scan failed:", error instanceof Error ? error.message : error);
+    return NextResponse.json(
+      { error: "Scan failed", detail: error instanceof Error ? error.message : String(error) },
+      { status: 500 }
+    );
+  }
 }
