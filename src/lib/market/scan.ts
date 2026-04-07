@@ -1,6 +1,6 @@
 /**
  * Market scan logic — shared between the cron route and the suggestions API.
- * Scans 28 markets with DeepSeek + Qwen and returns a SuggestionsResponse.
+ * Scans 28 markets with Claude + DeepSeek + Qwen and returns a SuggestionsResponse.
  */
 import { getPrices, getTimeSeries } from "@/lib/market/eodhd";
 import { MARKETS, SCREENING_ROWS } from "@/lib/market/symbols";
@@ -10,19 +10,25 @@ import { detectAllPatterns } from "@/lib/candlestick-patterns";
 import { calculateConfluenceScore } from "@/lib/confluence-score";
 import { detectMarketRegime } from "@/lib/market-regime";
 import { getATRAnalysis } from "@/lib/atr-calculator";
+import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 
 // ---------------------------------------------------------------------------
 // AI clients
 // ---------------------------------------------------------------------------
 
+function getClaudeClient() {
+  return new Anthropic({
+    apiKey: process.env.CLAUDE_API_KEY || "",
+    maxRetries: 0,
+  });
+}
+
 function getDeepSeekClient() {
   return new OpenAI({
     baseURL: "https://api.deepseek.com",
     apiKey: process.env.DEEPSEEK_API_KEY || "",
     maxRetries: 0,
-    // Force Cloudflare's native fetch — nodejs_compat causes the SDK to try
-    // Node.js http modules which don't work in the Cloudflare Workers runtime
     fetch: globalThis.fetch,
   });
 }
@@ -386,12 +392,20 @@ export async function runMarketScan(timeoutMs: number = 25_000): Promise<Suggest
   const userMessage = `Screen these markets grouped by trading style. Analyze each group through its designated timeframe lens:\n\n${context}`;
   const systemMessage = marketScreeningPrompt();
 
-  // Per-model timeout — both run in parallel so max wait = slower of the two
-  // cron-job.org closes connection after 30s; EODHD takes ~8s → AI gets max 18s
-  // max_tokens=800 keeps response time ~12s (15 suggestions × ~50 tokens each)
-  const perModelTimeout = Math.min(timeoutMs - 5000, 18_000);
+  // All three models in parallel — need at least 1 to succeed
+  // Claude is the reliable fallback; DeepSeek and Qwen add consensus when they respond in time
+  const aiTimeout = Math.min(timeoutMs - 5000, 20_000);
 
-  const [deepseekRes, qwenRes] = await Promise.allSettled([
+  const [claudeRes, deepseekRes, qwenRes] = await Promise.allSettled([
+    withTimeout(
+      getClaudeClient().messages.create({
+        model: "claude-opus-4-6",
+        max_tokens: 1200,
+        system: systemMessage,
+        messages: [{ role: "user", content: userMessage }],
+      }),
+      aiTimeout
+    ),
     withTimeout(
       getDeepSeekClient().chat.completions.create({
         model: "deepseek-chat",
@@ -402,7 +416,7 @@ export async function runMarketScan(timeoutMs: number = 25_000): Promise<Suggest
         temperature: 0.2,
         max_tokens: 1000,
       }),
-      perModelTimeout
+      aiTimeout
     ),
     withTimeout(
       getQwenClient().chat.completions.create(
@@ -417,40 +431,50 @@ export async function runMarketScan(timeoutMs: number = 25_000): Promise<Suggest
           enable_thinking: false,
         } as OpenAI.ChatCompletionCreateParamsNonStreaming
       ),
-      perModelTimeout
+      aiTimeout
     ),
   ]);
 
-  const deepseekError = deepseekRes.status === "rejected" ? deepseekRes.reason?.message : null;
-  const qwenError     = qwenRes.status === "rejected"    ? qwenRes.reason?.message    : null;
-  if (deepseekError) console.error("DeepSeek scan failed:", deepseekError);
-  if (qwenError)     console.error("Qwen scan failed:", qwenError);
+  // Extract content from each model
+  const claudeContent = claudeRes.status === "fulfilled"
+    ? (claudeRes.value.content.find((b) => b.type === "text") as { type: "text"; text: string } | undefined)?.text ?? "{}"
+    : "{}";
+  const deepseekContent = deepseekRes.status === "fulfilled"
+    ? (deepseekRes.value.choices[0]?.message?.content || "{}")
+    : "{}";
+  const qwenContent = qwenRes.status === "fulfilled"
+    ? (qwenRes.value.choices[0]?.message?.content || "{}")
+    : "{}";
 
-  const deepseekContent = deepseekRes.status === "fulfilled" ? (deepseekRes.value.choices[0]?.message?.content || "{}") : "{}";
-  const qwenContent     = qwenRes.status     === "fulfilled" ? (qwenRes.value.choices[0]?.message?.content     || "{}") : "{}";
+  if (claudeRes.status === "rejected") console.error("Claude scan failed:", claudeRes.reason?.message);
+  if (deepseekRes.status === "rejected") console.error("DeepSeek scan failed:", deepseekRes.reason?.message);
+  if (qwenRes.status === "rejected") console.error("Qwen scan failed:", qwenRes.reason?.message);
 
-  // Log first 300 chars of each response to diagnose parse failures
-  console.log("DeepSeek response:", deepseekContent.slice(0, 300));
-  console.log("Qwen response:",     qwenContent.slice(0, 300));
+  console.log("Claude response:", claudeContent.slice(0, 200));
+  console.log("DeepSeek response:", deepseekContent.slice(0, 200));
 
+  const claudeGroups   = parseScreeningResponse(claudeContent);
   const deepseekGroups = parseScreeningResponse(deepseekContent);
   const qwenGroups     = parseScreeningResponse(qwenContent);
 
   const totalResults =
+    claudeGroups.scalping.length + claudeGroups.daytrading.length + claudeGroups.swing.length +
     deepseekGroups.scalping.length + deepseekGroups.daytrading.length + deepseekGroups.swing.length +
     qwenGroups.scalping.length + qwenGroups.daytrading.length + qwenGroups.swing.length;
 
   if (totalResults === 0) {
-    const reason = [
-      deepseekError ? `DeepSeek: ${deepseekError}` : `DeepSeek: parsed 0 results (raw: ${deepseekContent.slice(0, 100)})`,
-      qwenError     ? `Qwen: ${qwenError}`         : `Qwen: parsed 0 results (raw: ${qwenContent.slice(0, 100)})`,
+    const errors = [
+      claudeRes.status === "rejected" ? `Claude: ${claudeRes.reason?.message}` : `Claude: parsed 0`,
+      deepseekRes.status === "rejected" ? `DeepSeek: ${deepseekRes.reason?.message}` : `DeepSeek: parsed 0`,
+      qwenRes.status === "rejected" ? `Qwen: ${qwenRes.reason?.message}` : `Qwen: parsed 0`,
     ].join(" | ");
-    throw new Error(`Both AI models returned no results — ${reason}`);
+    throw new Error(`All models returned no results — ${errors}`);
   }
 
-  const mergedScalping   = mergeGroupSuggestions(deepseekGroups.scalping,   qwenGroups.scalping);
-  const mergedDaytrading = mergeGroupSuggestions(deepseekGroups.daytrading, qwenGroups.daytrading);
-  const mergedSwing      = mergeGroupSuggestions(deepseekGroups.swing,      qwenGroups.swing);
+  // Merge all three models — Claude is the anchor, DeepSeek and Qwen add consensus when available
+  const mergedScalping   = mergeGroupSuggestions(mergeGroupSuggestions(claudeGroups.scalping,   deepseekGroups.scalping),   qwenGroups.scalping);
+  const mergedDaytrading = mergeGroupSuggestions(mergeGroupSuggestions(claudeGroups.daytrading, deepseekGroups.daytrading), qwenGroups.daytrading);
+  const mergedSwing      = mergeGroupSuggestions(mergeGroupSuggestions(claudeGroups.swing,      deepseekGroups.swing),      qwenGroups.swing);
 
   // Enrich only the ~15 selected symbols — enrichSymbols fetches OHLC on-demand
   const [scalpingEnrich, daytradingEnrich, swingEnrich] = await Promise.all([
