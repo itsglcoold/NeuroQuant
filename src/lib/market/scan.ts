@@ -125,8 +125,15 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 function parseScreeningResponse(content: string): ParsedGroups {
+  // Strip markdown code fences — model may wrap in ```json ... ```
+  // If response was truncated (max_tokens hit), closing ``` may be missing
   const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (codeBlockMatch) content = codeBlockMatch[1].trim();
+  if (codeBlockMatch) {
+    content = codeBlockMatch[1].trim();
+  } else {
+    // No closing fence found — strip just the opening fence and try anyway
+    content = content.replace(/^```(?:json)?\s*/i, "").trim();
+  }
   try {
     const parsed = JSON.parse(content);
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
@@ -393,7 +400,7 @@ export async function runMarketScan(timeoutMs: number = 25_000): Promise<Suggest
           { role: "user", content: userMessage },
         ],
         temperature: 0.2,
-        max_tokens: 800,
+        max_tokens: 1000,
       }),
       perModelTimeout
     ),
@@ -406,7 +413,7 @@ export async function runMarketScan(timeoutMs: number = 25_000): Promise<Suggest
             { role: "user", content: userMessage },
           ],
           temperature: 0.2,
-          max_tokens: 800,
+          max_tokens: 1000,
           enable_thinking: false,
         } as OpenAI.ChatCompletionCreateParamsNonStreaming
       ),
