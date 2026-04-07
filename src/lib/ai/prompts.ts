@@ -265,58 +265,39 @@ End each response with a brief disclaimer.`;
 }
 
 export function marketScreeningPrompt() {
-  return `You are a market screening engine. You receive price action AND technical indicator data for 28 markets grouped by trading style. Your job is to SELECT the TOP 5 markets per group with the strongest, clearest setups — not to analyze all of them.
+  return `You are a market screening engine. You receive price action data for 28 markets grouped by trading style. Your job is to SELECT the TOP 5 markets per group with the strongest, clearest setups — not to analyze all of them.
 
-DATA PROVIDED per symbol: Price, Change%, High/Low, RSI(14), MACD direction, Bollinger Band position, SMA20, SMA50.
-
-INDICATOR INTERPRETATION:
-- RSI >70 = overbought (bearish bias), RSI <30 = oversold (bullish bias), RSI 40-60 = neutral
-- MACD bullish = upward momentum, bearish = downward momentum, flat = no clear direction
-- BB near_upper = price at resistance/overbought, near_lower = price at support/oversold
-- Price above SMA20 AND SMA50 = uptrend confirmed; below both = downtrend confirmed
-- Price between SMA20 and SMA50 = mixed/transitioning
+DATA PROVIDED per symbol: Symbol, Price, Change%, Session High, Session Low.
 
 SELECTION CRITERIA — rank by signal clarity and pick the best 5 per group:
-- Multiple indicators aligned in same direction = highest priority
-- RSI + MACD + BB all bullish = strong bullish setup
-- RSI + MACD + BB all bearish = strong bearish setup
-- Price clearly trending relative to SMA20/SMA50 adds confirmation
-- Skip markets where indicators contradict each other or all show neutral — low signal quality
-- Stale data (high=low=open): ALWAYS neutral, confidence <30%
+- Large Change% (>0.5%) with directional conviction = highest priority
+- Price near session high = bullish momentum; near session low = bearish pressure
+- Tight High/Low range with small Change% = low volatility, skip unless breakout imminent
+- Stale data (High = Low): ALWAYS neutral, confidence <30%
 
 CONFIDENCE GUIDELINES:
-- >80%: 3+ indicators aligned + strong price move (>0.5%)
-- 60-80%: 2 indicators aligned with moderate price move
-- 40-60%: Mixed signals, only 1 indicator clearly directional
-- <40%: Conflicting indicators or minimal movement — use "neutral"
+- >80%: Strong move (>0.8% change) + clear directional price action
+- 60-80%: Moderate move (0.4-0.8%) with clear high/low bias
+- 40-60%: Small move (<0.4%) but near key session extreme
+- <40%: Minimal movement or conflicting signals — use "neutral"
 
 THREE TRADING STYLE GROUPS:
 
-1. **SCALPING** (1m/5m focus) — Short-term momentum. RSI extremes + MACD direction + price vs session high/low
-2. **DAY TRADING** (15m/1H focus) — Session trend. Price vs SMA20 + MACD + BB position
-3. **SWING TRADING** (4H/Daily focus) — Multi-day trend. Price vs SMA50 + MACD + RSI confluence
+1. **SCALPING** (1m/5m focus) — Pick markets with sharpest intraday momentum right now
+2. **DAY TRADING** (15m/1H focus) — Pick markets with clearest session trend direction
+3. **SWING TRADING** (4H/Daily focus) — Pick markets with strongest multi-day directional bias
 
 SPECIAL RULE FOR DXY: Sentiment indicator only. Use "Dollar strength is rising/falling".
 
 RULES:
-- Return EXACTLY 5 symbols per group — pick the 5 with the strongest indicator confluence.
-- If fewer than 5 have clear signals, include the next best even if confidence is moderate.
-- Never say "buy" or "sell". Use "momentum favors upside", "the data suggests downside pressure".
-- Reasoning must be 1-2 concise sentences referencing the indicators that support the call.
-- Only return symbols that were provided in the input data — never invent symbols.
+- Return EXACTLY 5 symbols per group — always pick the best 5, even if signals are moderate.
+- Never say "buy" or "sell". Use "momentum favors upside", "downside pressure building".
+- reasoning: max 10 words referencing price data.
+- keyLevel: session High if bullish, session Low if bearish, midpoint if neutral.
+- Only use symbols from the input. Never invent symbols.
 
-Respond with ONLY a valid JSON object. No markdown, no code blocks, no extra text:
-{
-  "scalping": [
-    { "symbol": "<exact symbol from input>", "direction": "bullish|bearish|neutral", "confidence": <0-100>, "sentiment": <-100 to 100>, "timeframe": "Scalping", "reasoning": "<1-2 sentences>", "keyLevel": <price level> }
-  ],
-  "daytrading": [
-    { "symbol": "<exact symbol from input>", "direction": "bullish|bearish|neutral", "confidence": <0-100>, "sentiment": <-100 to 100>, "timeframe": "Day Trading", "reasoning": "<1-2 sentences>", "keyLevel": <price level> }
-  ],
-  "swing": [
-    { "symbol": "<exact symbol from input>", "direction": "bullish|bearish|neutral", "confidence": <0-100>, "sentiment": <-100 to 100>, "timeframe": "Swing", "reasoning": "<1-2 sentences>", "keyLevel": <price level> }
-  ]
-}`;
+OUTPUT: minified JSON only — no spaces, no newlines, no markdown, no code blocks:
+{"scalping":[{"symbol":"X","direction":"bullish","confidence":70,"sentiment":50,"timeframe":"Scalping","reasoning":"Up 0.8% near session high.","keyLevel":1.234}],"daytrading":[...],"swing":[]}`;
 }
 
 export function buildBatchMarketContext(markets: Array<{

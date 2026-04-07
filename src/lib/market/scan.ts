@@ -400,7 +400,7 @@ export async function runMarketScan(timeoutMs: number = 25_000): Promise<Suggest
     withTimeout(
       getClaudeClient().messages.create({
         model: "claude-opus-4-6",
-        max_tokens: 800,
+        max_tokens: 1000,
         system: systemMessage,
         messages: [{ role: "user", content: userMessage }],
       }),
@@ -414,7 +414,7 @@ export async function runMarketScan(timeoutMs: number = 25_000): Promise<Suggest
           { role: "user", content: userMessage },
         ],
         temperature: 0.2,
-        max_tokens: 800,
+        max_tokens: 1000,
       }),
       aiTimeout
     ),
@@ -427,7 +427,7 @@ export async function runMarketScan(timeoutMs: number = 25_000): Promise<Suggest
             { role: "user", content: userMessage },
           ],
           temperature: 0.2,
-          max_tokens: 800,
+          max_tokens: 1000,
           enable_thinking: false,
         } as OpenAI.ChatCompletionCreateParamsNonStreaming
       ),
