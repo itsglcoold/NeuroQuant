@@ -391,7 +391,8 @@ export async function runMarketScan(timeoutMs: number = 25_000): Promise<Suggest
   const systemMessage = marketScreeningPrompt();
 
   // Per-model timeout — both run in parallel so max wait = slower of the two
-  const perModelTimeout = Math.min(timeoutMs - 5000, 40_000);
+  // cron-job.org closes connection after 30s; EODHD takes ~8s → AI gets max 20s
+  const perModelTimeout = Math.min(timeoutMs - 5000, 20_000);
 
   const [deepseekRes, qwenRes] = await Promise.allSettled([
     withTimeout(
