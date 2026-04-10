@@ -41,7 +41,7 @@ function buildTvSymbolMap(source: DataSourceId): Record<string, string> {
   // These symbols are source-independent — use broker CFD symbols
   // (exchange indices like SP:SPX / INDEX:DXY are blocked in embed widgets)
   const baseMap: Record<string, string> = {
-    "CL": "NYMEX:CL1!",
+    "CL": "OANDA:WTICOUSD",
     "DXY": "CAPITALCOM:DXY",
     "SPX": "OANDA:SPX500USD",
     "IXIC": "OANDA:NAS100USD",
