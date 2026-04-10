@@ -410,6 +410,16 @@ export default function MarketDetailPage() {
       {/* Chart — full width */}
       <TradingViewChart symbol={symbol} height={500} interval={selectedInterval.tv} />
 
+      {/* CL-specific disclaimer */}
+      {symbol === "CL" && (
+        <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3.5 py-2.5 text-xs text-amber-600 dark:text-amber-400">
+          <span className="mt-0.5 shrink-0">⚠️</span>
+          <span>
+            <strong>Live trading notice:</strong> Crude Oil prices can vary between platforms. Always verify your entry, TP, and SL levels against your broker&apos;s real-time price before placing live orders.
+          </span>
+        </div>
+      )}
+
       {/* Interval Selector + Run Analysis */}
       <div className="flex flex-col gap-3">
         {/* Interval pills */}
