@@ -97,7 +97,73 @@ function safeFloat(val: unknown): number {
   return isNaN(n) ? 0 : n;
 }
 
+// Real-time price for CL (WTI crude oil).
+// Strategy:
+//   1. EODHD CLUSD.FOREX — forex endpoint, potentially real-time
+//   2. Yahoo Finance CL=F — ~15-min delayed but accurate fallback
+// EODHD real-time/CL.US is NOT used — it returns the previous EOD settlement.
+async function getCLPrice(): Promise<MarketPrice> {
+  // 1. Try EODHD forex endpoint first (real-time for paid forex plans)
+  try {
+    const data = await fetchEodhd("real-time/CLUSD.FOREX");
+    const price = safeFloat(data.close) || safeFloat(data.open);
+    // Sanity check: WTI crude should be between $20 and $200
+    if (price >= 20 && price <= 200) {
+      const prevClose = safeFloat(data.previousClose) || safeFloat(data.open) || price;
+      const change = price - prevClose;
+      const changePercent = prevClose > 0 ? (change / prevClose) * 100 : 0;
+      return {
+        symbol: "CL",
+        price,
+        change,
+        changePercent,
+        high: safeFloat(data.high) || price,
+        low: safeFloat(data.low) || price,
+        open: safeFloat(data.open) || prevClose,
+        previousClose: prevClose,
+        timestamp: data.timestamp ? Number(data.timestamp) * 1000 : 0,
+      };
+    }
+  } catch {
+    // EODHD forex failed — fall through to Yahoo Finance
+  }
+
+  // 2. Yahoo Finance fallback (CL=F = WTI front-month futures, ~15-min delayed)
+  const url =
+    "https://query1.finance.yahoo.com/v8/finance/chart/CL=F?range=1d&interval=1m&includePrePost=false";
+  const resp = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!resp.ok) throw new Error(`Yahoo Finance error: ${resp.status}`);
+  const json = await resp.json() as { chart: { result: Array<{ meta: Record<string, number> }> } };
+  const meta = json?.chart?.result?.[0]?.meta;
+  if (!meta || !meta.regularMarketPrice) throw new Error("Yahoo Finance: no data");
+
+  const price = meta.regularMarketPrice;
+  const prevClose = meta.chartPreviousClose || meta.previousClose || price;
+  const change = price - prevClose;
+  const changePercent = prevClose > 0 ? (change / prevClose) * 100 : 0;
+
+  return {
+    symbol: "CL",
+    price,
+    change,
+    changePercent,
+    high: meta.regularMarketDayHigh || price,
+    low: meta.regularMarketDayLow || price,
+    open: meta.regularMarketOpen || prevClose,
+    previousClose: prevClose,
+    timestamp: (meta.regularMarketTime || 0) * 1000,
+  };
+}
+
 export async function getPrice(symbol: string): Promise<MarketPrice> {
+  // CL uses a dedicated function — EODHD real-time/CL.US gives stale EOD data
+  if (symbol === "CL") {
+    return getCLPrice();
+  }
+
   const eodSymbol = toEodhdSymbol(symbol);
   const data = await fetchEodhd(`real-time/${eodSymbol}`);
 
