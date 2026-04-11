@@ -81,8 +81,49 @@ export function DisclaimerGate({ children }: { children: React.ReactNode }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const valid = isDisclaimerValidLocal();
-    requestAnimationFrame(() => setAccepted(valid));
+    // Fast path: localStorage hit
+    if (isDisclaimerValidLocal()) {
+      requestAnimationFrame(() => setAccepted(true));
+      return;
+    }
+
+    // Slow path: localStorage miss (different browser/device/cleared cache)
+    // Check Supabase so returning users don't have to re-accept
+    async function checkSupabase() {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { setAccepted(false); return; }
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("disclaimer_version, disclaimer_accepted_at")
+          .eq("id", user.id)
+          .single();
+
+        if (
+          profile?.disclaimer_version === DISCLAIMER_VERSION &&
+          profile?.disclaimer_accepted_at
+        ) {
+          const acceptedAt = new Date(profile.disclaimer_accepted_at as string).getTime();
+          const expiryMs = EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+          if (Date.now() - acceptedAt < expiryMs) {
+            // Restore to localStorage so next visit is instant
+            localStorage.setItem(DISCLAIMER_KEY, JSON.stringify({
+              version: DISCLAIMER_VERSION,
+              timestamp: acceptedAt,
+            }));
+            setAccepted(true);
+            return;
+          }
+        }
+      } catch {
+        // Supabase check failed — show disclaimer to be safe
+      }
+      setAccepted(false);
+    }
+
+    checkSupabase();
   }, []);
 
   // Detect when user has scrolled to the bottom of the warnings
