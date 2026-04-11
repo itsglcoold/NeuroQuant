@@ -333,8 +333,9 @@ export function buildMarketDataContext(data: {
     sma50: number | null;
     bollingerBands: { upper: number; middle: number; lower: number } | null;
   };
+  candlestickPatterns?: Array<{ name: string; type: string; confidence: number; description: string }>;
 }) {
-  const { symbol, price, change, changePercent, timeSeries, indicators } = data;
+  const { symbol, price, change, changePercent, timeSeries, indicators, candlestickPatterns } = data;
 
   let context = `Market: ${symbol}\n`;
   context += `Current Price: ${price}\n`;
@@ -367,6 +368,13 @@ export function buildMarketDataContext(data: {
     const bbM = sf(indicators.bollingerBands.middle, 4);
     const bbL = sf(indicators.bollingerBands.lower, 4);
     if (bbU) context += `Bollinger Bands: Upper=${bbU}, Middle=${bbM ?? "N/A"}, Lower=${bbL ?? "N/A"}\n`;
+  }
+
+  if (candlestickPatterns && candlestickPatterns.length > 0) {
+    context += `\nDetected Candlestick Patterns (most recent bars):\n`;
+    for (const p of candlestickPatterns) {
+      context += `- ${p.name} [${p.type}, confidence: ${p.confidence}%]: ${p.description}\n`;
+    }
   }
 
   return context;

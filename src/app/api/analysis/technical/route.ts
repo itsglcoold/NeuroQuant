@@ -6,6 +6,7 @@ import { analyzeTechnical as claudeAnalyze } from "@/lib/ai/claude";
 import { calculateConsensus } from "@/lib/ai/consensus";
 import { withTimeout } from "@/lib/ai/timeout";
 import { checkAnalysisRateLimit } from "@/lib/ratelimit";
+import { detectAllPatterns } from "@/lib/candlestick-patterns";
 import type { ModelOutput } from "@/types/analysis";
 
 /** Per-analyst timeout: 45 seconds max per AI call (no retry — fail fast) */
@@ -83,18 +84,23 @@ export async function POST(request: NextRequest) {
           rsi: null, macd: null, sma20: null, sma50: null, ema12: null, ema26: null, bollingerBands: null,
         };
 
+        const mappedTimeSeries = timeSeries.map((bar) => ({
+          datetime: bar.datetime,
+          open: bar.open,
+          high: bar.high,
+          low: bar.low,
+          close: bar.close,
+        }));
+
+        // Detect candlestick patterns from the most recent bars
+        const candlestickPatterns = detectAllPatterns(mappedTimeSeries);
+
         const marketData = {
           symbol,
           price: price.price,
           change: price.change,
           changePercent: price.changePercent,
-          timeSeries: timeSeries.map((bar) => ({
-            datetime: bar.datetime,
-            open: bar.open,
-            high: bar.high,
-            low: bar.low,
-            close: bar.close,
-          })),
+          timeSeries: mappedTimeSeries,
           indicators: {
             rsi: indicators.rsi,
             macd: indicators.macd,
@@ -102,6 +108,7 @@ export async function POST(request: NextRequest) {
             sma50: indicators.sma50,
             bollingerBands: indicators.bollingerBands,
           },
+          candlestickPatterns,
           tradingStyle: tradingStyle as "scalping" | "daytrading" | "swing" | undefined,
         };
 
