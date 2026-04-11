@@ -100,7 +100,7 @@ export const SCREENING_ROWS = [
     key: "scalping" as const,
     label: "Scalping",
     subtitle: "The Hit-and-Run",
-    timeframeFocus: "1m / 5m",
+    timeframeFocus: "5m / 15m",
     badgeColor: "red",
     symbols: ["IXIC", "SPX", "XAU/USD", "DXY", "EUR/USD"],
   },
@@ -142,7 +142,7 @@ const CROSS_STYLE_MAP: Record<string, "daytrading" | "swing"> = {
 };
 
 const STYLE_META: Record<string, { label: string; badgeColor: string; timeframeFocus: string }> = {
-  scalping:    { label: "Scalping",       badgeColor: "red",   timeframeFocus: "1m / 5m" },
+  scalping:    { label: "Scalping",       badgeColor: "red",   timeframeFocus: "5m / 15m" },
   daytrading:  { label: "Day Trading",    badgeColor: "blue",  timeframeFocus: "15m / 1H" },
   swing:       { label: "Swing Trading",  badgeColor: "amber", timeframeFocus: "4H / Daily" },
 };
