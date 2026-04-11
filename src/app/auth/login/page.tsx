@@ -23,10 +23,17 @@ export default function LoginPage() {
   const [magicLinkSent, setMagicLinkSent] = useState(false);
 
   // Show error from callback redirect (e.g. expired magic link)
+  // Also redirect to dashboard if user already has an active session
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const urlError = params.get("error");
     if (urlError) setError(decodeURIComponent(urlError));
+
+    // If already authenticated, skip the login page entirely
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) window.location.replace("/dashboard");
+    });
   }, []);
 
   async function handleMagicLink(e: React.FormEvent) {
@@ -63,7 +70,6 @@ export default function LoginPage() {
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
-        queryParams: { prompt: "select_account" },
       },
     });
 
