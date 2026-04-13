@@ -34,9 +34,8 @@ const WS_SYMBOL_MAP: Record<string, string> = {
   "AUD/NZD": "AUDNZD",
   "EUR/AUD": "EURAUD",
   "NZD/CAD": "NZDCAD",
-  // Metals (available on forex endpoint)
-  "XAU/USD": "XAUUSD",
-  "XAG/USD": "XAGUSD",
+  // NOTE: XAU/USD and XAG/USD intentionally excluded — EODHD forex WS returns LBMA benchmark
+  // price (2×/day snapshot), not the live spot/futures price. Yahoo Finance REST is more accurate.
   // NOTE: CL (Crude Oil) intentionally excluded — EODHD forex WS gives stale prices for it.
   // CL uses REST polling instead for consistent, accurate pricing.
 };
