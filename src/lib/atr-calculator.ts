@@ -158,11 +158,17 @@ export function getATRAnalysis(bars: OHLCBar[], symbol: string): ATRAnalysis {
 
   const ratio = avg20 > 0 ? atr14 / avg20 : 1;
 
+  // Floor: never use an ATR smaller than the known daily-range default.
+  // Intraday bars (e.g. 15m CL) can yield ATR ≈ 0.30, which is accurate for
+  // that timeframe but too tight for SL/TP placement — use the daily default
+  // as the minimum so positions have at least one full day's range of room.
+  const effectiveATR = Math.max(atr14, fallbackValue);
+
   return {
-    value: atr14,
+    value: effectiveATR,
     ratio,
     isVolatile: ratio > 1.5,
-    pips: priceToPips(symbol, atr14),
+    pips: priceToPips(symbol, effectiveATR),
     pipLabel: label,
   };
 }

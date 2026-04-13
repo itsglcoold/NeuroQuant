@@ -474,7 +474,7 @@ export function QuickSimWidget({
           {/* ATR badge */}
           {atrAnalysis && atrAnalysis.pips > 0 && (
             <Badge variant="outline" className="text-[10px] gap-1 font-mono" title="Average True Range — typical daily move in pips">
-              ATR {Math.round(atrAnalysis.pips)}{atrAnalysis.pipLabel}
+              ATR {atrAnalysis.pips >= 10 ? Math.round(atrAnalysis.pips) : atrAnalysis.pips.toFixed(1)}{atrAnalysis.pipLabel}
             </Badge>
           )}
           {/* Timeframe tag */}
@@ -657,13 +657,15 @@ export function QuickSimWidget({
           {/* SL width in pips/pts */}
           {slValid && atr > 0 && (() => {
             const unit = atrAnalysis!.pipLabel;
-            const slPips = Math.round(priceToPips(symbol, Math.abs(currentPrice - slNum)));
-            const atrPips = Math.round(atrAnalysis!.pips);
-            const ratio = slPips / atrPips;
+            const rawSlPips = priceToPips(symbol, Math.abs(currentPrice - slNum));
+            const rawAtrPips = atrAnalysis!.pips;
+            // Use 1 decimal for pts assets (CL, XAU etc.), integers for forex pips
+            const fmt = (v: number) => rawAtrPips >= 10 ? String(Math.round(v)) : v.toFixed(1);
+            const ratio = rawAtrPips > 0 ? rawSlPips / rawAtrPips : 0;
             const color = ratio > 3 ? "text-red-500" : ratio > 2 ? "text-amber-500" : "text-green-500";
             return (
               <p className={`text-[10px] mt-0.5 font-mono ${color}`}>
-                SL: {slPips}{unit} &nbsp;·&nbsp; ATR: {atrPips}{unit} &nbsp;·&nbsp; {ratio.toFixed(1)}×ATR
+                SL: {fmt(rawSlPips)}{unit} &nbsp;·&nbsp; ATR: {fmt(rawAtrPips)}{unit} &nbsp;·&nbsp; {ratio.toFixed(1)}×ATR
               </p>
             );
           })()}
