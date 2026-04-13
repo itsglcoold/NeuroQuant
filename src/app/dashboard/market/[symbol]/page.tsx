@@ -705,6 +705,56 @@ export default function MarketDetailPage() {
         );
       })()}
 
+      {/* Trade Signal Banner — shown after analysis completes */}
+      {consensus && (() => {
+        const absScore = Math.abs(consensus.consensusScore);
+        const scoreOk = absScore >= 60;
+        const alignmentOk = consensus.probabilityScore >= 75;
+        const agreementOk = consensus.agreementLevel !== "low";
+        const passCount = [scoreOk, alignmentOk, agreementOk].filter(Boolean).length;
+        const signal = passCount === 3 ? "valid" : passCount === 2 ? "marginal" : "skip";
+
+        const failReasons = [
+          !scoreOk && `Score ${consensus.consensusScore > 0 ? "+" : ""}${consensus.consensusScore} (needs ±60)`,
+          !alignmentOk && `Alignment ${consensus.probabilityScore}% (needs 75%)`,
+          !agreementOk && `Analyst agreement too low`,
+        ].filter(Boolean) as string[];
+
+        const direction = consensus.consensusDirection === "bullish" ? "LONG" : consensus.consensusDirection === "bearish" ? "SHORT" : "NEUTRAL";
+
+        if (signal === "valid") return (
+          <div className="rounded-xl border-2 border-green-500 bg-green-500/10 px-5 py-4 flex items-center gap-4 shadow-lg shadow-green-500/10">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-green-500 text-white text-2xl font-black select-none">✓</div>
+            <div className="flex-1 min-w-0">
+              <p className="text-base font-black tracking-tight text-green-500 uppercase">Setup Valid — Consider a {direction} trade</p>
+              <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">
+                All criteria met · Score {consensus.consensusScore > 0 ? "+" : ""}{consensus.consensusScore} · Alignment {consensus.probabilityScore}% · Agreement {consensus.agreementLevel}
+              </p>
+            </div>
+          </div>
+        );
+
+        if (signal === "marginal") return (
+          <div className="rounded-xl border-2 border-amber-500 bg-amber-500/10 px-5 py-4 flex items-center gap-4 shadow-lg shadow-amber-500/10">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white text-2xl font-black select-none">!</div>
+            <div className="flex-1 min-w-0">
+              <p className="text-base font-black tracking-tight text-amber-500 uppercase">Marginal Setup — Proceed with caution</p>
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">Not all criteria met: {failReasons.join(" · ")}</p>
+            </div>
+          </div>
+        );
+
+        return (
+          <div className="rounded-xl border-2 border-red-500 bg-red-500/10 px-5 py-4 flex items-center gap-4 shadow-lg shadow-red-500/10">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-500 text-white text-2xl font-black select-none">✕</div>
+            <div className="flex-1 min-w-0">
+              <p className="text-base font-black tracking-tight text-red-500 uppercase">Skip This Setup — Wait for a stronger signal</p>
+              <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">{failReasons.join(" · ")}</p>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Active Trade Accordion — all open trades for this symbol */}
       {(() => {
         const activeTrades = simulator.openTrades.filter((t) => t.symbol === symbol);
