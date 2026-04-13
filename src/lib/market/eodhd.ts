@@ -160,64 +160,62 @@ async function getCLPrice(): Promise<MarketPrice> {
 
 // Real-time price for XAU/USD (Gold) and XAG/USD (Silver).
 // Strategy:
-//   1. EODHD XAUUSD.FOREX / XAGUSD.FOREX — may return LBMA London Fix (stale benchmark)
-//   2. Yahoo Finance XAUUSD=X / XAGUSD=X — live spot price, matches OANDA broker feed
+//   1. Yahoo Finance XAUUSD=X / XAGUSD=X — live spot price, matches OANDA broker feed
+//   2. EODHD XAUUSD.FOREX / XAGUSD.FOREX — fallback (may return LBMA London Fix)
 async function getMetalPrice(symbol: "XAU/USD" | "XAG/USD"): Promise<MarketPrice> {
   const eodhdTicker = symbol === "XAU/USD" ? "XAUUSD.FOREX" : "XAGUSD.FOREX";
-  const yahooTicker = symbol === "XAU/USD" ? "XAUUSD=X" : "XAGUSD=X";
+  const yahooTicker = symbol === "XAU/USD" ? "XAUUSD%3DX" : "XAGUSD%3DX"; // = → %3D
   // Sanity ranges: Gold $500–$15000, Silver $5–$500
   const [minPrice, maxPrice] = symbol === "XAU/USD" ? [500, 15000] : [5, 500];
 
-  // 1. Try EODHD first
+  // 1. Yahoo Finance — live spot price, closely matches OANDA:XAUUSD / OANDA:XAGUSD
   try {
-    const data = await fetchEodhd(`real-time/${eodhdTicker}`);
-    const price = safeFloat(data.close) || safeFloat(data.open);
-    if (price >= minPrice && price <= maxPrice) {
-      const prevClose = safeFloat(data.previousClose) || safeFloat(data.open) || price;
-      const change = price - prevClose;
-      const changePercent = prevClose > 0 ? (change / prevClose) * 100 : 0;
-      return {
-        symbol,
-        price,
-        change,
-        changePercent,
-        high: safeFloat(data.high) || price,
-        low: safeFloat(data.low) || price,
-        open: safeFloat(data.open) || prevClose,
-        previousClose: prevClose,
-        timestamp: data.timestamp ? Number(data.timestamp) * 1000 : 0,
-      };
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooTicker}?range=1d&interval=1m&includePrePost=false`;
+    const resp = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (resp.ok) {
+      const json = await resp.json() as { chart: { result: Array<{ meta: Record<string, number> }> } };
+      const meta = json?.chart?.result?.[0]?.meta;
+      const price = meta?.regularMarketPrice;
+      if (price && price >= minPrice && price <= maxPrice) {
+        const prevClose = meta.chartPreviousClose || meta.previousClose || price;
+        const change = price - prevClose;
+        const changePercent = prevClose > 0 ? (change / prevClose) * 100 : 0;
+        return {
+          symbol,
+          price,
+          change,
+          changePercent,
+          high: meta.regularMarketDayHigh || price,
+          low: meta.regularMarketDayLow || price,
+          open: meta.regularMarketOpen || prevClose,
+          previousClose: prevClose,
+          timestamp: (meta.regularMarketTime || 0) * 1000,
+        };
+      }
     }
   } catch {
-    // EODHD failed — fall through to Yahoo Finance
+    // Yahoo Finance failed — fall through to EODHD
   }
 
-  // 2. Yahoo Finance fallback — spot price, closely matches OANDA:XAUUSD / OANDA:XAGUSD
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooTicker}?range=1d&interval=1m&includePrePost=false`;
-  const resp = await fetch(url, {
-    headers: { "User-Agent": "Mozilla/5.0" },
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!resp.ok) throw new Error(`Yahoo Finance error: ${resp.status}`);
-  const json = await resp.json() as { chart: { result: Array<{ meta: Record<string, number> }> } };
-  const meta = json?.chart?.result?.[0]?.meta;
-  if (!meta || !meta.regularMarketPrice) throw new Error("Yahoo Finance: no data");
-
-  const price = meta.regularMarketPrice;
-  const prevClose = meta.chartPreviousClose || meta.previousClose || price;
+  // 2. EODHD fallback (may return LBMA benchmark price, but better than nothing)
+  const data = await fetchEodhd(`real-time/${eodhdTicker}`);
+  const price = safeFloat(data.close) || safeFloat(data.previousClose) || safeFloat(data.open);
+  const prevClose = safeFloat(data.previousClose) || safeFloat(data.open) || price;
   const change = price - prevClose;
   const changePercent = prevClose > 0 ? (change / prevClose) * 100 : 0;
-
   return {
     symbol,
     price,
     change,
     changePercent,
-    high: meta.regularMarketDayHigh || price,
-    low: meta.regularMarketDayLow || price,
-    open: meta.regularMarketOpen || prevClose,
+    high: safeFloat(data.high) || price,
+    low: safeFloat(data.low) || price,
+    open: safeFloat(data.open) || prevClose,
     previousClose: prevClose,
-    timestamp: (meta.regularMarketTime || 0) * 1000,
+    timestamp: data.timestamp ? Number(data.timestamp) * 1000 : 0,
   };
 }
 
