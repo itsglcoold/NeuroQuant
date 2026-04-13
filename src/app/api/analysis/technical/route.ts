@@ -4,7 +4,7 @@ import { analyzeTechnical as deepseekAnalyze } from "@/lib/ai/deepseek";
 import { analyzeTechnical as qwenAnalyze } from "@/lib/ai/qwen";
 import { analyzeTechnical as claudeAnalyze } from "@/lib/ai/claude";
 import { calculateConsensus } from "@/lib/ai/consensus";
-import { withTimeout } from "@/lib/ai/timeout";
+import { withTimeout, withRetry } from "@/lib/ai/timeout";
 import { checkAnalysisRateLimit } from "@/lib/ratelimit";
 import { detectAllPatterns } from "@/lib/candlestick-patterns";
 import type { ModelOutput } from "@/types/analysis";
@@ -139,7 +139,14 @@ export async function POST(request: NextRequest) {
 
           const promises = analysts.map(async (analyst, index) => {
             try {
-              const result = await withTimeout(analyst.fn(marketData), ANALYST_TIMEOUT_MS, analyst.name);
+              // 1 automatic retry — if the model fails (timeout/network/API error),
+              // wait 500ms and try once more before giving up
+              const result = await withRetry(
+                () => withTimeout(analyst.fn(marketData), ANALYST_TIMEOUT_MS, analyst.name),
+                1,    // 1 retry
+                500,  // 500ms between attempts
+                analyst.name,
+              );
               modelOutputs.push(result);
               successCount++;
               send("analyst", { index, result });
@@ -157,6 +164,7 @@ export async function POST(request: NextRequest) {
               };
               modelOutputs.push(fallback);
               send("analyst", { index, result: fallback, failed: true });
+              console.error(`${analyst.name} failed after retry:`, err instanceof Error ? err.message : err);
               return fallback;
             }
           });
