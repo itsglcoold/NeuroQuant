@@ -164,7 +164,9 @@ async function getCLPrice(): Promise<MarketPrice> {
 //   2. EODHD XAUUSD.FOREX / XAGUSD.FOREX — fallback (may return LBMA London Fix)
 async function getMetalPrice(symbol: "XAU/USD" | "XAG/USD"): Promise<MarketPrice> {
   const eodhdTicker = symbol === "XAU/USD" ? "XAUUSD.FOREX" : "XAGUSD.FOREX";
-  const yahooTicker = symbol === "XAU/USD" ? "XAUUSD%3DX" : "XAGUSD%3DX"; // = → %3D
+  // GC=F / SI=F = COMEX front-month futures — same =F format as CL=F (proven to work)
+  // Futures price is ~$5-15 above spot for Gold, ~$0.05-0.15 for Silver — negligible vs EODHD's $70+ error
+  const yahooTicker = symbol === "XAU/USD" ? "GC=F" : "SI=F";
   // Sanity ranges: Gold $500–$15000, Silver $5–$500
   const [minPrice, maxPrice] = symbol === "XAU/USD" ? [500, 15000] : [5, 500];
 
