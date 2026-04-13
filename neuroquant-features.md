@@ -1,5 +1,5 @@
 # NeuroQuant — Complete Feature Overview
-> AI-powered market analysis platform | Version: March 2026 (sessie 2026-03-29) | Stack: Next.js 15.5 + Supabase + Cloudflare Pages
+> AI-powered market analysis platform | Version: April 2026 (sessie 2026-04-14) | Stack: Next.js 15.5 + Supabase + Cloudflare Pages
 
 ---
 
@@ -54,6 +54,7 @@ The core feature of the platform. Three independent AI models analyze the same m
 - Technical indicators: RSI, MACD, SMA20, SMA50, Bollinger Bands
 - Indicator interval: 1h for short timeframes (1m/5m/15m), 1day for swing (4h/1d)
 - Correct indicator interval per timeframe (recent fix — was always 1day before)
+- **Candlestick patterns** detected from the most recent bars and fed to all three AI analysts as additional context (Hammer, Shooting Star, Doji variants, Engulfing, Inside Bar, Tweezers, Morning/Evening Star)
 
 ### Streaming Protocol
 Analysis results stream via SSE (Server-Sent Events) with events:
@@ -80,11 +81,18 @@ Analysis results stream via SSE (Server-Sent Events) with events:
 
 ## 5. Real-Time Pricing
 
-- **Primary:** EODHD WebSocket (`wss://ws.eodhistoricaldata.com/ws/forex`) for Forex & Metals
-- **Fallback:** REST polling via `/api/market-data` for Indices & Energy (no WS available)
+| Asset group | Source | Notes |
+|---|---|---|
+| Forex (22 pairs) | EODHD WebSocket (live ask) | Active during market hours |
+| Gold (XAU/USD) | Yahoo Finance `GC=F` REST | Futures — same source as chart |
+| Silver (XAG/USD) | Yahoo Finance `SI=F` REST | Futures — same source as chart |
+| Crude Oil (CL) | Yahoo Finance `CL=F` REST | Futures |
+| Indices (DXY, SPX, IXIC) | EODHD REST (NDX.INDX etc.) | No WebSocket available |
+
 - **Displayed:** Price, 24h change ($), 24h change (%), High/Low/Open/Prev Close
 - **Latency indicator:** < 500ms green, < 1500ms amber, > 1500ms orange
 - **Session tracker:** Shows which trading sessions are currently open (Sydney / Tokyo / London / New York)
+- **Note:** XAU/USD and XAG/USD intentionally excluded from WebSocket — EODHD forex WS returns the LBMA London Fix benchmark price (2×/day snapshot), not the live spot price. Yahoo Finance REST is always used for metals.
 
 ---
 
@@ -205,7 +213,45 @@ Displayed in the simulator widget before opening a trade. Combines three factors
 
 ---
 
-## 9. AI Chat
+## 9. MT5 Live Trading Bridge (Premium)
+
+A real-time bridge between MetaTrader 5 and the NeuroQuant dashboard. **Premium only.**
+
+### Architecture
+- **MT5 EA** (`NeuroQuant_Bridge.mq5`) runs inside the trader's MT5 terminal
+- EA pushes all trade events to a personal webhook URL via HTTP POST
+- Dashboard subscribes to live trade updates via Supabase Realtime
+- Close commands flow: browser click → Supabase → webhook GET → EA executes in MT5
+
+### EA Features
+- HMAC-SHA256 signed requests (every POST is authenticated)
+- Heartbeat every 30s — dashboard shows online/offline status
+- `OnTrade()` fires instantly on any trade event (no waiting for timer)
+- Push intervals: updates every 10s, poll for commands every 5s
+- Events: `heartbeat`, `account_info`, `trade_open`, `trade_update`, `trade_close`
+- Safety: max volume limit, remote close toggle, slippage cap
+
+### Dashboard Features
+- Connection card with webhook URL + secret (copy-to-clipboard)
+- Online/offline indicator (based on last heartbeat)
+- Account info: balance, equity, free margin
+- Live list of open trades: symbol, direction, entry price, current price, P&L
+- **Close any trade with one click** — command queued → EA picks it up → executed at market
+- Risk disclaimer gate (must accept before first use)
+
+### Download & Install
+- EA file: `https://neuroquant.app/NeuroQuant_Bridge.mq5`
+- Install guide: `https://neuroquant.app/mt5-ea` (6-step instructions)
+
+### Webhook API
+- `POST /api/mt5/webhook/[token]` — EA pushes events (HMAC-signed)
+- `GET /api/mt5/webhook/[token]` — EA polls for pending close commands
+- `POST /api/mt5` — setup: generates webhook token + secret
+- `POST /api/mt5/command` — queues a close command for a trade
+
+---
+
+## 10b. AI Chat
 
 - Full conversation interface at `/dashboard/chat`
 - Powered by DeepSeek (cost-optimized for chat)
@@ -497,6 +543,7 @@ When a user has an open trade for a symbol, a card appears on the market detail 
 | `/dashboard/watchlist` | All tiers | Personal watchlist with live prices |
 | `/dashboard/chat` | All tiers | AI chat with persistent history |
 | `/dashboard/live-trading` | Premium | MT5 live trading — view & close real trades |
+| `/mt5-ea` | Public | EA download page + 6-step installation guide |
 
 ---
 
@@ -506,7 +553,7 @@ When a user has an open trade for a symbol, a card appears on the market detail 
 |---|---|---|
 | Stripe payments integration | 🔴 Critical | Users can't upgrade — checkout/portal/webhooks needed |
 | RESEND_API_KEY in Cloudflare Pages | 🔴 Critical | Price alerts email delivery won't work without it |
-| MT5 EA (MQL5 Expert Advisor) | 🟡 High | Full EA code to write — webhook push + command polling + close execution |
+| MT5 EA (MQL5 Expert Advisor) | ✅ Done | `public/NeuroQuant_Bridge.mq5` — HMAC-signed, all events, close commands |
 | Time-of-day session filter | 🟡 Medium | Warn if trading outside London/NY sessions in QuickSimWidget |
 | Push notifications | 🟡 Medium | Browser push for price alerts |
 | Backtesting | 🟢 Low | Replay historical data through strategies |
@@ -557,4 +604,198 @@ Alle drie analysts draaiden op inferieure modellen — gecorrigeerd naar beste b
 ### Paper Trading Test
 - 28 trades gezet (1 per markt) op 2026-03-29 — evaluatie volgt over paar dagen
 
-*Updated: 2026-03-29 | For internal review and AI consultant feedback only*
+---
+
+## 26. Sessie 2026-03-29/30 — Weekend Risk Manager + Multi-Market Analyser
+
+### Weekend Risk Manager
+- Waarschuwing + blokkering wanneer markten gesloten zijn (weekend UTC hours)
+- Inline toggle in simulator widget
+- Fix: correcte UTC market hours, Switch component vervangen door inline toggle
+
+### Multi-Market Analyser (vervangt Bulk Trade Executor)
+- Selector met alle 28 markten, gegroepeerd per categorie (Forex / Metals / Energy / Indices)
+- Filter buttons: All / None / Forex / Metals / Energy / Indices
+- Klik "Analyse X markets in tabs" → elk geselecteerd symbool opent in eigen tab
+- Elke tab start automatisch de AI analyse (`?autoAnalyse=true`)
+- Juiste timeframe per symbool via `?style=scalping|daytrading|swing`
+- Popup blocker detectie + Engelstalige waarschuwing
+- Standaard uitgeklapt
+- **File:** `src/components/simulator/BulkTradeExecutor.tsx`
+
+### Overige fixes sessie 2026-03-29/30
+- Correcte decimal precision voor dollar change op market cards
+- "Bible methodology" referentie verwijderd uit AISuggestions UI
+- Simulator pagina opgeruimd — geen duplicate tekst meer
+- `src/lib/trade-calculator.ts` toegevoegd — shared SL/TP formules (TRADE_STYLES + computeSlTpFromATR)
+
+---
+
+## 27. Sessie 2026-04-01 — Auth fix + Indicator screening + ATR fixes
+
+### Auth fix: Multi-Market Analyser tabs
+- Tabs openden met Free-tier beperkingen omdat `autoAnalyse` vuurt vóór Supabase tier-check klaar was
+- Fix: `tierLoaded` state in `useUsageTracking` — autoAnalyse wacht tot DB tier bevestigd
+- Geen tokens in URL's (veiligheidsrisico) — cookies werken correct tussen tabs
+
+### AI Market Research: technische indicators in screening
+- Screening AI krijgt nu RSI(14), MACD richting, Bollinger positie, SMA20/50 per markt
+- Berekend uit pre-fetched OHLC bars (voor AI-selectie, niet erna)
+- Pre-fetched bars hergebruikt in enrichSymbols → geen dubbele API calls
+- Prompt: indicator confluence als primair selectiecriterium
+- Vermindert grote tegenstrijdigheden met detail analyse
+
+### ATR bugfix: alle timeframes
+- **Oorzaak**: barCount 1D/4H = 30, maar ATR vereist ≥35 bars → altijd fallback
+- **Oorzaak 2**: ATR_DEFAULTS miste alle cross pairs → CAD/JPY fallback = 0.0050 = 0.5p (was 1p in UI)
+- Fix: barCount verhoogd (4H→45, 1D→50)
+- Fix: ATR_DEFAULTS uitgebreid met 12 ontbrekende cross pairs
+- Fix: lower bound check (ATR < 0.02% prijs → fallback)
+- Resultaat: geen SL=0 of lot size explosie meer op 1D/4H
+
+### Default timeframes gecorrigeerd
+| Symbool | Was | Nu |
+|---|---|---|
+| XAU/USD | 5m | 15m |
+| DXY | 5m | 15m |
+| SPX | 5m | 15m |
+| IXIC | 5m | 15m |
+| EUR/USD | 5m | 15m |
+
+Alle 5 zijn scalping-groep. AI adviseerde consistent om naar 15m te switchen → nu 15m als default.
+
+---
+
+## 28. Sessie 2026-04-11 — Bug fixes + Candlestick patterns als AI input
+
+### Bug fixes
+
+#### CL (Crude Oil) prijs discrepantie
+- EODHD `CL.US` REST endpoint geeft stale EOD settlement ($84.46) in plaats van live WTI prijs ($90.76)
+- Fix: twee-staps strategie in `src/lib/market/eodhd.ts`:
+  1. Probeer `CLUSD.FOREX` endpoint (real-time voor forex plannen), sanity check $20–$200
+  2. Fallback: Yahoo Finance `CL=F` (~15 min delayed maar accuraat)
+- TradingView chart: blijft TVC:USOIL (kleine spot/futures afwijking acceptabel)
+- Waarschuwingsbanner toegevoegd op CL marktpagina voor live traders
+
+#### DisclaimerGate opnieuw getoond bij nieuwe browser/apparaat
+- localStorage is device-specific → bestaande users moesten opnieuw accepteren op elk nieuw apparaat
+- Fix in `src/components/dashboard/DisclaimerGate.tsx`:
+  - Bij localStorage miss → check Supabase `profiles.disclaimer_version` + `profiles.disclaimer_accepted_at`
+  - Als huidig versie + binnen 30 dagen → herstel localStorage, sla gate over
+- `DISCLAIMER_VERSION = "2026-03"` bumpen bij wijziging Terms/Privacy/Risk Disclosure
+
+#### Google OAuth double-login loop (derde keer opgelost)
+- `prompt: "select_account"` verwijderd uit OAuth opties (forceerde re-auth elke keer)
+- Sessie-check toegevoegd op login page mount: als al ingelogd → `window.location.replace("/dashboard")`
+
+#### Scalping badge timeframe fout
+- Badge toonde `"1m / 5m"` terwijl chart default op 15m staat
+- Fix: `timeframeFocus` gewijzigd naar `"5m / 15m"` in `SCREENING_ROWS` en `STYLE_META` (`src/lib/market/symbols.ts`)
+
+### Feature: Candlestick patterns als AI analyse input (detail pagina)
+- `detectAllPatterns(timeSeries)` aangeroepen vóór de AI calls in `src/app/api/analysis/technical/route.ts`
+- Gedetecteerde patronen toegevoegd aan `marketData.candlestickPatterns`
+- `buildMarketDataContext()` in `src/lib/ai/prompts.ts` uitgebreid: voegt "Detected Candlestick Patterns" sectie toe aan AI context
+- Alle drie analisten (Alpha/DeepSeek, Beta/Qwen, Gamma/Claude) ontvangen nu patrooninfo
+- Puur additief — alle bestaande prijs- en indicatordata ongewijzigd
+
+---
+
+## 29. Sessie 2026-04-13 — Index prijsdiscrepantie fix
+
+### Probleem
+Bij grondige controle van alle 28 markten bleek dat de EODHD prijsfeed en de TradingView grafiek voor indices niet hetzelfde instrument toonden. Dit had directe impact op entry prijs, SL/TP auto-fill, ATR berekening en AI analyse input.
+
+### Bevindingen per markt
+
+| Markt | EODHD | TradingView | Status |
+|---|---|---|---|
+| IXIC | `IXIC.INDX` (NASDAQ Composite, ~16.700) | `OANDA:NAS100USD` (NASDAQ 100, ~18.000) | 🔴 ~1.200pt verschil — ander instrument |
+| SPX | `GSPC.INDX` (cash index) | `OANDA:SPX500USD` (futures CFD) | ⚠️ Klein verschil buiten markturen |
+| DXY | `DXY.INDX` | `CAPITALCOM:DXY` | ✅ Verwaarloosbaar verschil |
+| 25 anderen | Forex/metals EODHD | FX/OANDA broker | ✅ Zelfde instrument |
+
+### Fixes
+
+#### IXIC (kritiek)
+- `src/lib/market/eodhd.ts`: `IXIC.INDX` → `NDX.INDX` (NASDAQ 100 index)
+- `src/lib/market/symbols.ts`: naam "NASDAQ" → "NASDAQ 100"
+- `MARKET_CATEGORIES` beschrijving bijgewerkt naar "NASDAQ 100"
+- TradingView `OANDA:NAS100USD` blijft ongewijzigd — was al correct
+
+#### SPX
+- Poging: `TVC:SPX` → geblokkeerd in TradingView embeds ("this symbol is only available on TradingView")
+- Teruggedraaid naar `OANDA:SPX500USD` — werkt wel, prijsverschil tijdens markturen < 0.1%
+
+#### Index pricing notice
+- Informatieve badge toegevoegd op DXY/SPX/IXIC marktpagina's
+- Melding: "Index prices update during exchange trading hours only"
+
+### Technische context
+- DXY/SPX/IXIC hebben **geen WebSocket** — prijzen komen altijd van EODHD REST polling
+- Buiten markturen tonen index prijzen altijd de laatste slotkoers (fundamentele beperking)
+
+---
+
+## 30. Sessie 2026-04-13 (vervolg) — Trade Signal Banner
+
+### Feature: Trade Signal Banner op market detail pagina
+
+Na elke AI analyse verschijnt een grote full-width banner die de gebruiker direct vertelt of hij moet traden:
+
+| Signal | Kleur | Criteria |
+|---|---|---|
+| ✓ **SETUP VALID** | Groen | Score ≥ ±60 + Alignment ≥ 75% + Agreement niet low |
+| **! MARGINAL SETUP** | Amber | 2 van 3 criteria groen |
+| **✕ SKIP THIS SETUP** | Rood | 0–1 criteria groen |
+
+### Failure reasons — direction-aware en mensentaal
+- Score te laag bullish: `Bullish signal too weak — score +25 needs to reach +60`
+- Score te laag bearish: `Bearish signal too weak — score -25 needs to reach -60`
+- Geen richting: `No clear direction — score needs to reach +60 or -60`
+- Alignment te laag: `Analyst alignment too low — only 62% of analysts agree (needs 75%)`
+- Agreement te laag: `Analysts disagree on direction — agreement level too low`
+
+### Drempelwaarden
+- Score: `|consensusScore| ≥ 60`
+- Alignment: `probabilityScore ≥ 75%`
+- Agreement: `agreementLevel !== "low"`
+
+### Bestand
+- `src/app/dashboard/market/[symbol]/page.tsx` — inline IIFE na de analyse grid
+
+---
+
+## 31. Sessie 2026-04-14 — WebSocket metals fix + MT5 EA
+
+### Bug fix: Gold/Silver WebSocket price override
+- **Root cause:** EODHD forex WebSocket was included in `WS_SYMBOL_MAP` for XAU/USD and XAG/USD
+  → WS sends LBMA benchmark price (2×/day snapshot, ~$4669) which overrode Yahoo Finance REST ($4740)
+- **Fix:** Removed XAU/USD and XAG/USD from `WS_SYMBOL_MAP` in `useEodhdWebSocket.ts`
+  → Metals always use Yahoo Finance REST (GC=F / SI=F) — even during market hours
+- **Commit:** c15d136
+
+### Feature: MT5 Expert Advisor (MQL5) ✅
+Complete MQL5 Expert Advisor bridging MT5 to the NeuroQuant dashboard.
+
+**File:** `public/NeuroQuant_Bridge.mq5`
+
+**EA capabilities:**
+- HMAC-SHA256 signed POST requests (every message authenticated)
+- `OnTrade()` fires immediately on any MT5 trade event
+- Heartbeat + account info every 30s (balance, equity, free margin, server, account)
+- Trade updates pushed every 10s (only if profit/price/SL/TP actually changed)
+- Close commands polled every 5s via GET request — executed at market price
+- Events: `heartbeat`, `account_info`, `trade_open`, `trade_update`, `trade_close`
+- Safety: max volume cap, remote close toggle, slippage limit
+- Startup validation: Alert on empty URL/Secret, non-HTTPS URL, URL not in WebRequest whitelist
+- Startup sync: pushes all currently open positions on first timer tick
+
+**Download page:** `src/app/mt5-ea/page.tsx` → `/mt5-ea`
+- 6-step installation guide (download → copy → compile → WebRequest → attach → done)
+- Requirements, safety note, link back to Live Trading dashboard
+
+**Commit:** f5d68b5
+
+*Updated: 2026-04-14 | For internal review and AI consultant feedback only*
