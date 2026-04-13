@@ -714,10 +714,19 @@ export default function MarketDetailPage() {
         const passCount = [scoreOk, alignmentOk, agreementOk].filter(Boolean).length;
         const signal = passCount === 3 ? "valid" : passCount === 2 ? "marginal" : "skip";
 
+        const scoreText = (() => {
+          if (scoreOk) return null;
+          const s = consensus.consensusScore;
+          const dir = consensus.consensusDirection;
+          if (dir === "bullish") return `Bullish signal too weak — score +${s} needs to reach +60`;
+          if (dir === "bearish") return `Bearish signal too weak — score ${s} needs to reach -60`;
+          return `No clear direction — score needs to reach +60 or -60`;
+        })();
+
         const failReasons = [
-          !scoreOk && `Score ${consensus.consensusScore > 0 ? "+" : ""}${consensus.consensusScore} (needs ±60)`,
-          !alignmentOk && `Alignment ${consensus.probabilityScore}% (needs 75%)`,
-          !agreementOk && `Analyst agreement too low`,
+          scoreText,
+          !alignmentOk && `Analyst alignment too low — only ${consensus.probabilityScore}% of analysts agree (needs 75%)`,
+          !agreementOk && `Analysts disagree on direction — agreement level too low`,
         ].filter(Boolean) as string[];
 
         const direction = consensus.consensusDirection === "bullish" ? "LONG" : consensus.consensusDirection === "bearish" ? "SHORT" : "NEUTRAL";
