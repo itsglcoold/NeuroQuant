@@ -420,6 +420,16 @@ export default function MarketDetailPage() {
         </div>
       )}
 
+      {/* Index-specific notice */}
+      {["DXY", "SPX", "IXIC"].includes(symbol) && (
+        <div className="flex items-start gap-2.5 rounded-lg border border-blue-500/30 bg-blue-500/5 px-3.5 py-2.5 text-xs text-blue-600 dark:text-blue-400">
+          <span className="mt-0.5 shrink-0">ℹ️</span>
+          <span>
+            <strong>Index pricing:</strong> Index prices update during exchange trading hours only. Outside market hours, the displayed price reflects the most recent closing value.
+          </span>
+        </div>
+      )}
+
       {/* Interval Selector + Run Analysis */}
       <div className="flex flex-col gap-3">
         {/* Interval pills */}

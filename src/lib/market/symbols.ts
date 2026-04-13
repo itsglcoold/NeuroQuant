@@ -11,7 +11,7 @@ export const MARKETS: MarketSymbol[] = [
   // Indices
   { symbol: "DXY", name: "US Dollar Index", category: "indices", icon: "DX", emoji: "\u{1F4B5}" },
   { symbol: "SPX", name: "S&P 500", category: "indices", icon: "SP", emoji: "\u{1F4C8}" },
-  { symbol: "IXIC", name: "NASDAQ", category: "indices", icon: "NQ", emoji: "\u{1F4B9}" },
+  { symbol: "IXIC", name: "NASDAQ 100", category: "indices", icon: "NQ", emoji: "\u{1F4B9}" },
 
   // Forex — Majors
   { symbol: "EUR/USD", name: "EUR/USD", category: "forex", icon: "EU", emoji: "\u{1F1EA}\u{1F1FA}" },
@@ -47,7 +47,7 @@ export const MARKETS: MarketSymbol[] = [
 export const MARKET_CATEGORIES = {
   metals: { label: "Metals", description: "Gold & Silver" },
   energy: { label: "Energy", description: "Crude Oil" },
-  indices: { label: "Indices", description: "DXY, S&P 500 & NASDAQ" },
+  indices: { label: "Indices", description: "DXY, S&P 500 & NASDAQ 100" },
   forex: { label: "Forex", description: "Currency Pairs" },
 } as const;
 

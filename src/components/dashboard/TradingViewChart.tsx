@@ -43,7 +43,7 @@ function buildTvSymbolMap(source: DataSourceId): Record<string, string> {
   const baseMap: Record<string, string> = {
     "CL": "TVC:USOIL",
     "DXY": "CAPITALCOM:DXY",
-    "SPX": "OANDA:SPX500USD",
+    "SPX": "TVC:SPX",
     "IXIC": "OANDA:NAS100USD",
   };
 

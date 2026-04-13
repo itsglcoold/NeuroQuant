@@ -41,7 +41,7 @@ const SYMBOL_MAP: Record<string, string> = {
   // Indices
   "DXY": "DXY.INDX",
   "SPX": "GSPC.INDX",
-  "IXIC": "IXIC.INDX",
+  "IXIC": "NDX.INDX",
 };
 
 // Symbols that need a different ticker for EOD (historical/daily) data
