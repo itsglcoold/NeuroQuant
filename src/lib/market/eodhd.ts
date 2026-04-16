@@ -160,47 +160,56 @@ async function getCLPrice(): Promise<MarketPrice> {
 
 // Real-time price for XAU/USD (Gold) and XAG/USD (Silver).
 // Strategy:
-//   1. Yahoo Finance XAUUSD=X / XAGUSD=X — live spot price, matches OANDA broker feed
-//   2. EODHD XAUUSD.FOREX / XAGUSD.FOREX — fallback (may return LBMA London Fix)
+//   1. Yahoo Finance XAUUSD=X / XAGUSD=X — spot price, matches OANDA:XAUUSD / TradingView
+//   2. Yahoo Finance GC=F / SI=F — COMEX futures fallback (~$20-25 premium over spot for gold)
+//   3. EODHD XAUUSD.FOREX / XAGUSD.FOREX — last resort (may return LBMA London Fix snapshot)
 async function getMetalPrice(symbol: "XAU/USD" | "XAG/USD"): Promise<MarketPrice> {
   const eodhdTicker = symbol === "XAU/USD" ? "XAUUSD.FOREX" : "XAGUSD.FOREX";
-  // GC=F / SI=F = COMEX front-month futures — same =F format as CL=F (proven to work)
-  // Futures price is ~$5-15 above spot for Gold, ~$0.05-0.15 for Silver — negligible vs EODHD's $70+ error
-  const yahooTicker = symbol === "XAU/USD" ? "GC=F" : "SI=F";
+  // Spot tickers: XAUUSD=X / XAGUSD=X match the OANDA spot feed shown on TradingView
+  const spotTicker  = symbol === "XAU/USD" ? "XAUUSD=X" : "XAGUSD=X";
+  // Futures tickers: ~$20-25 premium over spot for gold — use only as fallback
+  const futuresTicker = symbol === "XAU/USD" ? "GC=F" : "SI=F";
   // Sanity ranges: Gold $500–$15000, Silver $5–$500
   const [minPrice, maxPrice] = symbol === "XAU/USD" ? [500, 15000] : [5, 500];
 
-  // 1. Yahoo Finance — live spot price, closely matches OANDA:XAUUSD / OANDA:XAGUSD
-  try {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooTicker}?range=1d&interval=1m&includePrePost=false`;
-    const resp = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0" },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (resp.ok) {
+  // Helper: fetch a Yahoo Finance ticker and return the MarketPrice, or null on failure
+  async function tryYahoo(ticker: string): Promise<MarketPrice | null> {
+    try {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=1d&interval=1m&includePrePost=false`;
+      const resp = await fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0" },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!resp.ok) return null;
       const json = await resp.json() as { chart: { result: Array<{ meta: Record<string, number> }> } };
       const meta = json?.chart?.result?.[0]?.meta;
       const price = meta?.regularMarketPrice;
-      if (price && price >= minPrice && price <= maxPrice) {
-        const prevClose = meta.chartPreviousClose || meta.previousClose || price;
-        const change = price - prevClose;
-        const changePercent = prevClose > 0 ? (change / prevClose) * 100 : 0;
-        return {
-          symbol,
-          price,
-          change,
-          changePercent,
-          high: meta.regularMarketDayHigh || price,
-          low: meta.regularMarketDayLow || price,
-          open: meta.regularMarketOpen || prevClose,
-          previousClose: prevClose,
-          timestamp: (meta.regularMarketTime || 0) * 1000,
-        };
-      }
+      if (!price || price < minPrice || price > maxPrice) return null;
+      const prevClose = meta.chartPreviousClose || meta.previousClose || price;
+      const change = price - prevClose;
+      return {
+        symbol,
+        price,
+        change,
+        changePercent: prevClose > 0 ? (change / prevClose) * 100 : 0,
+        high: meta.regularMarketDayHigh || price,
+        low: meta.regularMarketDayLow || price,
+        open: meta.regularMarketOpen || prevClose,
+        previousClose: prevClose,
+        timestamp: (meta.regularMarketTime || 0) * 1000,
+      };
+    } catch {
+      return null;
     }
-  } catch {
-    // Yahoo Finance failed — fall through to EODHD
   }
+
+  // 1. Spot price — matches TradingView OANDA:XAUUSD exactly
+  const spotResult = await tryYahoo(spotTicker);
+  if (spotResult) return spotResult;
+
+  // 2. Futures fallback (contango premium, but better than LBMA snapshot)
+  const futuresResult = await tryYahoo(futuresTicker);
+  if (futuresResult) return futuresResult;
 
   // 2. EODHD fallback (may return LBMA benchmark price, but better than nothing)
   const data = await fetchEodhd(`real-time/${eodhdTicker}`);
@@ -227,8 +236,8 @@ export async function getPrice(symbol: string): Promise<MarketPrice> {
     return getCLPrice();
   }
 
-  // Metals use dedicated function — EODHD may return LBMA London Fix (stale benchmark)
-  // Yahoo Finance spot prices match the OANDA broker feed used in TradingView charts
+  // Metals use dedicated function — primary: Yahoo Finance spot (XAUUSD=X / XAGUSD=X)
+  // matches OANDA:XAUUSD on TradingView exactly. Futures (GC=F/SI=F) and EODHD as fallbacks.
   if (symbol === "XAU/USD" || symbol === "XAG/USD") {
     return getMetalPrice(symbol);
   }
