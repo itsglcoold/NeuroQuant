@@ -97,36 +97,55 @@ function safeFloat(val: unknown): number {
   return isNaN(n) ? 0 : n;
 }
 
+// Stooq tickers for real-time spot/near-month data — no API key, no URL encoding issues
+const STOOQ_MAP: Record<string, { ticker: string; min: number; max: number }> = {
+  "CL":   { ticker: "cl.f",  min: 10,   max: 300   },
+  "DXY":  { ticker: "dx.f",  min: 70,   max: 130   },
+  "SPX":  { ticker: "^spx",  min: 1000, max: 15000 },
+  "IXIC": { ticker: "^ndx",  min: 5000, max: 50000 },
+};
+
+async function tryStooq(ticker: string, minPrice: number, maxPrice: number, symbol: string): Promise<MarketPrice | null> {
+  try {
+    const url = `https://stooq.com/q/l/?s=${ticker}&f=sd2t2ohlcv&h&e=csv`;
+    const resp = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!resp.ok) return null;
+    const text = await resp.text();
+    const lines = text.trim().split("\n");
+    if (lines.length < 2) return null;
+    // CSV: Symbol,Date,Time,Open,High,Low,Close,Volume
+    const [, , , open, high, low, close] = lines[1].split(",");
+    const price   = parseFloat(close);
+    const openVal = parseFloat(open);
+    if (!price || price < minPrice || price > maxPrice) return null;
+    const change = price - openVal;
+    return {
+      symbol,
+      price,
+      change,
+      changePercent: openVal > 0 ? (change / openVal) * 100 : 0,
+      high:  parseFloat(high) || price,
+      low:   parseFloat(low)  || price,
+      open:  openVal          || price,
+      previousClose: openVal  || price,
+      timestamp: Date.now(),
+    };
+  } catch {
+    return null;
+  }
+}
+
 // Real-time price for CL (WTI crude oil).
 // Strategy:
-//   1. EODHD CLUSD.FOREX — forex endpoint, potentially real-time
-//   2. Yahoo Finance CL=F — ~15-min delayed but accurate fallback
-// EODHD real-time/CL.US is NOT used — it returns the previous EOD settlement.
+//   1. Stooq CL.F — real-time WTI futures, no API key
+//   2. Yahoo Finance CL=F — ~15-min delayed fallback
 async function getCLPrice(): Promise<MarketPrice> {
-  // 1. Try EODHD forex endpoint first (real-time for paid forex plans)
-  try {
-    const data = await fetchEodhd("real-time/CLUSD.FOREX");
-    const price = safeFloat(data.close) || safeFloat(data.open);
-    // Sanity check: WTI crude should be between $20 and $200
-    if (price >= 20 && price <= 200) {
-      const prevClose = safeFloat(data.previousClose) || safeFloat(data.open) || price;
-      const change = price - prevClose;
-      const changePercent = prevClose > 0 ? (change / prevClose) * 100 : 0;
-      return {
-        symbol: "CL",
-        price,
-        change,
-        changePercent,
-        high: safeFloat(data.high) || price,
-        low: safeFloat(data.low) || price,
-        open: safeFloat(data.open) || prevClose,
-        previousClose: prevClose,
-        timestamp: data.timestamp ? Number(data.timestamp) * 1000 : 0,
-      };
-    }
-  } catch {
-    // EODHD forex failed — fall through to Yahoo Finance
-  }
+  // 1. Stooq
+  const stooq = await tryStooq("cl.f", 10, 300, "CL");
+  if (stooq) return stooq;
 
   // 2. Yahoo Finance fallback (CL=F = WTI front-month futures, ~15-min delayed)
   const url =
@@ -143,13 +162,11 @@ async function getCLPrice(): Promise<MarketPrice> {
   const price = meta.regularMarketPrice;
   const prevClose = meta.chartPreviousClose || meta.previousClose || price;
   const change = price - prevClose;
-  const changePercent = prevClose > 0 ? (change / prevClose) * 100 : 0;
-
   return {
     symbol: "CL",
     price,
     change,
-    changePercent,
+    changePercent: prevClose > 0 ? (change / prevClose) * 100 : 0,
     high: meta.regularMarketDayHigh || price,
     low: meta.regularMarketDayLow || price,
     open: meta.regularMarketOpen || prevClose,
@@ -267,6 +284,13 @@ export async function getPrice(symbol: string): Promise<MarketPrice> {
   // matches OANDA:XAUUSD on TradingView exactly. Futures (GC=F/SI=F) and EODHD as fallbacks.
   if (symbol === "XAU/USD" || symbol === "XAG/USD") {
     return getMetalPrice(symbol);
+  }
+
+  // Try Stooq for symbols with a known mapping (DXY, SPX, IXIC) — real-time, no API key
+  const stooqEntry = STOOQ_MAP[symbol];
+  if (stooqEntry) {
+    const stooq = await tryStooq(stooqEntry.ticker, stooqEntry.min, stooqEntry.max, symbol);
+    if (stooq) return stooq;
   }
 
   const eodSymbol = toEodhdSymbol(symbol);
