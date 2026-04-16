@@ -399,7 +399,7 @@ export async function runMarketScan(timeoutMs: number = 25_000): Promise<Suggest
   const [claudeRes, deepseekRes, qwenRes] = await Promise.allSettled([
     withTimeout(
       getClaudeClient().messages.create({
-        model: "claude-opus-4-6",
+        model: "claude-opus-4-7",
         max_tokens: 1000,
         system: systemMessage,
         messages: [{ role: "user", content: userMessage }],
