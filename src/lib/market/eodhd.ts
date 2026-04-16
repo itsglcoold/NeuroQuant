@@ -160,60 +160,83 @@ async function getCLPrice(): Promise<MarketPrice> {
 
 // Real-time price for XAU/USD (Gold) and XAG/USD (Silver).
 // Strategy:
-//   1. Yahoo Finance XAUUSD=X / XAGUSD=X — spot price, matches OANDA:XAUUSD / TradingView
-//   2. Yahoo Finance GC=F / SI=F — COMEX futures fallback (~$20-25 premium over spot for gold)
-//   3. EODHD XAUUSD.FOREX / XAGUSD.FOREX — last resort (may return LBMA London Fix snapshot)
+//   1. goldprice.org API — free, real-time spot, no API key, no path-encoding issues
+//   2. Yahoo Finance GC=F / SI=F via v8/chart — COMEX futures (~$20-25 premium, known fallback)
+//   3. EODHD XAUUSD.FOREX / XAGUSD.FOREX — last resort (LBMA London Fix snapshot)
 async function getMetalPrice(symbol: "XAU/USD" | "XAG/USD"): Promise<MarketPrice> {
-  const eodhdTicker = symbol === "XAU/USD" ? "XAUUSD.FOREX" : "XAGUSD.FOREX";
-  // Spot tickers: XAUUSD=X / XAGUSD=X match the OANDA spot feed shown on TradingView
-  const spotTicker  = symbol === "XAU/USD" ? "XAUUSD=X" : "XAGUSD=X";
-  // Futures tickers: ~$20-25 premium over spot for gold — use only as fallback
-  const futuresTicker = symbol === "XAU/USD" ? "GC=F" : "SI=F";
-  // Sanity ranges: Gold $500–$15000, Silver $5–$500
-  const [minPrice, maxPrice] = symbol === "XAU/USD" ? [500, 15000] : [5, 500];
+  const isGold      = symbol === "XAU/USD";
+  const eodhdTicker = isGold ? "XAUUSD.FOREX" : "XAGUSD.FOREX";
+  const futuresTicker = isGold ? "GC=F" : "SI=F";
+  const [minPrice, maxPrice] = isGold ? [500, 15000] : [5, 500];
 
-  // Helper: fetch via Yahoo Finance v7 quote endpoint.
-  // The ticker goes in the QUERY STRING (not the URL path) so Cloudflare Edge
-  // never touches it. encodeURIComponent("XAUUSD=X") → "XAUUSD%3DX" which
-  // Yahoo Finance correctly decodes back to the spot ticker.
-  async function tryYahooQuote(ticker: string): Promise<MarketPrice | null> {
-    try {
-      const encoded = encodeURIComponent(ticker);
-      const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encoded}&fields=regularMarketPrice,regularMarketDayHigh,regularMarketDayLow,regularMarketOpen,regularMarketPreviousClose,regularMarketTime`;
-      const resp = await fetch(url, {
-        headers: { "User-Agent": "Mozilla/5.0" },
-        signal: AbortSignal.timeout(8000),
-      });
-      if (!resp.ok) return null;
-      const json = await resp.json() as { quoteResponse: { result: Array<Record<string, number>> } };
-      const r = json?.quoteResponse?.result?.[0];
-      const price = r?.regularMarketPrice;
-      if (!price || price < minPrice || price > maxPrice) return null;
-      const prevClose = r.regularMarketPreviousClose || price;
-      const change = price - prevClose;
-      return {
-        symbol,
-        price,
-        change,
-        changePercent: prevClose > 0 ? (change / prevClose) * 100 : 0,
-        high: r.regularMarketDayHigh || price,
-        low: r.regularMarketDayLow || price,
-        open: r.regularMarketOpen || prevClose,
-        previousClose: prevClose,
-        timestamp: (r.regularMarketTime || 0) * 1000,
+  // 1. goldprice.org — free real-time spot price, used by thousands of widgets
+  //    Returns XAU and XAG vs USD in a single request. No API key, no =X encoding issues.
+  try {
+    const resp = await fetch("https://data-asg.goldprice.org/dbXRates/USD", {
+      headers: { "User-Agent": "Mozilla/5.0" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (resp.ok) {
+      const json = await resp.json() as {
+        items: Array<{
+          xauPrice: number; xagPrice: number;
+          changeGold: number; changeSilver: number;
+          percentChangeGold: number; percentChangeSilver: number;
+        }>;
       };
-    } catch {
-      return null;
+      const item  = json?.items?.[0];
+      const price = isGold ? item?.xauPrice : item?.xagPrice;
+      if (price && price >= minPrice && price <= maxPrice) {
+        const change        = isGold ? (item.changeGold ?? 0)        : (item.changeSilver ?? 0);
+        const changePercent = isGold ? (item.percentChangeGold ?? 0) : (item.percentChangeSilver ?? 0);
+        return {
+          symbol,
+          price,
+          change,
+          changePercent,
+          high: price,                   // goldprice.org doesn't expose intraday H/L
+          low:  price,
+          open: price - change,
+          previousClose: price - change,
+          timestamp: Date.now(),
+        };
+      }
     }
+  } catch {
+    // goldprice.org failed — fall through to Yahoo Finance futures
   }
 
-  // 1. Spot price via v7 quote endpoint — ticker in query string, no path encoding issue
-  const spotResult = await tryYahooQuote(spotTicker);
-  if (spotResult) return spotResult;
-
-  // 2. Futures fallback via same endpoint (contango premium, but better than LBMA)
-  const futuresResult = await tryYahooQuote(futuresTicker);
-  if (futuresResult) return futuresResult;
+  // 2. Yahoo Finance futures — CL=F works reliably from Cloudflare Edge
+  //    GC=F is ~$20-25 above spot but better than an LBMA snapshot
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${futuresTicker}?range=1d&interval=1m&includePrePost=false`;
+    const resp = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (resp.ok) {
+      const json = await resp.json() as { chart: { result: Array<{ meta: Record<string, number> }> } };
+      const meta  = json?.chart?.result?.[0]?.meta;
+      const price = meta?.regularMarketPrice;
+      if (price && price >= minPrice && price <= maxPrice) {
+        const prevClose = meta.chartPreviousClose || meta.previousClose || price;
+        const change    = price - prevClose;
+        return {
+          symbol,
+          price,
+          change,
+          changePercent: prevClose > 0 ? (change / prevClose) * 100 : 0,
+          high: meta.regularMarketDayHigh || price,
+          low:  meta.regularMarketDayLow  || price,
+          open: meta.regularMarketOpen    || prevClose,
+          previousClose: prevClose,
+          timestamp: (meta.regularMarketTime || 0) * 1000,
+        };
+      }
+    }
+  } catch {
+    // Yahoo Finance failed — fall through to EODHD
+  }
 
   // 2. EODHD fallback (may return LBMA benchmark price, but better than nothing)
   const data = await fetchEodhd(`real-time/${eodhdTicker}`);
