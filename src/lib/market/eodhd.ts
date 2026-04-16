@@ -160,50 +160,50 @@ async function getCLPrice(): Promise<MarketPrice> {
 
 // Real-time price for XAU/USD (Gold) and XAG/USD (Silver).
 // Strategy:
-//   1. goldprice.org API — free, real-time spot, no API key, no path-encoding issues
+//   1. Stooq XAUUSD / XAGUSD — free real-time spot, CSV, no API key, no =X issues
 //   2. Yahoo Finance GC=F / SI=F via v8/chart — COMEX futures (~$20-25 premium, known fallback)
 //   3. EODHD XAUUSD.FOREX / XAGUSD.FOREX — last resort (LBMA London Fix snapshot)
 async function getMetalPrice(symbol: "XAU/USD" | "XAG/USD"): Promise<MarketPrice> {
   const isGold      = symbol === "XAU/USD";
   const eodhdTicker = isGold ? "XAUUSD.FOREX" : "XAGUSD.FOREX";
   const futuresTicker = isGold ? "GC=F" : "SI=F";
+  const stooqTicker   = isGold ? "xauusd" : "xagusd";
   const [minPrice, maxPrice] = isGold ? [500, 15000] : [5, 500];
 
-  // 1. goldprice.org — free real-time spot price, used by thousands of widgets
-  //    Returns XAU and XAG vs USD in a single request. No API key, no =X encoding issues.
+  // 1. Stooq — real-time spot XAUUSD / XAGUSD, CSV, no API key, no =X encoding issues.
+  //    Response: "Symbol,Date,Time,Open,High,Low,Close,Volume\nXAUUSD,2026-04-16,20:14:56,4796.42,4838.32,4779.35,4789.84,"
   try {
-    const resp = await fetch("https://data-asg.goldprice.org/dbXRates/USD", {
+    const url = `https://stooq.com/q/l/?s=${stooqTicker}&f=sd2t2ohlcv&h&e=csv`;
+    const resp = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0" },
       signal: AbortSignal.timeout(8000),
     });
     if (resp.ok) {
-      const json = await resp.json() as {
-        items: Array<{
-          xauPrice: number; xagPrice: number;
-          changeGold: number; changeSilver: number;
-          percentChangeGold: number; percentChangeSilver: number;
-        }>;
-      };
-      const item  = json?.items?.[0];
-      const price = isGold ? item?.xauPrice : item?.xagPrice;
-      if (price && price >= minPrice && price <= maxPrice) {
-        const change        = isGold ? (item.changeGold ?? 0)        : (item.changeSilver ?? 0);
-        const changePercent = isGold ? (item.percentChangeGold ?? 0) : (item.percentChangeSilver ?? 0);
-        return {
-          symbol,
-          price,
-          change,
-          changePercent,
-          high: price,                   // goldprice.org doesn't expose intraday H/L
-          low:  price,
-          open: price - change,
-          previousClose: price - change,
-          timestamp: Date.now(),
-        };
+      const text = await resp.text();
+      const lines = text.trim().split("\n");
+      // lines[0] = header, lines[1] = data
+      if (lines.length >= 2) {
+        const [, , , open, high, low, close] = lines[1].split(",");
+        const price    = parseFloat(close);
+        const openVal  = parseFloat(open);
+        if (price && price >= minPrice && price <= maxPrice) {
+          const change = price - openVal;
+          return {
+            symbol,
+            price,
+            change,
+            changePercent: openVal > 0 ? (change / openVal) * 100 : 0,
+            high:  parseFloat(high)  || price,
+            low:   parseFloat(low)   || price,
+            open:  openVal           || price,
+            previousClose: openVal   || price,
+            timestamp: Date.now(),
+          };
+        }
       }
     }
   } catch {
-    // goldprice.org failed — fall through to Yahoo Finance futures
+    // Stooq failed — fall through to Yahoo Finance futures
   }
 
   // 2. Yahoo Finance futures — CL=F works reliably from Cloudflare Edge
