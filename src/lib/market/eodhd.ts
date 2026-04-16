@@ -172,43 +172,47 @@ async function getMetalPrice(symbol: "XAU/USD" | "XAG/USD"): Promise<MarketPrice
   // Sanity ranges: Gold $500–$15000, Silver $5–$500
   const [minPrice, maxPrice] = symbol === "XAU/USD" ? [500, 15000] : [5, 500];
 
-  // Helper: fetch a Yahoo Finance ticker and return the MarketPrice, or null on failure
-  async function tryYahoo(ticker: string): Promise<MarketPrice | null> {
+  // Helper: fetch via Yahoo Finance v7 quote endpoint.
+  // The ticker goes in the QUERY STRING (not the URL path) so Cloudflare Edge
+  // never touches it. encodeURIComponent("XAUUSD=X") → "XAUUSD%3DX" which
+  // Yahoo Finance correctly decodes back to the spot ticker.
+  async function tryYahooQuote(ticker: string): Promise<MarketPrice | null> {
     try {
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=1d&interval=1m&includePrePost=false`;
+      const encoded = encodeURIComponent(ticker);
+      const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encoded}&fields=regularMarketPrice,regularMarketDayHigh,regularMarketDayLow,regularMarketOpen,regularMarketPreviousClose,regularMarketTime`;
       const resp = await fetch(url, {
         headers: { "User-Agent": "Mozilla/5.0" },
         signal: AbortSignal.timeout(8000),
       });
       if (!resp.ok) return null;
-      const json = await resp.json() as { chart: { result: Array<{ meta: Record<string, number> }> } };
-      const meta = json?.chart?.result?.[0]?.meta;
-      const price = meta?.regularMarketPrice;
+      const json = await resp.json() as { quoteResponse: { result: Array<Record<string, number>> } };
+      const r = json?.quoteResponse?.result?.[0];
+      const price = r?.regularMarketPrice;
       if (!price || price < minPrice || price > maxPrice) return null;
-      const prevClose = meta.chartPreviousClose || meta.previousClose || price;
+      const prevClose = r.regularMarketPreviousClose || price;
       const change = price - prevClose;
       return {
         symbol,
         price,
         change,
         changePercent: prevClose > 0 ? (change / prevClose) * 100 : 0,
-        high: meta.regularMarketDayHigh || price,
-        low: meta.regularMarketDayLow || price,
-        open: meta.regularMarketOpen || prevClose,
+        high: r.regularMarketDayHigh || price,
+        low: r.regularMarketDayLow || price,
+        open: r.regularMarketOpen || prevClose,
         previousClose: prevClose,
-        timestamp: (meta.regularMarketTime || 0) * 1000,
+        timestamp: (r.regularMarketTime || 0) * 1000,
       };
     } catch {
       return null;
     }
   }
 
-  // 1. Spot price — matches TradingView OANDA:XAUUSD exactly
-  const spotResult = await tryYahoo(spotTicker);
+  // 1. Spot price via v7 quote endpoint — ticker in query string, no path encoding issue
+  const spotResult = await tryYahooQuote(spotTicker);
   if (spotResult) return spotResult;
 
-  // 2. Futures fallback (contango premium, but better than LBMA snapshot)
-  const futuresResult = await tryYahoo(futuresTicker);
+  // 2. Futures fallback via same endpoint (contango premium, but better than LBMA)
+  const futuresResult = await tryYahooQuote(futuresTicker);
   if (futuresResult) return futuresResult;
 
   // 2. EODHD fallback (may return LBMA benchmark price, but better than nothing)
